@@ -42,6 +42,7 @@ R.viajes = (function () {
     { id: 'guia', nombre: 'Guía', icono: '🧭' },
     { id: 'itinerario', nombre: 'Itinerario', icono: '🗓️' },
     { id: 'documentos', nombre: 'Documentos', icono: '📁' },
+    { id: 'valija', nombre: 'Valija', icono: '🧳' },
     { id: 'viajeros', nombre: 'Viajeros', icono: '👥' },
     { id: 'gastos', nombre: 'Gastos', icono: '💸' }
   ];
@@ -146,8 +147,8 @@ R.viajes = (function () {
       : [];
 
     const PASOS = editando
-      ? ['Destinos', 'Fechas', 'Estilo', 'Viajeros', 'Presupuesto']
-      : ['Destinos', 'Fechas', 'Estilo', 'Lo resuelto', 'Viajeros', 'Presupuesto'];
+      ? ['Destinos', 'Fechas', 'Estilo', 'Viajeros']
+      : ['Destinos', 'Fechas', 'Estilo', 'Lo resuelto', 'Viajeros'];
     let paso = 0;
     let camposLugar = { origen: null, destinos: [] };
 
@@ -300,20 +301,7 @@ R.viajes = (function () {
         <p class="ayuda">${b.viajeros.length ? '' : 'Si viajás solo/a, seguí de largo. '}Si alguien ya viajó con vos, al escribir su nombre te lo sugerimos para que quede en su historial.</p>`;
       }
 
-      // Presupuesto
-      return `
-        <h4 class="titulo-paso">¿Cuánto querés gastar?</h4>
-        <div class="grilla-2">
-          <label class="campo"><span>Presupuesto total (opcional)</span><input id="aPresupuesto" inputmode="decimal" value="${esc(b.presupuesto)}" placeholder="Ej: 1500000"></label>
-          <label class="campo"><span>Moneda principal del viaje</span><select id="aMoneda">${U.opcionesMoneda(b.monedaBase)}</select></label>
-        </div>
-        <div class="resumen-asistente" style="background:${U.portada((b.destinos.find(d => d.nombre && !d.soloDia) || {}).nombre || 'viaje')}">
-          <div>
-            <small>${esc((TIPOS.find(t => t.id === b.tipo) || TIPOS[0]).nombre)} · ${esc((R.guia.TRANSPORTE[b.perfil.transporte] || {}).nombre || '')}${internacional() ? ' · Internacional' : ''}</small>
-            <h3>${esc(b.nombre || b.destinos.filter(d => d.nombre && !d.soloDia).map(d => d.nombre).join(' → ') || 'Tu viaje')}</h3>
-            <p>${esc(b.sinFechas ? 'Fechas a definir' : U.fmtRango(b.fechaInicio, b.fechaFin))} · ${U.plural(b.viajeros.length + 1, 'viajero', 'viajeros')}</p>
-          </div>
-        </div>`;
+      return '';
     }
 
     function leerPaso() {
@@ -340,7 +328,6 @@ R.viajes = (function () {
         const inc = cont.querySelectorAll('[data-incluye]');
         if (inc.length) b.paqueteIncluye = Array.from(inc).filter(x => x.checked).map(x => x.dataset.incluye);
       }
-      if (n === 'Presupuesto') { b.presupuesto = v('aPresupuesto'); b.monedaBase = v('aMoneda') || 'ARS'; }
     }
 
     function validar() {
@@ -465,7 +452,6 @@ R.viajes = (function () {
     }
 
     function finalizar() {
-      R.db.guardarPrefs({ monedaBase: b.monedaBase });
       const datos = datosDelViaje();
 
       if (editando) {
@@ -484,7 +470,6 @@ R.viajes = (function () {
         // Guardar el asistente confirma las bases que habían quedado "a revisar"
         if (R.motor.estado(v, 'd_destino') === 'revisar') R.motor.setEstado(v, 'd_destino', 'hecha');
         if (R.motor.estado(v, 'd_participantes') === 'revisar') R.motor.setEstado(v, 'd_participantes', 'hecha');
-        if (R.motor.estado(v, 'd_presupuesto') === 'revisar') R.motor.setEstado(v, 'd_presupuesto', 'hecha');
         if (R.motor.estado(v, 'd_fechas') === 'revisar' && v.fechaInicio && v.fechaFin) R.motor.setEstado(v, 'd_fechas', 'hecha');
         R.db.guardarViaje(v);
         U.cerrarModal();
@@ -526,7 +511,6 @@ R.viajes = (function () {
       marcar('d_destino');
       marcar('d_participantes');
       if (v.fechaInicio && v.fechaFin) marcar('d_fechas');
-      if (v.presupuesto > 0) marcar('d_presupuesto');
 
       if (b.resuelto.paquete) {
         v.perfil.paquete = { incluye: b.paqueteIncluye.slice() };
@@ -617,12 +601,18 @@ R.viajes = (function () {
       U.toast('Viaje eliminado.');
     };
 
+    // En el celular, la pestaña activa queda siempre a la vista
+    const barraPestanas = app.querySelector('.pestanas');
+    const activa = app.querySelector('.pestana.activa');
+    if (barraPestanas && activa) barraPestanas.scrollLeft = activa.offsetLeft - (barraPestanas.clientWidth - activa.offsetWidth) / 2;
+
     const cont = app.querySelector('#contPestana');
     if (pestana === 'guia') R.vistaGuia.render(v, cont);
     else if (pestana === 'itinerario') R.itinerario.render(v, cont);
     else if (pestana === 'documentos') R.documentos.render(v, cont);
     else if (pestana === 'viajeros') R.participantes.renderViajeros(v, cont);
     else if (pestana === 'gastos') R.gastos.render(v, cont);
+    else if (pestana === 'valija') R.valija.render(v, cont);
   }
 
   /* ---------------------------------------------------------

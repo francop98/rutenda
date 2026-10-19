@@ -24,6 +24,7 @@ R.formularios = (function () {
 
   const destinosAloj = v => (v.destinos || []).filter(d => !d.soloDia);
   const unir = (...partes) => partes.filter(Boolean).join(' · ');
+  const conAero = (ciudad, codigo) => `${ciudad || '¿?'}${codigo ? ` (${codigo})` : ''}`;
   const fh = (f, h) => unir(f ? U.fmtFecha(f, 'corto') : '', h || '');
 
   /* ---------------------------------------------------------
@@ -32,8 +33,10 @@ R.formularios = (function () {
   function camposTramo(modo) {
     const m = MODOS[modo] || MODOS.avion;
     return [
-      { id: 'desde', tipo: 'texto', etiqueta: 'Desde', ancho: 'medio' },
-      { id: 'hasta', tipo: 'texto', etiqueta: 'Hasta', ancho: 'medio' },
+      { id: 'desde', tipo: 'texto', etiqueta: 'Desde', ancho: 'medio', rerender: modo === 'avion' },
+      { id: 'hasta', tipo: 'texto', etiqueta: 'Hasta', ancho: 'medio', rerender: modo === 'avion' },
+      { id: 'desdeAeropuerto', tipo: 'aeropuerto', etiqueta: 'Aeropuerto de salida', ciudadDe: 'desde', ancho: 'medio', si: () => modo === 'avion' },
+      { id: 'hastaAeropuerto', tipo: 'aeropuerto', etiqueta: 'Aeropuerto de llegada', ciudadDe: 'hasta', ancho: 'medio', si: () => modo === 'avion' },
       { id: 'empresa', tipo: 'texto', etiqueta: m.empresa, ancho: 'medio' },
       { id: 'numero', tipo: 'texto', etiqueta: m.numero, ancho: 'medio' },
       { id: 'fechaSalida', tipo: 'fecha', etiqueta: 'Fecha de salida', ancho: 'medio' },
@@ -82,11 +85,11 @@ R.formularios = (function () {
     concepto: (v, d, ctx) => ctx && ctx.hasta ? `Traslado ${ctx.desde.nombre} → ${ctx.hasta.nombre}` : (MODOS[v.perfil.transporte] || MODOS.avion).concepto,
     itinerario: (v, d, ctx) => (d.tramos || []).filter(t => t.fechaSalida).map(t => ({
       fecha: t.fechaSalida, hora: t.horaSalida || '', tipo: 'vuelo',
-      titulo: `${t.desde || '¿?'} → ${t.hasta || '¿?'}`,
+      titulo: `${conAero(t.desde, t.desdeAeropuerto)} → ${conAero(t.hasta, t.hastaAeropuerto)}`,
       lugar: t.desde || '', confirmacion: d.codigo || '',
       notas: unir(unir(t.empresa, t.numero), t.horaLlegada ? `Llega ${t.fechaLlegada && t.fechaLlegada !== t.fechaSalida ? U.fmtFecha(t.fechaLlegada, 'corto') + ' ' : ''}${t.horaLlegada}` : '', t.escalas === 'Con escalas' ? `Escala: ${t.escalaEn || 'sí'}` : 'Directo')
     })),
-    resumen: (d) => (d.tramos || []).map(t => unir(t.sentido, `${t.desde || '¿?'} → ${t.hasta || '¿?'}`, unir(t.empresa, t.numero), fh(t.fechaSalida, t.horaSalida), t.escalas === 'Con escalas' ? 'con escala' + (t.escalaEn ? ' en ' + t.escalaEn : '') : 'directo'))
+    resumen: (d) => (d.tramos || []).map(t => unir(t.sentido, `${conAero(t.desde, t.desdeAeropuerto)} → ${conAero(t.hasta, t.hastaAeropuerto)}`, unir(t.empresa, t.numero), fh(t.fechaSalida, t.horaSalida), t.escalas === 'Con escalas' ? 'con escala' + (t.escalaEn ? ' en ' + t.escalaEn : '') : 'directo'))
       .concat(d.codigo ? [`Código: ${d.codigo}`] : []).concat(d.equipaje && d.equipaje !== 'Sin definir' ? [`Equipaje: ${d.equipaje}`] : [])
   };
 
@@ -241,20 +244,6 @@ R.formularios = (function () {
       resumen: d => [unir(d.tipo, d.proveedor, d.plan), d.activar && `Activar el ${U.fmtFecha(d.activar, 'corto')}`].filter(Boolean)
     },
 
-    doc_pasaporte: {
-      pasos: v => [{ titulo: 'Vencimientos', intro: 'Anotá cuándo vence el documento de viaje de cada uno. No hace falta cargar el número.', campos:
-        v.participantes.map(pid => ({ id: 'vence_' + pid, tipo: 'fecha', etiqueta: `Vence el de ${(R.db.persona(pid) || {}).nombre || 'viajero'}`, ancho: 'medio' }))
-          .concat([{ id: 'notas', tipo: 'textarea', etiqueta: 'Notas' }]) }],
-      archivos: { categoria: 'identidad', ayuda: 'Una foto o copia del documento (queda solo en tu dispositivo).' },
-      resumen: (d, v) => v.participantes.filter(pid => d['vence_' + pid]).map(pid => `${(R.db.persona(pid) || {}).nombre}: vence el ${U.fmtFecha(d['vence_' + pid])}`),
-      alGuardar: (v, d) => {
-        if (!v.fechaFin) return;
-        const limite = U.sumarDias(v.fechaFin, 180);
-        const justos = v.participantes.filter(pid => d['vence_' + pid] && d['vence_' + pid] < limite);
-        if (justos.length) setTimeout(() => U.toast(`Ojo: el documento de ${justos.map(pid => R.db.persona(pid).nombre).join(', ')} vence menos de 6 meses después de volver.`), 1600);
-      }
-    },
-
     doc_visa: {
       pasos: () => [{ titulo: 'El trámite', campos: [
         { id: 'estadoVisa', tipo: 'segmentado', etiqueta: '¿Cómo está?', opciones: ['No hace falta', 'En trámite', 'Aprobada'] },
@@ -269,16 +258,6 @@ R.formularios = (function () {
       concepto: () => 'Visa / permiso de ingreso',
       resumen: d => [d.estadoVisa, unir(d.tipo, d.tramite), d.turno && `Turno: ${U.fmtFecha(d.turno)}`, d.vence && `Vence: ${U.fmtFecha(d.vence)}`].filter(Boolean),
       alGuardar: (v, d, ctx, id) => { if (d.estadoVisa === 'No hace falta') v.tareas[id].estado = 'no_aplica'; if (d.estadoVisa === 'En trámite') v.tareas[id].estado = 'en_curso'; }
-    },
-
-    p_vacunas: {
-      pasos: () => [{ titulo: 'Vacunas', campos: [
-        { id: 'vacunas', tipo: 'texto', etiqueta: 'Vacunas aplicadas o pendientes' },
-        { id: 'fecha', tipo: 'fecha', etiqueta: 'Fecha de aplicación', ancho: 'medio' },
-        { id: 'notas', tipo: 'textarea', etiqueta: 'Notas' }
-      ] }],
-      archivos: { categoria: 'salud', ayuda: 'Certificados de vacunación.' },
-      resumen: d => [d.vacunas, d.fecha && U.fmtFecha(d.fecha)].filter(Boolean)
     },
 
     s_mascotas: {
@@ -327,12 +306,6 @@ R.formularios = (function () {
       concepto: (v, d) => d.detalle || 'Momento especial',
       itinerario: (v, d) => d.fecha ? [{ fecha: d.fecha, hora: d.hora || '', tipo: 'actividad', titulo: d.detalle || 'Momento especial', lugar: d.lugar || '' }] : [],
       resumen: d => [d.detalle, fh(d.fecha, d.hora), d.lugar].filter(Boolean)
-    },
-
-    s_checkin: {
-      pasos: () => [],
-      archivos: { categoria: 'pasaje', ayuda: 'Las tarjetas de embarque de cada viajero.' },
-      resumen: () => []
     },
 
     doc_copias: {
@@ -412,7 +385,7 @@ R.formularios = (function () {
           `<option value="${esc(o.v)}" ${o.v === v ? 'selected' : ''}>${esc(o.t)}</option>`).join('')}</select>${ayuda}</label>`;
       default: {
         const tipo = { fecha: 'date', hora: 'time', numero: 'text' }[c.tipo] || 'text';
-        return `<label class="campo ${ancho}"><span>${esc(c.etiqueta)}</span><input type="${tipo}" ${attrs} ${c.tipo === 'numero' ? 'inputmode="decimal"' : ''} value="${esc(v)}" placeholder="${esc(c.placeholder || '')}">${ayuda}</label>`;
+        return `<label class="campo ${ancho}"><span>${esc(c.etiqueta)}</span><input type="${tipo}" ${attrs} ${c.rerender ? 'data-rerender="1"' : ''} ${c.tipo === 'numero' ? 'inputmode="decimal"' : ''} value="${esc(v)}" placeholder="${esc(c.placeholder || '')}">${ayuda}</label>`;
       }
     }
   }
@@ -485,9 +458,24 @@ R.formularios = (function () {
           <div class="form-item">
             <div class="form-item-cab"><strong>${esc(c.etiquetaItem ? c.etiquetaItem(it, i) : 'Ítem ' + (i + 1))}</strong>
               <button type="button" class="btn-icono" data-quitar="${c.id}" data-i="${i}" title="Quitar">×</button></div>
-            <div class="form-grilla">${c.subcampos.filter(s => !s.si || s.si(datos, it)).map(s => campoHTML(s, it[s.id], it, { lista: c.id, i })).join('')}</div>
+            <div class="form-grilla">${c.subcampos.filter(s => !s.si || s.si(datos, it)).map(s => s.tipo === 'aeropuerto' ? aeropuertoHTML(s, it, { lista: c.id, i }) : campoHTML(s, it[s.id], it, { lista: c.id, i })).join('')}</div>
           </div>`).join('')}
         <button type="button" class="btn btn-suave btn-chico" data-agregar="${c.id}">${esc(c.textoAgregar || '+ Agregar')}</button>
+      </div>`;
+    }
+
+    /** Elegir aeropuerto: sugerencias según la ciudad del tramo + código manual. */
+    function aeropuertoHTML(c, item, clave) {
+      const sug = R.aeropuertos.sugerencias(v, item[c.ciudadDe]);
+      if (!item[c.id] && sug.length === 1) item[c.id] = sug[0].iata;
+      const val = item[c.id] || '';
+      const elegido = val && !sug.some(a => a.iata === val) ? R.aeropuertos.porCodigo(val) : null;
+      const chip = a => `<button type="button" class="chip-aero ${a.iata === val ? 'activo' : ''}" data-aero="${a.iata}" title="${esc(a.nombre)}"><strong>${a.iata}</strong><small>${esc(a.nombre.replace(/ (International )?Airport.*$/i, '').slice(0, 28))}</small></button>`;
+      return `<div class="campo ${c.ancho === 'medio' ? 'medio' : 'completo'} campo-aero">
+        <span>${esc(c.etiqueta)}</span>
+        <input type="hidden" data-campo="${c.id}" data-lista="${clave.lista}" data-item="${clave.i}" value="${esc(val)}">
+        <div class="aero-chips">${sug.map(chip).join('')}${elegido ? chip(elegido) : ''}</div>
+        <input type="text" class="aero-manual" maxlength="3" placeholder="${sug.length ? 'Otro: código (ej. COR)' : 'Código del aeropuerto (ej. EZE)'}" data-aero-manual="${clave.lista}|${clave.i}|${c.id}">
       </div>`;
     }
 
@@ -566,10 +554,13 @@ R.formularios = (function () {
       cont.querySelector('[data-a="sinDatos"]').onclick = () => {
         if (previo.datos) { U.cerrarModal(); return; }
         R.motor.setEstado(v, tareaId, 'hecha');
+        const deducidasSin = R.motor.deducidasRecientes();
         R.db.guardarViaje(v);
         U.cerrarModal();
         R.app.refrescar();
-        U.toast('Listo. Podés cargar los datos cuando quieras desde "Completá los datos".');
+        U.toast(deducidasSin.length
+          ? `Listo. También di por resuelto: ${deducidasSin.map(x => x.titulo).slice(0, 3).join(', ')}.`
+          : 'Listo. Podés cargar los datos cuando quieras desde "Completá los datos".');
       };
       cont.querySelectorAll('[data-seg] [data-opcion]').forEach(b => b.onclick = () => {
         const caja = b.closest('.campo');
@@ -590,6 +581,23 @@ R.formularios = (function () {
         datos[b.dataset.quitar].splice(Number(b.dataset.i), 1);
         pintar();
       });
+      cont.querySelectorAll('[data-aero]').forEach(b => b.onclick = () => {
+        const caja = b.closest('.campo-aero');
+        const hidden = caja.querySelector('input[type="hidden"]');
+        hidden.value = hidden.value === b.dataset.aero ? '' : b.dataset.aero;
+        leer();
+        pintar();
+      });
+      cont.querySelectorAll('[data-aero-manual]').forEach(x => x.oninput = () => {
+        const codigo = x.value.trim().toUpperCase();
+        if (codigo.length !== 3) return;
+        const a = R.aeropuertos.porCodigo(codigo);
+        if (!a) { U.toast(`No encuentro el aeropuerto ${codigo}.`); return; }
+        x.closest('.campo-aero').querySelector('input[type="hidden"]').value = a.iata;
+        leer();
+        pintar();
+      });
+      cont.querySelectorAll('[data-rerender]').forEach(x => x.onchange = () => { leer(); pintar(); });
       const archivo = cont.querySelector('#fpArchivos');
       if (archivo) archivo.onchange = () => { archivosNuevos = archivosNuevos.concat(Array.from(archivo.files)); pintar(); };
     }
@@ -601,6 +609,7 @@ R.formularios = (function () {
       try {
         const estabaHecha = R.motor.estado(v, tareaId) === 'hecha';
         const destrabadas = estabaHecha ? [] : R.motor.setEstado(v, tareaId, 'hecha');
+        const deducidas = estabaHecha ? [] : R.motor.deducidasRecientes();
         const { costo } = datos;
         const datosPaso = Object.assign({}, datos);
         delete datosPaso.costo;
@@ -641,7 +650,8 @@ R.formularios = (function () {
         if (gastoCargado) partes.push('gastos');
         if (archivosNuevos.length) partes.push('documentos');
         U.toast(partes.length ? `¡Guardado! Ya está en ${partes.join(', ').replace(/, ([^,]*)$/, ' y $1')}.` : '¡Guardado!');
-        if (destrabadas.length) setTimeout(() => U.toast(`Se destrabó: ${destrabadas.map(x => x.titulo).slice(0, 2).join(', ')}`), 2600);
+        if (deducidas.length) setTimeout(() => U.toast(`También di por resuelto: ${deducidas.map(x => x.titulo).slice(0, 3).join(', ')}.`), 2600);
+        else if (destrabadas.length) setTimeout(() => U.toast(`Se destrabó: ${destrabadas.map(x => x.titulo).slice(0, 2).join(', ')}`), 2600);
         if (op.alTerminar) op.alTerminar();
       } catch (e) {
         console.error(e);

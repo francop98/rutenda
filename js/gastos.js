@@ -138,11 +138,11 @@ R.gastos = (function () {
           ${t.ingresado ? `<span class="texto-suave">${U.fmtMoneda(t.gastado, v.monedaBase)} gastado − ${U.fmtMoneda(t.ingresado, v.monedaBase)} de reintegros</span>` : ''}
         </div>
         <div class="tarjeta-dato">
-          <small>Presupuesto</small>
+          <small class="dato-cab">Presupuesto <button class="btn-texto-mini" data-a="presupuesto">${pres ? 'Editar' : 'Definir'}</button></small>
           ${pres ? `<strong>${pctPres}% usado</strong>
             <div class="barra-progreso ${pctPres > 100 ? 'excedido' : ''}"><span style="width:${Math.min(100, pctPres)}%"></span></div>
             <span class="texto-suave">${pctPres > 100 ? 'Te pasaste por ' + U.fmtMoneda(t.neto - pres, v.monedaBase) : 'Quedan ' + U.fmtMoneda(pres - t.neto, v.monedaBase)}</span>`
-            : `<strong>Sin definir</strong><span class="texto-suave">Podés cargarlo en "Editar viaje".</span>`}
+            : `<strong>Opcional</strong><span class="texto-suave">Si querés, poné un tope y te aviso cuánto queda.</span>`}
         </div>
         <div class="tarjeta-dato">
           <small>Por persona</small>
@@ -197,11 +197,38 @@ R.gastos = (function () {
       </div>`;
 
     cont.querySelector('[data-a="gasto"]').onclick = () => editar(v, null, 'gasto');
+    cont.querySelector('[data-a="presupuesto"]').onclick = () => editarPresupuesto(v);
     cont.querySelector('[data-a="ingreso"]').onclick = () => editar(v, null, 'ingreso');
     cont.querySelectorAll('[data-mov]').forEach(b => b.onclick = () => editar(v, b.dataset.mov));
     cont.querySelectorAll('[data-saldar]').forEach(b => b.onclick = () => {
       const x = tr[Number(b.dataset.saldar)];
       registrarPago(v, x);
+    });
+  }
+
+  /** Presupuesto (opcional) y moneda principal del viaje. */
+  function editarPresupuesto(v) {
+    const conMovs = v.movimientos.length > 0;
+    U.modal({
+      titulo: 'Presupuesto y moneda',
+      subtitulo: 'Es opcional: sirve para ver cuánto te queda.',
+      cuerpo: `
+        <div class="grilla-2">
+          <label class="campo"><span>Presupuesto total</span><input id="gPres" inputmode="decimal" value="${esc(v.presupuesto || '')}" placeholder="Sin tope"></label>
+          <label class="campo"><span>Moneda principal</span><select id="gMoneda" ${conMovs ? 'disabled' : ''}>${U.opcionesMoneda(v.monedaBase)}</select></label>
+        </div>
+        ${conMovs ? '<p class="ayuda">La moneda principal no se puede cambiar cuando ya hay gastos cargados.</p>' : ''}`,
+      acciones: [
+        { texto: 'Cancelar' },
+        {
+          texto: 'Guardar', clase: 'btn-primario', onClick: el => {
+            v.presupuesto = U.numero(el.querySelector('#gPres').value) || 0;
+            if (!conMovs) { v.monedaBase = el.querySelector('#gMoneda').value; R.db.guardarPrefs({ monedaBase: v.monedaBase }); }
+            R.db.guardarViaje(v);
+            R.app.refrescar();
+          }
+        }
+      ]
     });
   }
 

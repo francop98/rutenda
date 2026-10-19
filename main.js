@@ -30,6 +30,9 @@
       if (!v) { location.hash = '#inicio'; return; }
       document.title = `${v.nombre || v.destino} · Tripbox`;
       R.viajes.renderViaje(app, v, pestana || 'guia');
+    } else if (vista === 'valijas') {
+      document.title = 'Mis listas de valija · Tripbox';
+      R.valija.renderMisListas(app);
     } else if (vista === 'personas') {
       document.title = 'Compañeros · Tripbox';
       R.participantes.renderPersonas(app);
@@ -63,7 +66,39 @@
     window.scrollTo(0, 0);
   }
 
-  window.R.app = { render, refrescar, pintarUsuario };
+  /* ---------- App instalable ---------- */
+  let eventoInstalar = null;
+  const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const esInstalada = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    eventoInstalar = e;
+    if ((location.hash || '#inicio').startsWith('#inicio')) refrescar();
+  });
+  window.addEventListener('appinstalled', () => { eventoInstalar = null; U.toast('¡Tripbox quedó instalada! 🎉'); refrescar(); });
+  function puedeInstalar() { return !esInstalada() && (!!eventoInstalar || esIOS); }
+  async function instalar() {
+    if (eventoInstalar) {
+      eventoInstalar.prompt();
+      await eventoInstalar.userChoice;
+      eventoInstalar = null;
+      refrescar();
+    } else if (esIOS) {
+      U.modal({
+        titulo: 'Instalar Tripbox',
+        cuerpo: '<ol class="pasos-instalar"><li>Tocá el botón <strong>Compartir</strong> de Safari (el cuadrado con la flecha).</li><li>Elegí <strong>Agregar a inicio</strong>.</li><li>Listo: Tripbox se abre como una app, a pantalla completa.</li></ol>',
+        acciones: [{ texto: 'Entendido', clase: 'btn-primario' }]
+      });
+    } else {
+      U.toast('Abrí el menú del navegador y elegí "Instalar app" o "Agregar a pantalla de inicio".');
+    }
+  }
+  if (esInstalada()) document.body.classList.add('instalada');
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+
+  window.R.app = { render, refrescar, pintarUsuario, puedeInstalar, instalar };
 
   /* ---------------------------------------------------------
      Pantalla de inicio
@@ -89,6 +124,14 @@
         </div>
       </section>
 
+      ${puedeInstalar() && !leerOculto('instalar') ? `
+        <div class="aviso-instalar">
+          <span class="ai-icono"></span>
+          <div><strong>Instalá Tripbox en tu celular</strong><small>Se abre como una app, a pantalla completa y sin conexión.</small></div>
+          <button class="btn btn-primario btn-chico" data-a="instalar">Instalar</button>
+          <button class="btn-icono" data-a="ocultarInstalar" aria-label="Ahora no">×</button>
+        </div>` : ''}
+
       ${destacado ? destacadoHTML(destacado) : ''}
 
       ${!viajes.length ? comoFunciona() : ''}
@@ -106,6 +149,10 @@
       </footer>`;
 
     app.querySelectorAll('[data-a="nuevo"]').forEach(b => b.onclick = () => R.viajes.abrirAsistente());
+    const bInst = app.querySelector('[data-a="instalar"]');
+    if (bInst) bInst.onclick = instalar;
+    const bOcultar = app.querySelector('[data-a="ocultarInstalar"]');
+    if (bOcultar) bOcultar.onclick = () => { try { localStorage.setItem('tripbox_oculto_instalar', '1'); } catch (e) { /* sin almacenamiento */ } refrescar(); };
     const sig = app.querySelector('[data-siguiente]');
     if (sig) sig.onclick = e => {
       e.preventDefault();
@@ -116,6 +163,8 @@
     app.querySelector('[data-a="exportar"]').onclick = exportar;
     app.querySelector('#importar').onchange = importar;
   }
+
+  function leerOculto(clave) { try { return localStorage.getItem('tripbox_oculto_' + clave) === '1'; } catch (e) { return false; } }
 
   function destacadoHTML(v) {
     const prog = R.motor.progreso(v);
@@ -204,6 +253,8 @@
   pintarUsuario();
   document.getElementById('btnNuevoViajeBarra').onclick = () => R.viajes.abrirAsistente();
   document.getElementById('btnUsuario').onclick = () => R.auth.abrirMiCuenta();
+  document.getElementById('btnNuevoViajeNav').onclick = () => R.viajes.abrirAsistente();
+  document.getElementById('btnCuentaNav').onclick = () => R.auth.abrirMiCuenta();
   window.addEventListener('hashchange', () => {
     const ruta = location.hash.split('/').slice(0, 2).join('/');
     const cambioDeVista = ruta !== rutaAnterior;

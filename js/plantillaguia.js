@@ -40,6 +40,8 @@ R.guia = (function () {
   ];
 
   const esInter = v => !!v.perfil.internacional;
+  const req = v => R.requisitos.analizar(v);
+  const paisesCon = (v, niveles) => req(v).porPais.filter(p => niveles.includes(p.nivel)).map(p => p.pais).join(', ');
   const usa = medio => v => v.perfil.transporte === medio;
 
   const tareas = [
@@ -59,13 +61,6 @@ R.guia = (function () {
       impacto: 4, anticipacion: 80, dependeDe: ['d_destino']
     },
     {
-      id: 'd_presupuesto', fase: 'definir', titulo: 'Definir el presupuesto total',
-      desc: 'Poné un número total (o por persona) para saber qué opciones de transporte y alojamiento entran.',
-      consejo: 'Una regla práctica: separá transporte, alojamiento, comidas, actividades y un 10% de imprevistos.',
-      porque: 'Filtra qué opciones de transporte y alojamiento conviene mirar.',
-      impacto: 4, anticipacion: 80, dependeDe: ['d_destino']
-    },
-    {
       id: 'd_fechas', fase: 'definir', titulo: 'Cerrar fechas firmes',
       desc: 'Pasá de fechas tentativas a fechas confirmadas: día de salida y de regreso.',
       consejo: 'Revisá feriados, vacaciones laborales y temporada alta del destino: mover un día puede cambiar mucho el precio.',
@@ -75,25 +70,41 @@ R.guia = (function () {
 
     /* ---------- Documentación ---------- */
     {
-      id: 'doc_pasaporte', fase: 'documentos', titulo: 'Revisar pasaporte o documento de viaje',
-      desc: 'Confirmá que el pasaporte (o el DNI, según el destino) esté vigente para todas las fechas del viaje.',
-      consejo: 'Muchos países piden que el pasaporte venza al menos 6 meses después de tu regreso. Si hay que renovarlo, el trámite puede tardar semanas.',
-      porque: 'Si hay que renovarlo, es lo que más tarda y frena todo.',
-      impacto: 5, anticipacion: 90, dependeDe: [], aplica: esInter, docCategoria: 'identidad'
+      id: 'doc_pasaporte', fase: 'documentos',
+      titulo: 'Revisar el pasaporte de todos',
+      desc: v => req(v).necesitaPasaporte
+        ? `Para ${paisesCon(v, ['pasaporte', 'autorizacion', 'visa'])} se necesita pasaporte. Confirmá que esté vigente para todo el viaje (y unos meses más).`
+        : `Para ${paisesCon(v, ['dni']) || 'este viaje'} alcanza con el DNI argentino vigente (tarjeta). Revisá que no esté vencido, también el de los menores.`,
+      consejo: v => req(v).necesitaPasaporte
+        ? 'Si hay que sacarlo o renovarlo, el trámite puede tardar semanas: es lo primero.'
+        : 'El DNI tiene que ser la tarjeta vigente; la constancia de trámite en general no sirve para cruzar.',
+      porque: v => req(v).necesitaPasaporte ? 'Si hay que renovarlo, es lo que más tarda y frena todo.' : 'Es rápido, pero sin documento vigente no se cruza.',
+      impacto: v => req(v).necesitaPasaporte ? 5 : 3, anticipacion: v => req(v).necesitaPasaporte ? 90 : 7,
+      dependeDe: [], aplica: v => req(v).necesitaPasaporte, docCategoria: 'identidad'
     },
     {
-      id: 'doc_requisitos', fase: 'documentos', titulo: 'Verificar requisitos de entrada y visa',
-      desc: 'Revisá qué pide el destino para entrar: visa, permiso electrónico, comprobante de alojamiento, pasaje de vuelta, seguro obligatorio, etc.',
-      consejo: 'Consultá siempre la fuente oficial (embajada o consulado del destino): los requisitos cambian.',
+      id: 'doc_dni', rec: true, fase: 'documentos', titulo: 'Revisar que el DNI de todos esté vigente',
+      desc: v => req(v).internacional ? `Para ${paisesCon(v, ['dni'])} alcanza con el DNI argentino vigente (la tarjeta). No hace falta pasaporte.` : 'Lo vas a necesitar para viajar y para registrarte en el alojamiento.',
+      consejo: 'La constancia de DNI en trámite en general no sirve para cruzar fronteras. Revisá también el de los menores.',
+      porque: 'Sin documento vigente no se viaja.',
+      impacto: 3, anticipacion: 10, dependeDe: [], aplica: v => !req(v).necesitaPasaporte, docCategoria: 'identidad'
+    },
+    {
+      id: 'doc_requisitos', fase: 'documentos',
+      titulo: v => `Verificar requisitos de entrada a ${req(v).aVerificar.map(p => p.pais).join(', ')}`,
+      desc: 'Tripbox no tiene los requisitos confirmados para este destino: revisalos en la fuente oficial.',
+      consejo: 'Consultá siempre la Cancillería o el consulado del destino.',
       porque: 'Un requisito no cumplido puede dejarte sin embarcar.',
-      impacto: 5, anticipacion: 75, dependeDe: ['d_destino'], aplica: esInter
+      impacto: 5, anticipacion: 75, dependeDe: ['d_destino'], aplica: v => req(v).aVerificar.length > 0
     },
     {
-      id: 'doc_visa', fase: 'documentos', titulo: 'Tramitar visa o permiso de ingreso',
-      desc: 'Si el destino lo pide, iniciá el trámite. Si no hace falta, marcá este paso como "No aplica".',
-      consejo: 'Algunos trámites piden turno con mucha anticipación. Guardá el comprobante en Documentos.',
-      porque: 'Los turnos y aprobaciones no dependen de vos: hay que empezar temprano.',
-      impacto: 5, anticipacion: 60, dependeDe: ['doc_requisitos', 'doc_pasaporte'], aplica: esInter, docCategoria: 'identidad'
+      id: 'doc_visa', fase: 'documentos',
+      titulo: v => `Tramitar ${req(v).tramites.map(p => p.tramite || 'la visa de ' + p.pais).join(' y ')}`,
+      desc: v => req(v).tramites.map(p => `${p.pais}: ${p.nota}`).join(' '),
+      consejo: 'Hacelo apenas tengas el pasaporte al día. Guardá el comprobante en Documentos.',
+      porque: v => req(v).tramites.some(p => p.nivel === 'visa') ? 'Los turnos y aprobaciones no dependen de vos: hay que empezar temprano.' : 'Es un trámite online, pero sin la autorización no te dejan embarcar.',
+      impacto: 5, anticipacion: v => req(v).tramites.some(p => p.nivel === 'visa') ? 75 : 21,
+      dependeDe: ['doc_pasaporte'], aplica: v => req(v).tramites.length > 0, docCategoria: 'identidad'
     },
     {
       id: 'doc_menores', fase: 'documentos', titulo: 'Autorización de viaje para menores',
@@ -104,13 +115,13 @@ R.guia = (function () {
     },
     {
       id: 'doc_licencia', fase: 'documentos', titulo: 'Licencia de conducir válida en destino',
-      desc: 'Si vas a manejar en el exterior, revisá si tu licencia sirve o si necesitás un permiso internacional.',
+      desc: 'En países del Mercosur la licencia argentina sirve; fuera de la región, revisá si necesitás el permiso internacional.',
       consejo: 'Llevá siempre la licencia original junto con el permiso internacional.',
       porque: 'Sin la licencia correcta no te entregan el auto alquilado.',
-      impacto: 3, anticipacion: 30, dependeDe: [], aplica: v => esInter(v) && !!v.perfil.alquilaAuto, docCategoria: 'identidad'
+      impacto: 3, anticipacion: 30, dependeDe: [], aplica: v => req(v).necesitaPasaporte && !!v.perfil.alquilaAuto, docCategoria: 'identidad'
     },
     {
-      id: 'doc_copias', fase: 'documentos', titulo: 'Guardar copias digitales de los documentos',
+      id: 'doc_copias', rec: true, fase: 'documentos', titulo: 'Guardar copias digitales de los documentos',
       desc: 'Subí a Documentos fotos o PDFs de pasaporte, DNI, pasajes y reservas.',
       consejo: 'Si perdés algo durante el viaje, tener la copia a mano acelera cualquier trámite.',
       porque: 'Es rápido y te salva ante cualquier pérdida.',
@@ -154,14 +165,14 @@ R.guia = (function () {
       impacto: 4, anticipacion: 21, dependeDe: ['d_fechas'], aplica: usa('auto')
     },
     {
-      id: 't_auto_revision', fase: 'transporte', titulo: 'Poner el auto a punto',
+      id: 't_auto_revision', rec: true, fase: 'transporte', titulo: 'Poner el auto a punto',
       desc: 'Service, neumáticos (y auxilio), documentación del auto y seguro al día.',
       consejo: 'Si cruzás a otro país, revisá qué documentación extra del vehículo te piden.',
       porque: 'Un turno de taller puede demorar; mejor no dejarlo para último momento.',
       impacto: 3, anticipacion: 14, dependeDe: [], aplica: usa('auto')
     },
     {
-      id: 't_asientos', fase: 'transporte', titulo: 'Elegir asientos y revisar equipaje',
+      id: 't_asientos', rec: true, fase: 'transporte', titulo: 'Elegir asientos y revisar equipaje',
       desc: 'Seleccioná asientos y confirmá cuánto equipaje incluye tu tarifa (y si conviene sumar valija).',
       consejo: 'Sumar equipaje al reservar suele ser más barato que pagarlo en el aeropuerto.',
       porque: 'Detalle importante pero que se puede resolver más cerca de la fecha.',
@@ -178,7 +189,7 @@ R.guia = (function () {
       impacto: 4, anticipacion: 45, dependeDe: ['d_fechas'], despuesDe: ['t_principal', 't_ruta', 't_tramo'], docCategoria: 'reserva'
     },
     {
-      id: 'a_confirmar', fase: 'alojamiento', porDestino: true,
+      id: 'a_confirmar', rec: true, fase: 'alojamiento', porDestino: true,
       titulo: (v, c) => c.varios ? `Confirmar check-in en ${c.destino.nombre}` : 'Confirmar reserva y horario de check-in',
       desc: 'Revisá que la reserva esté confirmada y avisá tu horario estimado de llegada.',
       consejo: 'Si llegás tarde de noche, avisalo: algunos lugares no tienen recepción 24 h.',
@@ -195,14 +206,15 @@ R.guia = (function () {
       impacto: 4, anticipacion: 15, dependeDe: ['d_fechas'], despuesDe: ['t_principal'], aplica: esInter, docCategoria: 'seguro'
     },
     {
-      id: 'p_vacunas', fase: 'proteccion', titulo: 'Vacunas y recomendaciones de salud',
-      desc: 'Averiguá si el destino pide o recomienda vacunas y con cuánta anticipación aplicarlas.',
-      consejo: 'Algunas vacunas necesitan varios días antes de hacer efecto o de ser aceptadas como válidas.',
-      porque: 'Algunas vacunas requieren tiempo antes de viajar.',
-      impacto: 4, anticipacion: 45, dependeDe: ['d_destino'], aplica: esInter, docCategoria: 'salud'
+      id: 'p_vacunas', fase: 'proteccion',
+      titulo: v => `Vacuna contra la fiebre amarilla (${req(v).fiebreAmarilla.map(x => x.region || x.lugar).join(', ')})`,
+      desc: v => req(v).fiebreAmarilla.map(x => x.nota).join(' ') + ' Consultá en un vacunatorio o centro de medicina del viajero.',
+      consejo: 'Tiene que aplicarse al menos 10 días antes de llegar. Si ya la tenés, buscá el certificado y subilo a Documentos.',
+      porque: 'Necesita tiempo para hacer efecto antes del viaje.',
+      impacto: 4, anticipacion: 30, dependeDe: ['d_destino'], aplica: v => req(v).fiebreAmarilla.length > 0, docCategoria: 'salud'
     },
     {
-      id: 'p_botiquin', fase: 'proteccion', titulo: 'Botiquín y medicación personal',
+      id: 'p_botiquin', rec: true, fase: 'proteccion', titulo: 'Botiquín y medicación personal',
       desc: 'Prepará lo básico y tu medicación habitual para todos los días del viaje (y un poco más).',
       consejo: 'Llevá la medicación en el equipaje de mano, con la receta si corresponde.',
       porque: 'Rápido de resolver, pero imprescindible.',
@@ -211,21 +223,21 @@ R.guia = (function () {
 
     /* ---------- Dinero ---------- */
     {
-      id: 'm_medios', fase: 'dinero', titulo: 'Definir cómo vas a pagar',
+      id: 'm_medios', rec: true, fase: 'dinero', titulo: 'Definir cómo vas a pagar',
       desc: 'Decidí qué tarjetas, efectivo y moneda vas a usar, y cuánto llevar de cada cosa.',
       consejo: 'Combiná al menos dos medios de pago distintos por si uno falla.',
       porque: 'Evita quedarte sin forma de pagar en destino.',
-      impacto: 3, anticipacion: 14, dependeDe: ['d_presupuesto']
+      impacto: 3, anticipacion: 14, dependeDe: []
     },
     {
-      id: 'm_aviso', fase: 'dinero', titulo: 'Habilitar tarjetas para usar en el exterior',
+      id: 'm_aviso', rec: true, fase: 'dinero', titulo: 'Habilitar tarjetas para usar en el exterior',
       desc: 'Revisá que tus tarjetas funcionen en el destino y avisá al banco si hace falta.',
       consejo: 'Anotá el teléfono del banco para emergencias fuera del país.',
       porque: 'Una tarjeta bloqueada en destino es un dolor de cabeza evitable.',
       impacto: 3, anticipacion: 7, dependeDe: ['m_medios'], aplica: esInter
     },
     {
-      id: 'm_efectivo', fase: 'dinero', titulo: 'Conseguir efectivo para los primeros días',
+      id: 'm_efectivo', rec: true, fase: 'dinero', titulo: 'Conseguir efectivo para los primeros días',
       desc: 'Tené algo de efectivo para traslados, propinas o lugares que no aceptan tarjeta.',
       consejo: 'Repartilo entre la billetera y otro lugar seguro.',
       porque: 'Útil al llegar, pero se resuelve sobre la fecha.',
@@ -250,7 +262,7 @@ R.guia = (function () {
       aplica: v => v.perfil.transporte !== 'auto'
     },
     {
-      id: 'mv_local', fase: 'movilidad', titulo: 'Investigar el transporte local',
+      id: 'mv_local', rec: true, fase: 'movilidad', titulo: 'Investigar el transporte local',
       desc: 'Averiguá cómo moverte allá: apps, tarjetas de transporte, horarios y zonas.',
       consejo: 'Muchas ciudades tienen pases turísticos que combinan transporte y museos.',
       porque: 'Útil, pero se puede resolver incluso durante el viaje.',
@@ -259,7 +271,7 @@ R.guia = (function () {
 
     /* ---------- Experiencias ---------- */
     {
-      id: 'e_imperdibles', fase: 'experiencias', titulo: 'Armar la lista de imperdibles',
+      id: 'e_imperdibles', rec: true, fase: 'experiencias', titulo: 'Armar la lista de imperdibles',
       desc: 'Anotá lugares, comidas y experiencias que no te querés perder.',
       consejo: 'Separá lo que necesita reserva de lo que se puede improvisar.',
       porque: 'Te ayuda a detectar qué hay que reservar con anticipación.',
@@ -281,7 +293,7 @@ R.guia = (function () {
       impacto: 3, anticipacion: 14, dependeDe: ['d_fechas'], despuesDe: ['a_reserva']
     },
     {
-      id: 'e_itinerario', fase: 'experiencias', titulo: 'Armar el itinerario día por día',
+      id: 'e_itinerario', rec: true, fase: 'experiencias', titulo: 'Armar el itinerario día por día',
       desc: 'Distribuí actividades en los días del viaje en la pestaña Itinerario.',
       consejo: 'Dejá huecos libres: los mejores momentos muchas veces son los no planeados.',
       porque: 'Ordena todo lo anterior; se arma mejor con transporte y alojamiento definidos.',
@@ -290,14 +302,14 @@ R.guia = (function () {
 
     /* ---------- Conectividad ---------- */
     {
-      id: 'c_datos', fase: 'conectividad', titulo: 'Resolver internet en destino',
+      id: 'c_datos', rec: true, fase: 'conectividad', titulo: 'Resolver internet en destino',
       desc: 'Elegí entre roaming, eSIM o chip local para tener datos desde que llegás.',
       consejo: 'Verificá que tu teléfono sea compatible con eSIM antes de comprar una.',
       porque: 'Al llegar vas a necesitar mapas y comunicarte.',
       impacto: 2, anticipacion: 7, dependeDe: ['d_fechas'], aplica: esInter
     },
     {
-      id: 'c_offline', fase: 'conectividad', titulo: 'Descargar mapas offline y apps útiles',
+      id: 'c_offline', rec: true, fase: 'conectividad', titulo: 'Descargar mapas offline y apps útiles',
       desc: 'Bajá mapas del destino, apps de transporte, traductor y lo que vayas a usar.',
       consejo: 'Hacelo con wifi en casa: pesan bastante.',
       porque: 'Rápido y te salva si te quedás sin señal.',
@@ -338,7 +350,7 @@ R.guia = (function () {
       desc: 'Juntá facturas y comprobantes y presentá la rendición.',
       consejo: 'Sacale foto a cada comprobante en el momento y subilo a Documentos.',
       porque: 'Los plazos de rendición suelen ser cortos.',
-      impacto: 3, anticipacion: 5, ref: 'fin', dependeDe: ['r_gastos'], aplica: v => v.tipo === 'trabajo'
+      impacto: 3, anticipacion: 5, ref: 'fin', dependeDe: [], aplica: v => v.tipo === 'trabajo'
     },
 
     /* ---------- Antes de salir ---------- */
@@ -357,21 +369,21 @@ R.guia = (function () {
       impacto: 3, anticipacion: 1, dependeDe: ['t_principal'], aplica: usa('avion'), docCategoria: 'pasaje'
     },
     {
-      id: 's_casa', fase: 'salida', titulo: 'Dejar la casa lista',
+      id: 's_casa', rec: true, fase: 'salida', titulo: 'Dejar la casa lista',
       desc: 'Plantas, heladera, llaves, luces, servicios y quién puede pasar ante cualquier cosa.',
       consejo: 'Un temporizador de luz da sensación de casa habitada.',
       porque: 'Te vas tranquilo sabiendo que todo queda en orden.',
       impacto: 2, anticipacion: 2, dependeDe: []
     },
     {
-      id: 's_valija', fase: 'salida', titulo: 'Armar la valija',
+      id: 's_valija', rec: true, fase: 'salida', titulo: 'Armar la valija',
       desc: 'Prepará ropa según el clima, cargadores, adaptadores y lo esencial en el equipaje de mano.',
       consejo: 'En el equipaje de mano: documentos, medicación, cargador y una muda de ropa.',
       porque: 'Se hace sobre la fecha, con el pronóstico a mano.',
       impacto: 2, anticipacion: 1, dependeDe: []
     },
     {
-      id: 's_repaso', fase: 'salida', titulo: 'Repasar documentos y horarios del primer día',
+      id: 's_repaso', rec: true, fase: 'salida', titulo: 'Repasar documentos y horarios del primer día',
       desc: 'Revisá que tengas todo: documentos, reservas, horarios de salida y cómo llegar al alojamiento.',
       consejo: 'Calculá con margen el horario para salir hacia el aeropuerto o terminal.',
       porque: 'El último control antes de salir.',
@@ -379,27 +391,6 @@ R.guia = (function () {
     },
 
     /* ---------- Durante y al volver ---------- */
-    {
-      id: 'r_gastos', fase: 'regreso', titulo: 'Registrar los gastos del viaje',
-      desc: 'Cargá los gastos en la pestaña Gastos a medida que ocurren: quién pagó y entre quiénes se divide.',
-      consejo: 'Cargarlos en el momento evita discusiones al final.',
-      porque: 'Cuanto antes se carga, menos se olvida.',
-      impacto: 2, anticipacion: 0, ref: 'fin', dependeDe: []
-    },
-    {
-      id: 'r_cuentas', fase: 'regreso', titulo: 'Dividir cuentas y saldar deudas',
-      desc: 'Revisá los saldos y registrá los pagos entre viajeros hasta que todo quede en cero.',
-      consejo: 'Tripbox calcula la menor cantidad de transferencias necesarias.',
-      porque: 'Cuentas claras, amistades largas.',
-      impacto: 3, anticipacion: 7, ref: 'fin', dependeDe: ['r_gastos'], aplica: v => v.participantes.length > 1
-    },
-    {
-      id: 'r_recuerdos', fase: 'regreso', titulo: 'Guardar recuerdos y notas del viaje',
-      desc: 'Elegí tus fotos favoritas y anotá qué te gustó (y qué no) para el próximo viaje.',
-      consejo: 'Tus notas de hoy son los consejos de tu próximo viaje.',
-      porque: 'Cierra el viaje y suma experiencia para el próximo.',
-      impacto: 1, anticipacion: 14, ref: 'fin', dependeDe: []
-    }
   ];
 
   /** Motivos de cambio de planes y el paso raíz que afectan. */
@@ -408,8 +399,7 @@ R.guia = (function () {
     { id: 'destino', nombre: 'Cambió el destino', icono: '🧭', afecta: ['d_destino'] },
     { id: 'transporte', nombre: 'Se canceló o cambió el vuelo / transporte', icono: '✈️', afecta: ['t_principal', 't_ruta', 't_tramo', 'pq_paquete'] },
     { id: 'alojamiento', nombre: 'Se cayó o cambió el alojamiento', icono: '🏡', afecta: ['a_reserva', 'pq_paquete'] },
-    { id: 'participantes', nombre: 'Cambiaron los viajeros', icono: '👥', afecta: ['d_participantes'] },
-    { id: 'presupuesto', nombre: 'Cambió el presupuesto', icono: '💰', afecta: ['d_presupuesto'] }
+    { id: 'participantes', nombre: 'Cambiaron los viajeros', icono: '👥', afecta: ['d_participantes'] }
   ];
 
   const ESTADOS = {

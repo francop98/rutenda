@@ -38,10 +38,10 @@ R.auth = (function () {
     const uid = localStorage.getItem(CLAVE_SESION);
     if (!uid) return null;
     const u = Object.values(leerUsuarios()).find(x => x.uid === uid);
-    return u ? { uid: u.uid, nombre: u.nombre, apellido: u.apellido, email: u.email, creado: u.creado } : null;
+    return u ? { uid: u.uid, nombre: u.nombre, apellido: u.apellido, email: u.email, nacionalidad: u.nacionalidad || 'AR', creado: u.creado } : null;
   }
 
-  async function registrar({ nombre, apellido, email, clave }) {
+  async function registrar({ nombre, apellido, email, clave, nacionalidad }) {
     email = normalizarEmail(email);
     if (!nombre || !nombre.trim()) throw new Error('Escribí tu nombre.');
     if (!emailValido(email)) throw new Error('El mail no parece válido.');
@@ -50,7 +50,7 @@ R.auth = (function () {
     if (usuarios[email]) throw new Error('Ya existe una cuenta con ese mail. Probá ingresar.');
     const sal = U.id('sal');
     const u = {
-      uid: U.id('usr'), nombre: nombre.trim(), apellido: (apellido || '').trim(), email,
+      uid: U.id('usr'), nombre: nombre.trim(), apellido: (apellido || '').trim(), email, nacionalidad: nacionalidad || 'AR',
       sal, hash: await hash(sal + clave), creado: new Date().toISOString()
     };
     usuarios[email] = u;
@@ -69,13 +69,14 @@ R.auth = (function () {
 
   function salir() { localStorage.removeItem(CLAVE_SESION); }
 
-  function actualizarPerfil({ nombre, apellido }) {
+  function actualizarPerfil({ nombre, apellido, nacionalidad }) {
     const actual = usuarioActual();
     if (!actual) return;
     const usuarios = leerUsuarios();
     const u = usuarios[actual.email];
     u.nombre = nombre.trim();
     u.apellido = (apellido || '').trim();
+    if (nacionalidad) u.nacionalidad = nacionalidad;
     guardarUsuarios(usuarios);
   }
 
@@ -120,6 +121,7 @@ R.auth = (function () {
                 </div>` : `
                 <h2>¡Hola de nuevo!</h2>
                 <p class="texto-suave">Ingresá para seguir con tus viajes.</p>`}
+              ${modo === 'registro' ? `<label class="campo"><span>Nacionalidad de tu documento</span><select id="acNac">${R.requisitos.NACIONALIDADES.map(([c, n]) => `<option value="${c}" ${c === 'AR' ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : ''}
               <label class="campo"><span>Mail</span><input id="acEmail" type="email" autocomplete="email" required></label>
               <label class="campo"><span>Contraseña</span><input id="acClave" type="password" autocomplete="${modo === 'registro' ? 'new-password' : 'current-password'}" required></label>
               ${modo === 'registro' ? `<label class="campo"><span>Repetí la contraseña</span><input id="acClave2" type="password" autocomplete="new-password" required></label>` : ''}
@@ -148,7 +150,7 @@ R.auth = (function () {
         try {
           if (modo === 'registro') {
             if (val('acClave') !== val('acClave2')) throw new Error('Las contraseñas no coinciden.');
-            await registrar({ nombre: val('acNombre'), apellido: val('acApellido'), email: val('acEmail'), clave: val('acClave') });
+            await registrar({ nombre: val('acNombre'), apellido: val('acApellido'), email: val('acEmail'), clave: val('acClave'), nacionalidad: val('acNac') });
           } else {
             await ingresar(val('acEmail'), val('acClave'));
           }
@@ -174,6 +176,8 @@ R.auth = (function () {
           <label class="campo"><span>Nombre</span><input id="mcNombre" value="${esc(u.nombre)}"></label>
           <label class="campo"><span>Apellido</span><input id="mcApellido" value="${esc(u.apellido)}"></label>
         </div>
+        <label class="campo"><span>Nacionalidad de tu documento</span><select id="mcNac">${R.requisitos.NACIONALIDADES.map(([c, n]) => `<option value="${c}" ${c === u.nacionalidad ? 'selected' : ''}>${n}</option>`).join('')}</select>
+          <small class="ayuda">Con esto Tripbox sabe qué documentación y visas te piden en cada destino.</small></label>
         <details class="detalle-plegable">
           <summary>Cambiar contraseña</summary>
           <div class="grilla-2">
@@ -181,7 +185,9 @@ R.auth = (function () {
             <label class="campo"><span>Nueva contraseña</span><input id="mcNueva" type="password" autocomplete="new-password"></label>
           </div>
         </details>
+        ${R.app.puedeInstalar() ? '<button type="button" class="btn btn-suave btn-bloque" data-a="instalarApp">📲 Instalar Tripbox como app</button>' : ''}
         <p class="ayuda">Cuenta creada el ${U.fmtFecha(u.creado.slice(0, 10))}. Por ahora tus datos se guardan en este dispositivo.</p>`,
+      alAbrir: el => { const b = el.querySelector('[data-a="instalarApp"]'); if (b) b.onclick = () => { U.cerrarModal(); R.app.instalar(); }; },
       acciones: [
         { texto: 'Cerrar sesión', clase: 'btn-texto peligro', onClick: () => { salir(); location.hash = '#inicio'; location.reload(); } },
         { texto: 'Cancelar' },
@@ -189,7 +195,7 @@ R.auth = (function () {
           texto: 'Guardar', clase: 'btn-primario', onClick: el => {
             const nombre = el.querySelector('#mcNombre').value.trim();
             if (!nombre) { U.toast('El nombre no puede quedar vacío.'); return false; }
-            actualizarPerfil({ nombre, apellido: el.querySelector('#mcApellido').value });
+            actualizarPerfil({ nombre, apellido: el.querySelector('#mcApellido').value, nacionalidad: el.querySelector('#mcNac').value });
             const yo = R.db.yo();
             yo.nombre = nombre;
             R.db.guardarPersona(yo);

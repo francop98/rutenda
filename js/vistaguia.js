@@ -22,6 +22,7 @@ R.vistaGuia = (function () {
   }
 
   function chipEstado(t) {
+    if (t.postergado) return '<span class="chip chip-gris">Más tarde</span>';
     if (t.faltanDatos) return '<span class="chip chip-sol">Faltan datos</span>';
     if (t.estado === 'pendiente') return t.bloqueada ? '<span class="chip chip-gris">Esperando</span>' : '';
     const e = R.guia.ESTADOS[t.estado];
@@ -37,7 +38,10 @@ R.vistaGuia = (function () {
     const fases = R.motor.progresoPorFase(v);
     const aRevisar = R.motor.pasosARevisar(v);
     const top = proximos[0];
-    const faltanDatos = R.motor.analizar(v).filter(t => t.faltanDatos);
+    const info = R.motor.analizar(v);
+    const faltanDatos = info.filter(t => t.faltanDatos);
+    const enMarcha = info.filter(t => t.estado === 'en_curso');
+    const postergados = info.filter(t => t.postergado);
 
     cont.innerHTML = `
       ${aRevisar.length ? `
@@ -48,7 +52,18 @@ R.vistaGuia = (function () {
 
       <div class="guia-grilla">
         <div class="col-principal">
-          ${top ? tarjetaProximo(v, top) : tarjetaSinProximo(v, prog)}
+          ${top ? tarjetaProximo(v, top) : tarjetaSinProximo(v, prog, enMarcha.length + postergados.length)}
+          ${enMarcha.length ? `
+            <div class="bloque bloque-marcha">
+              <h3 class="bloque-titulo">En marcha <span class="contador">${enMarcha.length}</span></h3>
+              <div class="lista-siguientes">${enMarcha.map(t => `
+                <div class="fila-siguiente fila-datos">
+                  <span class="num">▶</span>
+                  <span class="fs-texto" data-tarea="${t.id}"><strong>${esc(t.titulo)}</strong><small>${esc(R.guia.fase(t.fase).nombre)}</small></span>
+                  <button class="btn btn-primario btn-chico" data-rapido="hecha" data-id="${t.id}">✓ Listo</button>
+                  <button class="btn btn-texto btn-chico" data-rapido="pendiente" data-id="${t.id}">Pausar</button>
+                </div>`).join('')}</div>
+            </div>` : ''}
           ${proximos.length > 1 ? `
             <div class="bloque">
               <h3 class="bloque-titulo">Lo que sigue</h3>
@@ -72,6 +87,8 @@ R.vistaGuia = (function () {
                   <button class="btn btn-texto btn-chico" data-nohace="${t.id}" title="No hace falta cargar datos">No hace falta</button>
                 </div>`).join('')}</div>
             </div>` : ''}
+
+          ${consejosHTML(v)}
         </div>
 
         <aside class="col-lateral">
@@ -82,6 +99,7 @@ R.vistaGuia = (function () {
               <p class="texto-suave">${mensajeProgreso(prog.pct)}</p>
             </div>
           </div>
+          ${R.requisitos.tarjeta(v)}
           <div class="bloque tarjeta-cambio">
             <h4>¿Cambiaron los planes?</h4>
             <p class="texto-suave">Contame qué cambió y te digo en qué orden reorganizar todo.</p>
@@ -111,12 +129,70 @@ R.vistaGuia = (function () {
     const btnPlan = cont.querySelector('[data-a="verPlan"]');
     if (btnPlan) btnPlan.onclick = () => mostrarPlan(v, R.motor.ordenarPlan(v, R.motor.pasosARevisar(v)));
     cont.querySelector('[data-a="propia"]').onclick = () => editarPropia(v);
+    cont.querySelectorAll('[data-posponer]').forEach(b => b.onclick = () => {
+      R.motor.posponer(v, b.dataset.posponer, true);
+      guardar(v);
+      R.app.refrescar();
+      U.toast('Te lo vuelvo a sugerir más adelante. Está en el recorrido con la marca "Más tarde".');
+    });
+    const bValija = cont.querySelector('[data-a="abrirValija"]');
+    if (bValija) bValija.onclick = () => { location.hash = `#viaje/${v.id}/valija`; };
+    cont.querySelectorAll('[data-ir]').forEach(b => b.onclick = () => { location.hash = `#viaje/${v.id}/${b.dataset.ir}`; });
+    const verRec = cont.querySelector('[data-a="verTodasRec"]');
+    if (verRec) verRec.onclick = () => { verTodasRec = !verTodasRec; R.app.refrescar(); };
+    const notas = cont.querySelector('#notasViaje');
+    if (notas) notas.oninput = () => { v.notasViaje = notas.value; guardar(v); };
     cont.querySelectorAll('[data-completar]').forEach(b => b.onclick = () => R.formularios.abrir(v, b.dataset.completar));
     cont.querySelectorAll('[data-nohace]').forEach(b => b.onclick = () => {
       v.tareas[b.dataset.nohace] = Object.assign({}, v.tareas[b.dataset.nohace], { sinDatosOk: true });
       guardar(v);
       R.app.refrescar();
     });
+  }
+
+  /**
+   * Recomendaciones: cosas útiles que no son pasos obligatorios de la organización.
+   * Ordenadas de la más necesaria a la menos (urgencia + importancia). No cuentan en el progreso.
+   */
+  let verTodasRec = false;
+  function consejosHTML(v) {
+    const est = R.viajes.estadoViaje(v);
+    const rec = R.motor.recomendaciones(v);
+    const mostrar = verTodasRec ? rec.pendientes : rec.pendientes.slice(0, 5);
+    const motivo = t => {
+      if (t.bloqueada) return `Cuando tengas: ${t.bloqueadaPor.map(id => R.motor.nombre(v, id)).join(', ')}`;
+      const urg = t.razones.find(r => r.tipo === 'urgente');
+      return urg ? urg.texto : (t.porque || t.desc || '');
+    };
+    const items = mostrar.map(t => `
+      <li class="${t.bloqueada ? 'rec-espera' : ''} ${t.diasRestantes != null && t.diasRestantes <= 7 && !t.bloqueada ? 'rec-urgente' : ''}">
+        <span>${R.guia.fase(t.fase).icono}</span>
+        <div data-tarea="${t.id}" class="rec-texto"><strong>${esc(t.titulo)}</strong><small>${esc(motivo(t))}</small></div>
+        <div class="rec-acciones">
+          ${t.base === 's_valija' ? '<button class="btn btn-suave btn-chico" data-ir="valija">🧳 Armar</button>' : ''}
+          <button class="btn-icono rec-ok" data-rapido="hecha" data-id="${t.id}" title="Hecho">✓</button>
+          <button class="btn-icono" data-rapido="no_aplica" data-id="${t.id}" title="No me sirve">×</button>
+        </div>
+      </li>`);
+    const fijos = [];
+    fijos.push(`<li><span>💸</span><div><strong>Registrá los gastos a medida que ocurren</strong><small>Con quién pagó y entre quiénes se divide: al final las cuentas salen solas.</small></div><button class="btn btn-suave btn-chico" data-ir="gastos">Gastos</button></li>`);
+    if (v.participantes.length > 1) {
+      const pendientes = R.gastos.transferencias(R.gastos.saldos(v)).length;
+      fijos.push(`<li><span>🤝</span><div><strong>Dividí las cuentas al volver</strong><small>${v.movimientos.length ? (pendientes ? `Hoy harían falta ${U.plural(pendientes, 'transferencia', 'transferencias')} para quedar a mano.` : 'Por ahora todos están a mano.') : 'Cuando haya gastos, te digo quién le debe a quién.'}</small></div><button class="btn btn-suave btn-chico" data-ir="gastos">Saldos</button></li>`);
+    }
+    if (est !== 'planificando') {
+      fijos.push(`<li class="consejo-notas"><span>📸</span><div><strong>Guardá recuerdos y notas del viaje</strong><small>Lo que te gustó, lo que no y lo que harías distinto.</small>
+        <textarea id="notasViaje" rows="3" placeholder="Escribí lo que quieras recordar…">${esc(v.notasViaje || '')}</textarea></div></li>`);
+    }
+    return `
+      <div class="bloque bloque-consejos">
+        <div class="bloque-cab"><h3 class="bloque-titulo">Recomendaciones</h3>${rec.total ? `<span class="chip">${rec.hechas}/${rec.total} hechas</span>` : ''}</div>
+        <p class="texto-suave rec-intro">No son obligatorias: ordenadas de la más necesaria a la menos.</p>
+        ${items.length ? `<ul class="lista-consejos lista-rec">${items.join('')}</ul>` : '<p class="texto-suave">¡Todas las recomendaciones resueltas! 🙌</p>'}
+        ${rec.pendientes.length > 5 ? `<button class="btn btn-texto btn-chico" data-a="verTodasRec">${verTodasRec ? 'Ver menos' : `Ver todas (${rec.pendientes.length})`}</button>` : ''}
+        <h4 class="subtitulo">Durante el viaje</h4>
+        <ul class="lista-consejos">${fijos.join('')}</ul>
+      </div>`;
   }
 
   function mensajeProgreso(pct) {
@@ -150,15 +226,22 @@ R.vistaGuia = (function () {
           </div>` : ''}
         <div class="pp-acciones">
           <button class="btn btn-primario" data-rapido="hecha" data-id="${t.id}">${t.tieneFormulario ? '✓ Listo, cargar datos' : '✓ Listo'}</button>
-          ${t.estado === 'pendiente' ? `<button class="btn btn-suave" data-rapido="en_curso" data-id="${t.id}">▶ Empezar</button>` : ''}
-          ${t.estado === 'en_curso' || t.estado === 'revisar' ? `<button class="btn btn-suave" data-rapido="pendiente" data-id="${t.id}">⏸ Volver a pendiente</button>` : ''}
+          ${t.base === 's_valija' ? '<button class="btn btn-suave" data-a="abrirValija">🧳 Abrir el armador</button>' : ''}
+          <button class="btn btn-suave" data-rapido="en_curso" data-id="${t.id}" title="Queda en marcha y la guía sigue con lo siguiente">▶ Empezar y seguir</button>
+          <button class="btn btn-texto" data-posponer="${t.id}" title="Te lo vuelvo a sugerir más adelante">Más tarde</button>
           <button class="btn btn-texto" data-rapido="no_aplica" data-id="${t.id}">No aplica</button>
         </div>
-        <p class="pp-estado">Estado: <strong>${R.guia.ESTADOS[t.estado].nombre}</strong>${t.estado === 'en_curso' ? ' · lo marcaste como empezado' : ''}</p>
+        <p class="pp-estado">${t.estado === 'revisar' ? 'Quedó a revisar por un cambio de planes.' : '"Empezar y seguir" lo deja en marcha y te muestro el siguiente; "Más tarde" lo saltea por ahora.'}</p>
       </article>`;
   }
 
-  function tarjetaSinProximo(v, prog) {
+  function tarjetaSinProximo(v, prog, enEspera) {
+    if (enEspera && prog.pct < 100) {
+      return `<article class="proximo-paso">
+        <div class="pp-cuerpo"><span class="pp-icono">▶</span>
+        <div><h2>Lo demás ya está en marcha</h2><p>Tenés pasos empezados o para más tarde. Cuando los termines, marcá Listo y seguimos.</p></div></div>
+      </article>`;
+    }
     if (prog.pct >= 100) {
       return `<article class="proximo-paso celebracion">
         <div class="pp-cuerpo"><span class="pp-icono">🌅</span>
@@ -208,6 +291,12 @@ R.vistaGuia = (function () {
     guardar(v);
     R.app.refrescar();
     const progDespues = R.motor.progreso(v).pct;
+    const deducidas = nuevo === 'hecha' ? R.motor.deducidasRecientes() : [];
+    if (deducidas.length) {
+      U.toast(`Listo. También di por resuelto: ${deducidas.map(t => t.titulo).slice(0, 3).join(', ')}${deducidas.length > 3 ? '…' : ''}.`);
+      return;
+    }
+    if (nuevo === 'en_curso') { U.toast('Quedó en marcha. Seguimos con lo siguiente.'); return; }
     if (progDespues === 100 && progAntes < 100) {
       celebrar();
     } else if (nuevo === 'hecha' && destrabadas.length) {
@@ -245,13 +334,17 @@ R.vistaGuia = (function () {
         <div class="segmentado segmentado-estado">${Object.entries(R.guia.ESTADOS).filter(([k]) => k !== 'revisar' || t.estado === 'revisar').map(([k, e]) =>
           `<button type="button" data-estado="${k}" class="${t.estado === k ? 'activo' : ''}">${e.nombre}</button>`).join('')}</div>
         ${datos.incluidoEnPaquete ? '<p class="aviso-suave">📦 Incluido en el paquete que compraste.</p>' : ''}
+        ${datos.deducido && t.estado === 'hecha' ? '<p class="aviso-suave">✓ Lo di por resuelto porque completaste un paso que lo necesitaba.</p>' : ''}
+        ${t.postergado ? '<p class="aviso-suave">⏭ Lo dejaste para más tarde. <button type="button" class="btn-texto-mini" data-a="reactivar">Volver a sugerirlo</button></p>' : ''}
         ${t.desc ? `<p class="detalle-desc">${esc(t.desc)}</p>` : ''}
         ${t.tieneFormulario ? `
           <div class="detalle-datos">
             <div class="bloque-cab"><h4>Datos cargados</h4><button type="button" class="btn ${datos.datos ? 'btn-suave' : 'btn-primario'} btn-chico" data-a="formulario">${datos.datos ? 'Editar datos' : (t.estado === 'hecha' ? 'Cargar datos' : 'Listo, cargar datos')}</button></div>
             ${datos.datos ? `<ul class="lista-resumen">${R.formularios.resumen(v, t).map(l => `<li>${esc(l)}</li>`).join('') || '<li>Sin detalles.</li>'}</ul>` : '<p class="texto-suave">Cuando lo resuelvas, cargá los datos (horarios, códigos, costo, archivos) y se suman solos al itinerario, a los gastos y a documentos.</p>'}
           </div>` : ''}
-        ${['d_destino', 'd_fechas', 'd_participantes', 'd_presupuesto'].includes(t.id) ? '<button type="button" class="btn btn-suave btn-chico boton-editar-viaje" data-a="editarViaje">✎ Editar destinos, fechas, viajeros y presupuesto</button>' : ''}
+        ${['d_destino', 'd_fechas', 'd_participantes'].includes(t.id) ? '<button type="button" class="btn btn-suave btn-chico boton-editar-viaje" data-a="editarViaje">✎ Editar destinos, fechas y viajeros</button>' : ''}
+        ${t.base === 's_valija' ? '<button type="button" class="btn btn-primario btn-chico boton-editar-viaje" data-a="abrirValija">🧳 Abrir el armador de valija</button>' : ''}
+        ${['doc_pasaporte', 'doc_visa', 'doc_requisitos', 'p_vacunas'].includes(t.base) ? R.requisitos.tarjeta(v) : ''}
         ${t.consejo ? `<div class="consejo"><strong>💡 Consejo</strong><p>${esc(t.consejo)}</p></div>` : ''}
         ${t.razones.length ? `<div class="detalle-bloque"><h4>¿Por qué tiene esta prioridad?</h4><ul class="lista-razones">${t.razones.map(r => `<li><span>${ICONO_RAZON[r.tipo] || '•'}</span>${esc(r.texto)}</li>`).join('')}</ul></div>` : ''}
         <div class="detalle-grilla">
@@ -269,6 +362,10 @@ R.vistaGuia = (function () {
 
     const bForm = el.querySelector('[data-a="formulario"]');
     if (bForm) bForm.onclick = () => R.formularios.abrir(v, id);
+    const bReact = el.querySelector('[data-a="reactivar"]');
+    if (bReact) bReact.onclick = () => { R.motor.posponer(v, id, false); guardar(v); U.cerrarModal(); R.app.refrescar(); };
+    const bVal = el.querySelector('[data-a="abrirValija"]');
+    if (bVal) bVal.onclick = () => { U.cerrarModal(); location.hash = `#viaje/${v.id}/valija`; };
     const bEdit = el.querySelector('[data-a="editarViaje"]');
     if (bEdit) bEdit.onclick = () => R.viajes.abrirAsistente(v);
     const nota = el.querySelector('#tNota');

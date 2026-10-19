@@ -26,6 +26,10 @@ R.motor = (function () {
       id, base: t.id, ctx: ctx || null, destId: ctx && ctx.destino ? ctx.destino.id : (ctx && ctx.hasta ? ctx.hasta.id : null),
       titulo: typeof t.titulo === 'function' ? t.titulo(v, ctx || {}) : t.titulo,
       desc: typeof t.desc === 'function' ? t.desc(v, ctx || {}) : t.desc,
+      consejo: typeof t.consejo === 'function' ? t.consejo(v, ctx || {}) : t.consejo,
+      porque: typeof t.porque === 'function' ? t.porque(v, ctx || {}) : t.porque,
+      impacto: typeof t.impacto === 'function' ? t.impacto(v, ctx || {}) : t.impacto,
+      anticipacion: typeof t.anticipacion === 'function' ? t.anticipacion(v, ctx || {}) : t.anticipacion,
       dependeDe: (t.dependeDe || []).slice(),
       despuesDe: (t.despuesDe || []).slice(),
       propia: false
@@ -92,17 +96,20 @@ R.motor = (function () {
   function analizar(v) {
     const ts = lista(v);
     const ids = new Set(ts.map(t => t.id));
+    const recs = new Set(ts.filter(t => t.rec).map(t => t.id));
     const hoy = R.util.hoyISO();
     const viajeEmpezo = v.fechaInicio && v.fechaInicio <= hoy;
 
     return ts.map(t => {
       const est = estado(v, t.id);
-      const deps = t.dependeDe.filter(d => ids.has(d));
+      // Un paso de la guía nunca espera a una recomendación
+      const valida = d => ids.has(d) && (t.rec || !recs.has(d));
+      const deps = t.dependeDe.filter(valida);
       const bloqueadaPor = deps.filter(d => !resuelta(v, d));
-      const previasSugeridas = t.despuesDe.filter(d => ids.has(d) && !resuelta(v, d));
+      const previasSugeridas = t.despuesDe.filter(d => valida(d) && !resuelta(v, d));
       const fl = fechaLimite(v, t);
       const dr = fl ? R.util.diasEntre(hoy, fl) : null;
-      const destraba = ts.filter(o => o.dependeDe.includes(t.id) && !resuelta(v, o.id));
+      const destraba = ts.filter(o => !o.rec && o.dependeDe.includes(t.id) && !resuelta(v, o.id));
 
       let score = t.impacto * 12;
       const razones = [];
@@ -150,10 +157,12 @@ R.motor = (function () {
       const bloqueada = bloqueadaPor.length > 0;
       const datosPaso = v.tareas[t.id] || {};
       const tieneFormulario = !!(R.formularios && R.formularios.tiene(t));
-      const faltanDatos = tieneFormulario && est === 'hecha' && !datosPaso.datos && !datosPaso.sinDatosOk;
+      const faltanDatos = !t.rec && tieneFormulario && est === 'hecha' && !datosPaso.datos && !datosPaso.sinDatosOk;
       return Object.assign({}, t, {
+        postergado: !!datosPaso.postergado && !RESUELTO.has(est),
         tieneFormulario,
         faltanDatos,
+        dependeDe: deps,
         estado: est,
         resuelta: RESUELTO.has(est),
         bloqueada,
@@ -174,15 +183,16 @@ R.motor = (function () {
     return t ? t.titulo : id;
   }
 
+  /** Lo próximo a resolver: pendiente o a revisar, sin bloqueos, sin "en marcha" ni "más tarde". */
   function proximos(v, n) {
     return analizar(v)
-      .filter(t => !t.resuelta && !t.bloqueada)
+      .filter(t => !t.rec && !t.resuelta && !t.bloqueada && t.estado !== 'en_curso' && !t.postergado)
       .sort((a, b) => b.orden - a.orden)
       .slice(0, n || 3);
   }
 
   function progreso(v) {
-    const ts = lista(v);
+    const ts = lista(v).filter(t => !t.rec);
     let hechas = 0, noAplica = 0;
     ts.forEach(t => {
       const e = estado(v, t.id);
@@ -196,7 +206,7 @@ R.motor = (function () {
   function progresoPorFase(v) {
     const info = analizar(v);
     return R.guia.fases.map(f => {
-      const delaFase = info.filter(t => t.fase === f.id);
+      const delaFase = info.filter(t => t.fase === f.id && !t.rec);
       const validas = delaFase.filter(t => t.estado !== 'no_aplica');
       const hechas = validas.filter(t => t.estado === 'hecha').length;
       return { fase: f, tareas: delaFase, hechas, total: validas.length };
@@ -209,12 +219,53 @@ R.motor = (function () {
     const previo = v.tareas[id] || {};
     v.tareas[id] = Object.assign({}, previo, {
       estado: nuevo,
+      postergado: false,
       fechaHecha: nuevo === 'hecha' ? new Date().toISOString() : null
     });
+    ultimasDeducidas = nuevo === 'hecha' ? deducirPrevios(v, id) : [];
     const despues = analizar(v);
     const destrabadas = despues.filter(t => antes.includes(t.id) && !t.bloqueada);
     return destrabadas;
   }
+
+  /**
+   * Si resolviste un paso, lo que era imprescindible antes también está resuelto
+   * (ej.: si ya tenés los vuelos, las fechas están cerradas). Devuelve los pasos deducidos.
+   */
+  let ultimasDeducidas = [];
+  function deducirPrevios(v, id) {
+    const ts = lista(v);
+    const porId = {};
+    ts.forEach(t => { porId[t.id] = t; });
+    const deducidas = [];
+    const visitar = tid => {
+      const t = porId[tid];
+      if (!t) return;
+      t.dependeDe.forEach(dep => {
+        if (!porId[dep] || porId[dep].rec || resuelta(v, dep)) return;
+        v.tareas[dep] = Object.assign({}, v.tareas[dep] || {}, { estado: 'hecha', deducido: true, postergado: false, fechaHecha: new Date().toISOString() });
+        deducidas.push(porId[dep]);
+        visitar(dep);
+      });
+    };
+    visitar(id);
+    return deducidas;
+  }
+  function deducidasRecientes() { return ultimasDeducidas.slice(); }
+
+  /** "Más tarde": saca el paso de la sugerencia sin marcarlo. */
+  function posponer(v, id, si) {
+    v.tareas[id] = Object.assign({}, v.tareas[id] || { estado: 'pendiente' }, { postergado: si !== false });
+  }
+
+  /** Recomendaciones pendientes, de la más necesaria a la menos. */
+  function recomendaciones(v) {
+    const todas = analizar(v).filter(t => t.rec);
+    const pendientes = todas.filter(t => !t.resuelta).sort((a, b) => b.orden - a.orden);
+    return { pendientes, hechas: todas.filter(t => t.estado === 'hecha').length, total: todas.filter(t => t.estado !== 'no_aplica').length };
+  }
+
+  function enMarcha(v) { return analizar(v).filter(t => t.estado === 'en_curso'); }
 
   /** Ordena una lista de pasos respetando dependencias y luego prioridad. */
   function ordenarPlan(v, idsPlan) {
@@ -278,9 +329,10 @@ R.motor = (function () {
     }
 
     const reabiertas = [];
+    const esRec = new Set(ts.filter(t => t.rec).map(t => t.id));
     afectadas.forEach(id => {
       const e = estado(v, id);
-      if (e === 'no_aplica') return;
+      if (e === 'no_aplica' || esRec.has(id)) return;
       if (raices.has(id) || e === 'hecha' || e === 'en_curso') {
         v.tareas[id] = Object.assign({}, v.tareas[id] || {}, { estado: 'revisar', fechaHecha: null });
         reabiertas.push(id);
@@ -299,11 +351,11 @@ R.motor = (function () {
   }
 
   function pasosARevisar(v) {
-    return lista(v).filter(t => estado(v, t.id) === 'revisar').map(t => t.id);
+    return lista(v).filter(t => !t.rec && estado(v, t.id) === 'revisar').map(t => t.id);
   }
 
   return {
-    lista, idsDe, estado, resuelta, fechaLimite, analizar, nombre, proximos, progreso,
+    lista, idsDe, estado, resuelta, posponer, enMarcha, deducidasRecientes, recomendaciones, fechaLimite, analizar, nombre, proximos, progreso,
     progresoPorFase, setEstado, ordenarPlan, replanificar, pasosARevisar
   };
 })();

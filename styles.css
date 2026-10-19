@@ -861,3 +861,185 @@ body.sin-sesion .app { max-width: none; padding: 0; }
 body.sin-sesion .acceso { margin: 0; }
 .campo > .segmentado { align-self: flex-start; margin-bottom: 4px; }
 .tv-portada h3, .destacado-portada h2, .portada-viaje h1 { text-shadow: 0 2px 12px rgba(20, 35, 34, .35); }
+
+/* =========================================================
+   v4 — requisitos, guía flexible, aeropuertos y valija
+   ========================================================= */
+.btn-texto-mini { border: 0; background: transparent; color: var(--mar); font-weight: 700; font-size: .78rem; padding: 0 4px; text-transform: none; letter-spacing: 0; }
+.dato-cab { display: flex; align-items: center; justify-content: space-between; }
+
+/* Guía */
+.bloque-marcha { border-color: color-mix(in srgb, var(--mar) 35%, var(--linea)); }
+.bloque-marcha .num { background: var(--mar); color: #fff; font-size: .8rem; }
+.bloque-marcha .fs-texto { cursor: pointer; }
+.lista-consejos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.lista-consejos li { display: flex; align-items: flex-start; gap: 12px; }
+.lista-consejos li > span { font-size: 1.3rem; width: 28px; text-align: center; }
+.lista-consejos li > div { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.lista-consejos small { color: var(--tinta-suave); }
+.lista-consejos textarea { margin-top: 8px; width: 100%; padding: 10px 12px; border-radius: var(--radio-chico); border: 1px solid var(--linea); background: var(--arena); resize: vertical; }
+
+/* Requisitos */
+.tarjeta-requisitos h4 { margin-bottom: 10px; }
+.lista-requisitos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.lista-requisitos li { display: flex; flex-direction: column; gap: 3px; padding-bottom: 10px; border-bottom: 1px solid var(--linea); }
+.lista-requisitos li:last-child { border-bottom: 0; padding-bottom: 0; }
+.req-pais { font-weight: 700; }
+.req-nivel { align-self: flex-start; padding: 2px 10px; border-radius: 999px; font-size: .76rem; font-weight: 700; background: var(--arena-2); }
+.nivel-dni { background: var(--salvia-claro); color: #4e7a4b; }
+.nivel-pasaporte { background: var(--mar-claro); color: var(--mar-oscuro); }
+.nivel-autorizacion { background: var(--sol-claro); color: #8a6417; }
+.nivel-visa { background: var(--terracota-claro); color: var(--terracota-oscuro); }
+.nivel-verificar { background: var(--alerta-claro); color: var(--alerta); }
+.lista-requisitos small { color: var(--tinta-suave); font-size: .82rem; }
+.req-salud-titulo { margin-top: 14px; }
+.req-fuente { margin-top: 12px; font-size: .76rem; color: var(--tinta-tenue); }
+.req-fuente a { color: var(--mar); font-weight: 600; }
+.modal .tarjeta-requisitos { box-shadow: none; margin: 0 0 16px; }
+
+/* Aeropuertos */
+.aero-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip-aero { display: flex; flex-direction: column; align-items: flex-start; padding: 6px 12px; border: 1px solid var(--linea); border-radius: 12px; background: var(--papel); line-height: 1.15; }
+.chip-aero strong { font-size: .95rem; letter-spacing: .04em; }
+.chip-aero small { color: var(--tinta-tenue); font-size: .72rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-aero.activo { border-color: var(--mar); background: var(--mar-claro); color: var(--mar-oscuro); }
+.aero-manual { margin-top: 6px; width: 100%; padding: 7px 10px; border-radius: 9px; border: 1px dashed var(--linea); background: var(--papel); font-size: .84rem; text-transform: uppercase; }
+.aero-manual::placeholder { text-transform: none; }
+.campo-aero { margin-bottom: 14px; }
+
+/* Valija */
+.valija-grilla { display: grid; grid-template-columns: 1fr 320px; gap: 18px; align-items: start; }
+.valija-grilla .col-lateral .bloque { margin-top: 18px; }
+.barra-valija { height: 10px; margin-top: 14px; }
+.fila-valija select { padding: 10px 12px; border-radius: var(--radio-chico); border: 1px solid var(--linea); background: var(--arena); max-width: 190px; }
+.lista-valija { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.lista-valija li { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-top: 1px solid var(--linea); }
+.lista-valija li:first-child { border-top: 0; }
+.lista-valija label { flex: 1; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.lista-valija input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--salvia); flex: none; }
+.lista-valija li.hecho span { color: var(--tinta-tenue); text-decoration: line-through; }
+.lista-valija .btn-icono { width: 28px; height: 28px; }
+.lista-valija.grande li { padding: 12px 4px; font-size: 1.02rem; }
+.origen-lista { font-size: .72rem; color: var(--tinta-tenue); background: var(--arena-2); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.listas-elegir { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 14px; }
+.lista-op { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--papel); text-align: left; }
+.lista-op span:first-child { display: flex; flex-direction: column; }
+.lista-op small { color: var(--tinta-tenue); }
+.lista-op > span:last-child { font-weight: 700; color: var(--mar); font-size: 1.2rem; }
+.lista-op:hover { border-color: var(--mar); }
+.lista-op.usada { background: var(--mar-claro); }
+.lista-sugerencias { list-style: none; margin: 10px 0 12px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lista-sugerencias li { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: .9rem; }
+.lista-sugerencias .btn-icono { width: 28px; height: 28px; color: var(--mar); font-weight: 700; }
+.lista-faltan { list-style: none; padding: 0; margin: 10px 0 0; color: var(--tinta-suave); }
+.grilla-listas { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.titulo-lista { flex: 1; border: 0; background: transparent; font-family: var(--fuente-titulo); font-size: 1.3rem; font-weight: 600; padding: 4px 0; border-bottom: 1px dashed transparent; outline: none; min-width: 0; }
+.titulo-lista:focus, .titulo-lista:hover { border-bottom-color: var(--linea); }
+.lp-grupo { margin-bottom: 10px; }
+.lp-grupo small { color: var(--tinta-tenue); font-weight: 700; font-size: .76rem; text-transform: uppercase; letter-spacing: .05em; }
+.lista-chips { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.lista-chips li { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px 4px 12px; border-radius: 999px; background: var(--arena); border: 1px solid var(--linea); font-size: .86rem; }
+.lista-chips button { border: 0; background: transparent; color: var(--tinta-tenue); font-size: 1rem; padding: 0 4px; }
+
+@media (max-width: 900px) {
+  .valija-grilla { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .fila-valija { flex-wrap: wrap; }
+  .fila-valija input { flex-basis: 100%; }
+  .fila-valija select { flex: 1; max-width: none; }
+  .grilla-listas { grid-template-columns: 1fr; }
+}
+
+/* =========================================================
+   v5 — app para celular (mobile-first)
+   ========================================================= */
+html { -webkit-tap-highlight-color: transparent; }
+body { overscroll-behavior-y: none; }
+.barra { padding-top: max(12px, env(safe-area-inset-top)); }
+
+/* Navegación inferior tipo app */
+.nav-inferior { display: none; }
+.nav-inferior a, .nav-inferior button {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px 6px;
+  border: 0; background: transparent; color: var(--tinta-tenue); font-size: .7rem; font-weight: 600;
+}
+.nav-inferior svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.nav-inferior a.activo { color: var(--mar); }
+.nav-inferior a.activo svg { stroke-width: 2.3; }
+.nav-inferior .nav-nuevo {
+  flex: none; width: 56px; height: 56px; margin: -22px 6px 0; padding: 0; border-radius: 50%; justify-content: center;
+  background: var(--mar); color: #fff; box-shadow: 0 8px 20px color-mix(in srgb, var(--mar) 45%, transparent);
+}
+.nav-inferior .nav-nuevo svg { width: 28px; height: 28px; stroke-width: 2.4; }
+body.sin-sesion .nav-inferior { display: none !important; }
+
+/* Aviso para instalar */
+.aviso-instalar { display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 14px 16px; border-radius: var(--radio); background: var(--papel); border: 1px solid var(--linea); box-shadow: var(--sombra); }
+.aviso-instalar > div { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.aviso-instalar small { color: var(--tinta-suave); }
+.ai-icono { flex: none; width: 42px; height: 42px; border-radius: 11px; background: url('iconos/icono-192.png') center / cover; }
+.pasos-instalar { padding-left: 20px; display: flex; flex-direction: column; gap: 8px; color: var(--tinta-suave); }
+
+/* Recomendaciones */
+.rec-intro { margin: -6px 0 12px; font-size: .86rem; }
+.lista-rec li { align-items: center; }
+.rec-texto { cursor: pointer; }
+.rec-acciones { display: flex; gap: 6px; align-items: center; flex: none; }
+.rec-ok { color: var(--salvia); font-weight: 700; }
+.rec-ok:hover { background: var(--salvia-claro); }
+.lista-rec li.rec-urgente strong::after { content: ' · pronto'; color: var(--terracota-oscuro); font-size: .78rem; font-weight: 700; }
+.lista-rec li.rec-espera { opacity: .7; }
+
+@media (max-width: 760px) {
+  body { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+  .barra { gap: 10px; }
+  .barra .nav, #btnNuevoViajeBarra, .boton-usuario { display: none; }
+  .barra .marca span:last-child { display: inline; }
+  .barra { justify-content: center; }
+  .nav-inferior {
+    display: flex; align-items: flex-end; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    padding: 0 6px env(safe-area-inset-bottom);
+    background: color-mix(in srgb, var(--papel) 94%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid var(--linea);
+  }
+  .toast { bottom: calc(92px + env(safe-area-inset-bottom)); }
+  .pestanas { top: calc(52px + env(safe-area-inset-top)); }
+  /* Evita el zoom automático de iOS al tocar campos */
+  input, select, textarea, .lugar-input { font-size: 16px !important; }
+  .btn { min-height: 44px; }
+  .btn-chico { min-height: 36px; }
+  .hero h1 { font-size: 1.9rem; }
+  .hero .btn-grande { width: 100%; }
+  .destacado-portada { min-height: 200px; }
+  .modal-pie .btn, .asistente-pie .btn-primario { flex: 1; }
+  .pp-acciones .btn-primario { flex-basis: 100%; }
+  .rec-acciones .btn-chico { display: none; }
+  .lista-rec li { flex-wrap: nowrap; }
+  .fila-datos .btn { margin-left: 0; }
+}
+@media (min-width: 761px) {
+  .nav-inferior { display: none !important; }
+}
+/* Las columnas nunca se estiran más que la pantalla */
+.guia-grilla > *, .valija-grilla > *, .gastos-grilla > *, .destacado > * { min-width: 0; }
+@media (max-width: 900px) { .guia-grilla, .valija-grilla { grid-template-columns: minmax(0, 1fr); } }
+.pp-acciones { flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .hero { padding: 26px 20px 70px; }
+  .hero h1 { font-size: 1.6rem; margin: 4px 0 6px; }
+  .hero-frase { font-size: .95rem; margin-bottom: 18px; }
+  .portada-viaje { padding: 14px 18px 58px; }
+  .portada-viaje h1 { font-size: 1.55rem; margin: 8px 0 4px; }
+  .portada-meta { font-size: .88rem; }
+  .portada-cuenta { margin-top: 6px; }
+  .portada-avatares { margin-top: 8px; }
+  .portada-lado .anillo { width: 70px !important; height: 70px !important; }
+  .portada-fila { margin-top: 10px; gap: 12px; }
+  .etiqueta-clara { font-size: .72rem; }
+}
+.lista-consejos li > .rec-acciones { flex: none; flex-direction: row; }
+.lista-valija label { min-width: 0; }
+.lista-valija label span { overflow-wrap: anywhere; }
+.origen-lista { max-width: 38%; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 760px) { .origen-lista { display: none; } }

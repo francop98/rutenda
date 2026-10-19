@@ -1,0 +1,17 @@
+{
+  "name": "Tripbox · Tu viaje, paso a paso",
+  "short_name": "Tripbox",
+  "description": "Organizá tu viaje paso a paso: pasajes, alojamiento, documentos, valija y gastos compartidos.",
+  "lang": "es-AR",
+  "start_url": "./index.html#inicio",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fbf7f1",
+  "theme_color": "#2f7d7b",
+  "icons": [
+    { "src": "iconos/icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "iconos/icono-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "iconos/icono-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

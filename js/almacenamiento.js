@@ -27,6 +27,7 @@ R.db = (function () {
     r.viajes = Array.isArray(r.viajes) ? r.viajes : [];
     r.personas = Array.isArray(r.personas) ? r.personas : base.personas;
     r.prefs = Object.assign({}, base.prefs, r.prefs || {});
+    r.listasValija = Array.isArray(r.listasValija) ? r.listasValija : [];
     if (!r.personas.some(p => p.esYo)) r.personas.unshift(base.personas[0]);
     r.viajes.forEach(normalizarViaje);
     return r;
@@ -52,6 +53,7 @@ R.db = (function () {
     v.documentos = v.documentos || [];
     v.movimientos = v.movimientos || [];
     v.cambios = v.cambios || [];
+    v.valija = v.valija || { items: [], listas: [] };
     v.monedaBase = v.monedaBase || 'ARS';
     return v;
   }
@@ -127,6 +129,16 @@ R.db = (function () {
     guardar();
   }
 
+  /* ---------- Listas de valija personalizadas (del usuario) ---------- */
+  function listasValija() { return d().listasValija; }
+  function guardarListaValija(l) {
+    const lista = d().listasValija;
+    const i = lista.findIndex(x => x.id === l.id);
+    if (i >= 0) lista[i] = l; else lista.push(l);
+    guardar();
+  }
+  function eliminarListaValija(id) { d().listasValija = d().listasValija.filter(l => l.id !== id); guardar(); }
+
   function prefs() { return d().prefs; }
   function guardarPrefs(cambios) { Object.assign(d().prefs, cambios); guardar(); }
 
@@ -171,7 +183,7 @@ R.db = (function () {
   return {
     cargar, guardar, viajes, viaje, guardarViaje, eliminarViaje,
     personas, persona, yo, guardarPersona, crearPersona, eliminarPersona,
-    prefs, guardarPrefs, exportar, importar,
+    prefs, guardarPrefs, exportar, importar, listasValija, guardarListaValija, eliminarListaValija,
     guardarArchivo, obtenerArchivo, eliminarArchivo
   };
 })();

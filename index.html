@@ -6,6 +6,12 @@
   <title>Tripbox · Tu viaje, paso a paso</title>
   <meta name="description" content="Tripbox: organizá tu viaje desde cero con una guía paso a paso que prioriza por vos: pasajes, alojamiento, documentos, itinerario y gastos compartidos.">
   <meta name="theme-color" content="#2f7d7b">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="iconos/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Tripbox">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M24 16v-4a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v4' fill='none' stroke='%2322605e' stroke-width='5'/%3E%3Crect x='6' y='16' width='52' height='42' rx='10' fill='%232f7d7b'/%3E%3Crect x='6' y='30' width='52' height='4' fill='%2322605e'/%3E%3Ccircle cx='32' cy='45' r='7' fill='%23f2c46d'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -20,6 +26,7 @@
     </a>
     <nav class="nav" aria-label="Principal">
       <a href="#inicio" data-nav="inicio">Mis viajes</a>
+      <a href="#valijas" data-nav="valijas">Mis listas</a>
       <a href="#personas" data-nav="personas">Compañeros</a>
     </nav>
     <button class="btn btn-primario btn-chico" id="btnNuevoViajeBarra" type="button">+ Nuevo viaje</button>
@@ -27,6 +34,15 @@
   </header>
 
   <main id="app" class="app" aria-live="polite"></main>
+
+  <!-- Navegación tipo app (celular) -->
+  <nav class="nav-inferior" aria-label="Navegación principal">
+    <a href="#inicio" data-nav="inicio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>Viajes</a>
+    <a href="#valijas" data-nav="valijas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/></svg>Listas</a>
+    <button type="button" class="nav-nuevo" id="btnNuevoViajeNav" aria-label="Nuevo viaje"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <a href="#personas" data-nav="personas"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/></svg>Compañeros</a>
+    <button type="button" id="btnCuentaNav"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>Cuenta</button>
+  </nav>
 
   <div id="capaModal"></div>
   <div id="toast" class="toast" role="status"></div>
@@ -36,6 +52,9 @@
   <script src="js/almacenamiento.js"></script>
   <script src="js/lugares.js"></script>
   <script src="js/paisajeviaje.js"></script>
+  <script src="js/aeropuertosdatos.js"></script>
+  <script src="js/aeropuertos.js"></script>
+  <script src="js/requisitosviaje.js"></script>
   <script src="js/autenticacion.js"></script>
   <!-- Inteligencia de la guía -->
   <script src="js/plantillaguia.js"></script>
@@ -48,6 +67,7 @@
   <script src="js/documentos.js"></script>
   <script src="js/gastos.js"></script>
   <script src="js/participantes.js"></script>
+  <script src="js/valija.js"></script>
   <!-- Arranque -->
   <script src="main.js"></script>
 </body>
