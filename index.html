@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Tripbox · Tu viaje, paso a paso</title>
+  <meta name="description" content="Tripbox: organizá tu viaje desde cero con una guía paso a paso que prioriza por vos: pasajes, alojamiento, documentos, itinerario y gastos compartidos.">
+  <meta name="theme-color" content="#2f7d7b">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M24 16v-4a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v4' fill='none' stroke='%2322605e' stroke-width='5'/%3E%3Crect x='6' y='16' width='52' height='42' rx='10' fill='%232f7d7b'/%3E%3Crect x='6' y='30' width='52' height='4' fill='%2322605e'/%3E%3Ccircle cx='32' cy='45' r='7' fill='%23f2c46d'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="barra">
+    <a href="#inicio" class="marca" aria-label="Tripbox, inicio">
+      <span class="marca-logo" aria-hidden="true"></span>
+      <span>Tripbox</span>
+    </a>
+    <nav class="nav" aria-label="Principal">
+      <a href="#inicio" data-nav="inicio">Mis viajes</a>
+      <a href="#personas" data-nav="personas">Compañeros</a>
+    </nav>
+    <button class="btn btn-primario btn-chico" id="btnNuevoViajeBarra" type="button">+ Nuevo viaje</button>
+    <button class="boton-usuario" id="btnUsuario" type="button" aria-label="Mi cuenta"></button>
+  </header>
+
+  <main id="app" class="app" aria-live="polite"></main>
+
+  <div id="capaModal"></div>
+  <div id="toast" class="toast" role="status"></div>
+
+  <!-- Base -->
+  <script src="js/utilidades.js"></script>
+  <script src="js/almacenamiento.js"></script>
+  <script src="js/lugares.js"></script>
+  <script src="js/paisajeviaje.js"></script>
+  <script src="js/autenticacion.js"></script>
+  <!-- Inteligencia de la guía -->
+  <script src="js/plantillaguia.js"></script>
+  <script src="js/motorprioridad.js"></script>
+  <script src="js/formulariospasos.js"></script>
+  <!-- Secciones -->
+  <script src="js/viajes.js"></script>
+  <script src="js/vistaguia.js"></script>
+  <script src="js/itinerario.js"></script>
+  <script src="js/documentos.js"></script>
+  <script src="js/gastos.js"></script>
+  <script src="js/participantes.js"></script>
+  <!-- Arranque -->
+  <script src="main.js"></script>
+</body>
+</html>
