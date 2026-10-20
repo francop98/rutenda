@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — requisitos de entrada y recomendaciones de salud
+   Rutenda — requisitos de entrada y recomendaciones de salud
    La app deduce sola qué documentación y qué vacunas
    corresponden según la nacionalidad del viajero y los
    destinos (incluidas las escapadas de un día).
@@ -108,7 +108,7 @@ R.requisitos = (function () {
       if (codigo ? codigo === origen : normal(d.pais) === normal((v.origen || {}).pais)) return;
       if (porPais.some(p => (codigo && p.codigo === codigo) || (!codigo && normal(p.pais) === normal(d.pais)))) return;
       let regla = nac === 'AR' && codigo ? REGLAS_AR[codigo] : null;
-      if (!regla) regla = { nivel: 'verificar', nota: nac === 'AR' ? 'Todavía no tengo los requisitos de este país: confirmalos en la fuente oficial.' : 'Por ahora Tripbox conoce los requisitos para documentación argentina. Confirmalos en el consulado del destino.' };
+      if (!regla) regla = { nivel: 'verificar', nota: nac === 'AR' ? 'Todavía no tengo los requisitos de este país: confirmalos en la fuente oficial.' : 'Por ahora Rutenda conoce los requisitos para documentación argentina. Confirmalos en el consulado del destino.' };
       porPais.push({ codigo, pais: d.pais || d.nombre, bandera: R.lugares ? R.lugares.bandera(codigo) : '', nivel: regla.nivel, nota: regla.nota, tramite: regla.tramite || '' });
     });
 

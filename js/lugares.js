@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — buscador de lugares
+   Rutenda — buscador de lugares
    Autocompleta ciudades y completa país, provincia/estado,
    código de país y coordenadas automáticamente.
    Usa el geocodificador gratuito de Open-Meteo (sin clave).

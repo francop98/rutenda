@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — paisaje del viaje
+   Rutenda — paisaje del viaje
    Ilustración que se personaliza con cada viaje:
    - El medio de transporte define la escena (avión, auto,
      micro, tren o barco) y avanza con el progreso.

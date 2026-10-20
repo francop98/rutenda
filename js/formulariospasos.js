@@ -1,6 +1,6 @@
 /* =========================================================
-   Tripbox — formularios de cada paso
-   Cuando marcás un paso como listo, Tripbox te pide sus datos
+   Rutenda — formularios de cada paso
+   Cuando marcás un paso como listo, Rutenda te pide sus datos
    paso a paso (aerolínea, horarios, código, costo, quién pagó,
    archivos…) y con eso arma solo:
    - el itinerario (eventos con origen = id del paso)

@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — motor de prioridades
+   Rutenda — motor de prioridades
    Decide qué conviene hacer primero combinando:
    1. Impacto: cuánto cuesta cambiarlo y qué tan escaso es.
    2. Urgencia: cuánto falta para la fecha recomendada.
@@ -21,7 +21,7 @@ R.motor = (function () {
     const destinos = v.destinos || [];
     const conAloj = destinos.filter(d => !d.soloDia);
     // Donde dormís: destinos y paradas en las que hacés noche
-    const estadias = R.recorrido.estadias(v).map(e => Object.assign({}, e.lugar, { id: e.id, nombre: e.nombre, desde: e.desde, hasta: e.hasta, parada: e.tipo === 'parada' }));
+    const estadias = R.recorrido.estadias(v).filter(e => !e.dePaso).map(e => Object.assign({}, e.lugar, { id: e.id, nombre: e.nombre, desde: e.desde, hasta: e.hasta, parada: e.tipo === 'parada' }));
     const escapadas = destinos.filter(d => d.soloDia);
     const varios = estadias.length > 1;
     const concreta = (t, id, ctx) => Object.assign({}, t, {
@@ -43,7 +43,7 @@ R.motor = (function () {
     const base = [];
     R.guia.tareas.filter(t => !t.aplica || t.aplica(v)).forEach(t => {
       if (t.porDestino) {
-        const lugares = estadias.length ? estadias : (conAloj.length ? conAloj : [{ id: 'unico', nombre: v.destino || 'destino' }]);
+        const lugares = estadias.length || (v.destinos || []).some(d => d.dePaso) ? estadias : (conAloj.length ? conAloj : [{ id: 'unico', nombre: v.destino || 'destino' }]);
         lugares.forEach(d => base.push(concreta(t, `${t.id}__${d.id}`, { destino: d, varios })));
       } else if (t.porTramo) {
         for (let i = 1; i < conAloj.length; i++) base.push(concreta(t, `${t.id}__${conAloj[i].id}`, { desde: conAloj[i - 1], hasta: conAloj[i] }));

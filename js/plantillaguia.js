@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — plantilla de la guía paso a paso
+   Rutenda — plantilla de la guía paso a paso
    Cada paso tiene:
    - impacto (1 a 5): cuánto cuesta cambiarlo / qué tan escaso es
    - anticipacion: días antes de salir en que conviene tenerlo listo
@@ -92,7 +92,7 @@ R.guia = (function () {
     {
       id: 'doc_requisitos', fase: 'documentos',
       titulo: v => `Verificar requisitos de entrada a ${req(v).aVerificar.map(p => p.pais).join(', ')}`,
-      desc: 'Tripbox no tiene los requisitos confirmados para este destino: revisalos en la fuente oficial.',
+      desc: 'Rutenda no tiene los requisitos confirmados para este destino: revisalos en la fuente oficial.',
       consejo: 'Consultá siempre la Cancillería o el consulado del destino.',
       porque: 'Un requisito no cumplido puede dejarte sin embarcar.',
       impacto: 5, anticipacion: 75, dependeDe: ['d_destino'], aplica: v => req(v).aVerificar.length > 0

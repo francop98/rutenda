@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — cuenta de usuario
+   Rutenda — cuenta de usuario
    Con Firebase configurado (js/firebaseconfig.js): cuentas
    reales con Firebase Auth (verificación de mail y recuperación
    de contraseña). Si no, funciona en modo local en este
@@ -224,7 +224,7 @@ R.auth = (function () {
             ${R.paisaje.svg(null, { transporte: 'avion', progreso: 0.65 })}
             <div class="acceso-marca">
               <span class="marca-logo grande" aria-hidden="true"></span>
-              <h1>Tripbox</h1>
+              <h1>Rutenda</h1>
               <p>${invitado ? 'Te invitaron a un viaje. Ingresá o creá tu cuenta para sumarte.' : 'Tu viaje, paso a paso. Organizado, guardado y a salvo en un solo lugar.'}</p>
             </div>
           </div>
@@ -325,7 +325,7 @@ R.auth = (function () {
           <label class="campo"><span>Apellido</span><input id="mcApellido" value="${esc(u.apellido)}"></label>
         </div>
         <label class="campo"><span>Nacionalidad de tu documento</span><select id="mcNac">${R.requisitos.NACIONALIDADES.map(([c, n]) => `<option value="${c}" ${c === u.nacionalidad ? 'selected' : ''}>${n}</option>`).join('')}</select>
-          <small class="ayuda">Con esto Tripbox sabe qué documentación y visas te piden en cada destino.</small></label>
+          <small class="ayuda">Con esto Rutenda sabe qué documentación y visas te piden en cada destino.</small></label>
         <div class="bloque-interno">
           <strong>🔔 Recordatorios</strong>
           <p class="texto-suave">${push === 'activo' ? 'Activados en este dispositivo.' : push === 'bloqueado' ? 'El navegador bloqueó las notificaciones: habilitalas en los ajustes del sitio.' : push === 'no' ? 'Este navegador no permite notificaciones (en iPhone, instalá la app primero).' : 'Te avisamos del check-in, lo que se acerca y el día a día del viaje.'}</p>
@@ -339,7 +339,8 @@ R.auth = (function () {
             <label class="campo"><span>Nueva contraseña</span><input id="mcNueva" type="password" autocomplete="new-password"></label>
           </div>
         </details>
-        ${R.app.puedeInstalar() ? '<button type="button" class="btn btn-suave btn-bloque" data-a="instalarApp">📲 Instalar Tripbox como app</button>' : ''}
+        ${R.app.puedeInstalar() ? '<button type="button" class="btn btn-suave btn-bloque" data-a="instalarApp">📲 Instalar Rutenda como app</button>' : ''}
+        <p class="ayuda version-app">Rutenda · versión ${R.VERSION}</p>
         <p class="ayuda">Cuenta creada el ${U.fmtFecha(String(u.creado).slice(0, 10))}. ${enNube() ? 'Tus datos se guardan en la nube y se sincronizan en tus dispositivos.' : 'Modo local: tus datos se guardan en este dispositivo.'}</p>`,
       alAbrir: el => {
         const b = el.querySelector('[data-a="instalarApp"]');

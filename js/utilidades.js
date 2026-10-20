@@ -1,8 +1,11 @@
 /* =========================================================
-   Tripbox — utilidades generales
+   Rutenda — utilidades generales
    Fechas, formato, modales, avisos y piezas visuales comunes.
    ========================================================= */
 window.R = window.R || {};
+
+/** Versión de la app (cambios chicos: 10.1, 10.2…; cambios grandes: 11, 12…). Igual que VERSION en sw.js. */
+window.R.VERSION = '10.1';
 
 R.util = (function () {
   const pad = n => String(n).padStart(2, '0');
@@ -103,7 +106,7 @@ R.util = (function () {
     const [a, b] = PORTADAS[hash(texto) % PORTADAS.length];
     return `linear-gradient(135deg, ${a} 0%, ${b} 100%)`;
   }
-  const COLORES_PERSONA = ['#2f7d7b', '#c9785a', '#466a8f', '#6d8a5c', '#8a5a7a', '#b8893a', '#5b6f9e', '#a05d5d'];
+  const COLORES_PERSONA = ['#2E5A52', '#c9785a', '#466a8f', '#6d8a5c', '#8a5a7a', '#b8893a', '#5b6f9e', '#a05d5d'];
   function colorPersona(semilla) { return COLORES_PERSONA[hash(semilla) % COLORES_PERSONA.length]; }
   function iniciales(nombre) {
     const partes = String(nombre || '?').trim().split(/\s+/);

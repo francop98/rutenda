@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — aeropuertos
+   Rutenda — aeropuertos
    Sugiere los aeropuertos de una ciudad por cercanía
    (ej. Buenos Aires → AEP y EZE) y permite buscar por
    código, ciudad o nombre. Datos en aeropuertosdatos.js.

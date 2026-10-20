@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — arranque, navegación y pantalla de inicio
+   Rutenda — arranque, navegación y pantalla de inicio
    Rutas:
      #inicio                 → mis viajes
      #viaje/{id}/{pestaña}   → un viaje (guia, itinerario, documentos, viajeros, gastos)
@@ -18,7 +18,7 @@
     if (!listo) return;
     if (!R.auth.usuarioActual()) {
       document.body.classList.add('sin-sesion');
-      document.title = 'Tripbox · Ingresá';
+      document.title = 'Rutenda · Ingresá';
       R.auth.renderPantalla(app, arrancarSesion);
       return;
     }
@@ -27,7 +27,7 @@
     const hash = location.hash.replace(/^#/, '') || 'inicio';
     const [vista, id, pestana] = hash.split('/');
     document.querySelectorAll('[data-nav]').forEach(a => {
-      a.classList.toggle('activo', a.dataset.nav === vista || (vista === 'viaje' && a.dataset.nav === 'inicio'));
+      a.classList.toggle('activo', a.dataset.nav === vista || (vista === 'viaje' && a.dataset.nav === 'viajes') || (vista === 'personas' && a.dataset.nav === 'viajes' && a.closest('.nav-inferior')));
     });
 
     if (vista === 'unirse' && id) {
@@ -35,16 +35,19 @@
     } else if (vista === 'viaje' && id) {
       const v = R.db.viaje(id);
       if (!v) { location.hash = '#inicio'; return; }
-      document.title = `${v.nombre || v.destino} · Tripbox`;
+      document.title = `${v.nombre || v.destino} · Rutenda`;
       R.viajes.renderViaje(app, v, pestana || 'guia');
     } else if (vista === 'valijas') {
-      document.title = 'Mis listas de valija · Tripbox';
+      document.title = 'Mis listas de valija · Rutenda';
       R.valija.renderMisListas(app);
+    } else if (vista === 'viajes') {
+      document.title = 'Mis viajes · Rutenda';
+      renderMisViajes();
     } else if (vista === 'personas') {
-      document.title = 'Compañeros · Tripbox';
+      document.title = 'Compañeros · Rutenda';
       R.participantes.renderPersonas(app);
     } else {
-      document.title = 'Tripbox · Tu viaje, paso a paso';
+      document.title = 'Rutenda · Tu viaje, paso a paso';
       renderInicio();
     }
   }
@@ -107,7 +110,7 @@
     eventoInstalar = e;
     if ((location.hash || '#inicio').startsWith('#inicio')) refrescar();
   });
-  window.addEventListener('appinstalled', () => { eventoInstalar = null; U.toast('¡Tripbox quedó instalada! 🎉'); refrescar(); });
+  window.addEventListener('appinstalled', () => { eventoInstalar = null; U.toast('¡Rutenda quedó instalada! 🎉'); refrescar(); });
   function puedeInstalar() { return !esInstalada() && (!!eventoInstalar || esIOS); }
   async function instalar() {
     if (eventoInstalar) {
@@ -117,8 +120,8 @@
       refrescar();
     } else if (esIOS) {
       U.modal({
-        titulo: 'Instalar Tripbox',
-        cuerpo: '<ol class="pasos-instalar"><li>Tocá el botón <strong>Compartir</strong> de Safari (el cuadrado con la flecha).</li><li>Elegí <strong>Agregar a inicio</strong>.</li><li>Listo: Tripbox se abre como una app, a pantalla completa.</li></ol>',
+        titulo: 'Instalar Rutenda',
+        cuerpo: '<ol class="pasos-instalar"><li>Tocá el botón <strong>Compartir</strong> de Safari (el cuadrado con la flecha).</li><li>Elegí <strong>Agregar a inicio</strong>.</li><li>Listo: Rutenda se abre como una app, a pantalla completa.</li></ol>',
         acciones: [{ texto: 'Entendido', clase: 'btn-primario' }]
       });
     } else {
@@ -142,24 +145,33 @@
     const porEstado = est => viajes.filter(v => R.viajes.estadoViaje(v) === est);
     const enCurso = porEstado('en_curso');
     const planificando = porEstado('planificando').sort((a, b) => (a.fechaInicio || '9999').localeCompare(b.fechaInicio || '9999'));
-    const pasados = porEstado('pasado').sort((a, b) => (b.fechaFin || '').localeCompare(a.fechaFin || ''));
     const destacado = enCurso[0] || planificando[0];
+    const otrosProximos = planificando.filter(v => v !== destacado).slice(0, 3);
+    const hayViajes = viajes.length > 0;
 
     app.innerHTML = `
+      ${hayViajes ? `
+      <section class="saludo-inicio">
+        <div>
+          <p class="hero-saludo">${U.saludo()}${esc(nombre)} ☀️</p>
+          <h1>${enCurso.length ? '¡Buen viaje!' : destacado ? '¿Seguimos organizando?' : '¿A dónde vamos?'}</h1>
+        </div>
+        <button class="btn btn-suave btn-chico" data-a="nuevo">+ Nuevo viaje</button>
+      </section>` : `
       <section class="hero">
-        ${U.paisaje(null, { transporte: destacado ? destacado.perfil.transporte : 'avion', progreso: destacado ? R.motor.progreso(destacado).pct / 100 : 0.55 })}
+        ${U.paisaje(null, { transporte: 'avion', progreso: 0.55 })}
         <div class="hero-contenido">
           <p class="hero-saludo">${U.saludo()}${esc(nombre)} ☀️</p>
-          <h1>${viajes.length ? '¿Seguimos organizando?' : '¿A dónde vamos?'}</h1>
+          <h1>¿A dónde vamos?</h1>
           <p class="hero-frase">${esc(U.frase())}</p>
           <button class="btn btn-primario btn-grande" data-a="nuevo">+ Planificar un viaje</button>
         </div>
-      </section>
+      </section>`}
 
       ${puedeInstalar() && !leerOculto('instalar') ? `
         <div class="aviso-instalar">
           <span class="ai-icono"></span>
-          <div><strong>Instalá Tripbox en tu celular</strong><small>Se abre como una app, a pantalla completa y sin conexión.</small></div>
+          <div><strong>Instalá Rutenda en tu celular</strong><small>Se abre como una app, a pantalla completa y sin conexión.</small></div>
           <button class="btn btn-primario btn-chico" data-a="instalar">Instalar</button>
           <button class="btn-icono" data-a="ocultarInstalar" aria-label="Ahora no">×</button>
         </div>` : ''}
@@ -170,19 +182,13 @@
 
       ${destacado ? destacadoHTML(destacado) : ''}
 
-      ${!viajes.length ? comoFunciona() : ''}
+      ${!hayViajes ? comoFunciona() : ''}
 
-      ${seccion('En curso', enCurso.filter(v => v !== destacado))}
-      ${seccion('Planificando', planificando.filter(v => v !== destacado))}
-      ${seccion('Viajes realizados', pasados)}
-
-      <footer class="pie">
-        <p>${R.db.modo() === 'nube' ? '☁️ Tus datos están guardados en tu cuenta y se sincronizan en tus dispositivos.' : 'Tus datos se guardan en este dispositivo.'}</p>
-        <div class="pie-acciones">
-          <button class="btn btn-texto btn-chico" data-a="exportar">Descargar copia de seguridad</button>
-          <label class="btn btn-texto btn-chico">Restaurar copia<input type="file" accept="application/json" id="importar" hidden></label>
-        </div>
-      </footer>`;
+      ${otrosProximos.length ? `
+        <section class="seccion-viajes">
+          <div class="cab-seccion-chica"><h2 class="titulo-seccion">También en camino</h2><a href="#viajes" class="btn btn-texto btn-chico">Ver todos →</a></div>
+          <div class="lista-compacta">${otrosProximos.map(filaViaje).join('')}</div>
+        </section>` : viajes.length > 1 ? `<p class="ir-viajes"><a href="#viajes" class="btn btn-texto btn-chico">Ver todos mis viajes (${viajes.length}) →</a></p>` : ''}`;
 
     app.querySelectorAll('[data-a="nuevo"]').forEach(b => b.onclick = () => R.viajes.abrirAsistente());
     const bInst = app.querySelector('[data-a="instalar"]');
@@ -196,10 +202,88 @@
       location.hash = `#viaje/${v.id}/guia`;
       setTimeout(() => R.vistaGuia.abrirTarea(v, sig.dataset.siguiente), 200);
     };
-    app.querySelector('[data-a="exportar"]').onclick = exportar;
-    app.querySelector('#importar').onchange = importar;
     enCurso.forEach(v => R.itinerario.enlazarHoy(app, v));
     if (R.recordatorios) R.recordatorios.enlazarAvisos(app);
+  }
+
+  /** Fila compacta de un viaje (inicio y listas). */
+  function filaViaje(v) {
+    const prog = R.motor.progreso(v);
+    const est = R.viajes.estadoViaje(v);
+    return `
+      <a class="fila-viaje" href="#viaje/${v.id}/guia">
+        <span class="fv-portada" style="background:${U.portada(v.destino)}">${R.viajes.tipoDe(v).icono}</span>
+        <span class="fv-texto">
+          <strong>${esc(v.nombre || (v.destinos || []).filter(d => !d.soloDia).map(d => d.nombre).join(' → ') || v.destino)}</strong>
+          <small>${esc(U.fmtRango(v.fechaInicio, v.fechaFin))} · ${esc(R.viajes.cuentaRegresiva(v))}</small>
+        </span>
+        ${est === 'pasado' ? '<span class="fv-estado">✓</span>' : `<span class="fv-pct">${prog.pct}%</span>`}
+      </a>`;
+  }
+
+  /* ---------------------------------------------------------
+     Mis viajes: todos, con filtros
+     --------------------------------------------------------- */
+  let filtroViajes = 'todos';
+  function renderMisViajes() {
+    const viajes = R.db.viajes().slice();
+    const estado = v => {
+      const e = R.viajes.estadoViaje(v);
+      return e === 'planificando' && !v.fechaInicio ? 'sin_fecha' : e;
+    };
+    const grupos = [
+      { id: 'en_curso', titulo: 'En curso', icono: '🧳' },
+      { id: 'planificando', titulo: 'Próximos', icono: '🗓️' },
+      { id: 'sin_fecha', titulo: 'Sin fechas', icono: '💭' },
+      { id: 'pasado', titulo: 'Finalizados', icono: '📸' }
+    ].map(g => {
+      const lista = viajes.filter(v => estado(v) === g.id);
+      lista.sort((a, b) => g.id === 'pasado' ? (b.fechaFin || '').localeCompare(a.fechaFin || '') : (a.fechaInicio || '9999').localeCompare(b.fechaInicio || '9999'));
+      return Object.assign(g, { lista });
+    });
+    if (filtroViajes !== 'todos' && !grupos.some(g => g.id === filtroViajes && g.lista.length)) filtroViajes = 'todos';
+    const visibles = grupos.filter(g => g.lista.length && (filtroViajes === 'todos' || g.id === filtroViajes));
+
+    app.innerHTML = `
+      <section class="cab-mis-viajes">
+        <div>
+          <h1 class="titulo-pagina">Mis viajes</h1>
+          <p class="texto-suave">${viajes.length ? U.plural(viajes.length, 'viaje', 'viajes') : 'Todavía no cargaste viajes.'}</p>
+        </div>
+        <div class="acciones-fila">
+          <a class="btn btn-texto btn-chico" href="#personas">👥 Compañeros</a>
+          <button class="btn btn-primario btn-chico" data-a="nuevo">+ Nuevo viaje</button>
+        </div>
+      </section>
+      ${viajes.length ? `
+      <div class="chips-filtro filtro-viajes">
+        <button class="${filtroViajes === 'todos' ? 'activo' : ''}" data-filtro-viajes="todos">Todos</button>
+        ${grupos.filter(g => g.lista.length).map(g => `<button class="${filtroViajes === g.id ? 'activo' : ''}" data-filtro-viajes="${g.id}">${g.titulo} <span>${g.lista.length}</span></button>`).join('')}
+      </div>
+      ${visibles.map(g => `
+        <section class="seccion-viajes">
+          <h2 class="titulo-seccion">${g.icono} ${esc(g.titulo)} <span class="contador">${g.lista.length}</span></h2>
+          <div class="grilla-viajes">${g.lista.map(R.viajes.tarjeta).join('')}</div>
+        </section>`).join('')}` : `
+      <div class="vacio">
+        <div class="vacio-icono">🧭</div>
+        <h3>Tu primer viaje te espera</h3>
+        <p>Cargá a dónde vas y Rutenda te arma la guía paso a paso.</p>
+        <button class="btn btn-primario" data-a="nuevo">+ Planificar un viaje</button>
+      </div>`}
+
+      <footer class="pie">
+        <p>${R.db.modo() === 'nube' ? '☁️ Tus datos están guardados en tu cuenta y se sincronizan en tus dispositivos.' : 'Tus datos se guardan en este dispositivo.'}</p>
+        <div class="pie-acciones">
+          <button class="btn btn-texto btn-chico" data-a="exportar">Descargar copia de seguridad</button>
+          <label class="btn btn-texto btn-chico">Restaurar copia<input type="file" accept="application/json" id="importar" hidden></label>
+        </div>
+      </footer>`;
+
+    app.querySelectorAll('[data-a="nuevo"]').forEach(b => b.onclick = () => R.viajes.abrirAsistente());
+    app.querySelectorAll('[data-filtro-viajes]').forEach(b => b.onclick = () => { filtroViajes = b.dataset.filtroViajes; renderMisViajes(); });
+    app.querySelector('[data-a="exportar"]').onclick = exportar;
+    app.querySelector('#importar').onchange = importar;
   }
 
   function leerOculto(clave) { try { return localStorage.getItem('tripbox_oculto_' + clave) === '1'; } catch (e) { return false; } }
@@ -229,15 +313,6 @@
             </div>` : `<p class="texto-suave">¡Nada pendiente por ahora! 🌴</p>`}
           <a href="#viaje/${v.id}/guia" class="btn btn-suave btn-chico">Ver el viaje completo →</a>
         </div>
-      </section>`;
-  }
-
-  function seccion(titulo, lista) {
-    if (!lista.length) return '';
-    return `
-      <section class="seccion-viajes">
-        <h2 class="titulo-seccion">${esc(titulo)} <span class="contador">${lista.length}</span></h2>
-        <div class="grilla-viajes">${lista.map(R.viajes.tarjeta).join('')}</div>
       </section>`;
   }
 
@@ -302,7 +377,7 @@
     if (cambioDeVista) window.scrollTo(0, 0);
   });
   rutaAnterior = location.hash.split('/').slice(0, 2).join('/');
-  app.innerHTML = '<div class="pantalla-carga"><span class="marca-logo grande"></span><p>Abriendo Tripbox…</p></div>';
+  app.innerHTML = '<div class="pantalla-carga"><span class="marca-logo grande"></span><p>Abriendo Rutenda…</p></div>';
   R.auth.iniciar().then(async u => {
     listo = true;
     if (u) await arrancarSesion(u); else render();

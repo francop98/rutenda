@@ -1,6 +1,6 @@
 rules_version = '2';
 // =========================================================
-// Tripbox — reglas de Storage (archivos de cada viaje)
+// Rutenda — reglas de Storage (archivos de cada viaje)
 // Solo los miembros del viaje ven y suben archivos (máx. 25 MB).
 // =========================================================
 service firebase.storage {

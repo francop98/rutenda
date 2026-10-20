@@ -1,8 +1,8 @@
 /* =========================================================
-   Tripbox — escanear reservas con IA
+   Rutenda — escanear reservas con IA
    Le sacás una foto o subís el PDF de un pasaje, reserva,
    voucher o seguro: la función /api/escanear-reserva (Groq)
-   lee los datos y Tripbox completa el formulario del paso
+   lee los datos y Rutenda completa el formulario del paso
    para que lo revises antes de guardar.
    ========================================================= */
 window.R = window.R || {};

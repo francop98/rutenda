@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — capa de datos
+   Rutenda — capa de datos
    Toda la app lee y escribe por R.db. Hay dos modos:
    - "nube": Firebase (Firestore + Storage), con sincronización
      en tiempo real y viajes compartidos (ver sincronizacion.js).
@@ -94,7 +94,7 @@ R.db = (function () {
   }
 
   function limpiarPersona(p) { const r = { id: p.id, nombre: p.nombre, color: p.color || colorDe(p.id) }; if (p.uid) r.uid = p.uid; return r; }
-  function colorDe(id) { return U() ? U().colorPersona(id) : '#2f7d7b'; }
+  function colorDe(id) { return U() ? U().colorPersona(id) : '#1F3A36'; }
   function nombreYo() { return (usuario && usuario.nombre) || 'Yo'; }
   function buscarEnViajes(pid) {
     for (const v of estado.viajes) if (v.personas && v.personas[pid]) return v.personas[pid];
@@ -145,7 +145,7 @@ R.db = (function () {
     try {
       localStorage.setItem(claveLocal(), JSON.stringify({ version: 2, viajes: estado.viajes, prefs: estado.prefs, listasValija: estado.listasValija }));
     } catch (e) {
-      console.error('Tripbox: error al guardar', e);
+      console.error('Rutenda: error al guardar', e);
       if (U()) U().toast('No se pudo guardar. Revisá el espacio del navegador.');
     }
   }
@@ -259,7 +259,7 @@ R.db = (function () {
   function exportar() { return JSON.stringify({ version: 2, viajes: estado.viajes, prefs: estado.prefs, listasValija: estado.listasValija }, null, 2); }
   function importar(texto) {
     const nuevo = JSON.parse(texto);
-    if (!nuevo || !Array.isArray(nuevo.viajes)) throw new Error('El archivo no parece una copia de Tripbox.');
+    if (!nuevo || !Array.isArray(nuevo.viajes)) throw new Error('El archivo no parece una copia de Rutenda.');
     estado.legado = Array.isArray(nuevo.personas) ? nuevo.personas : [];
     nuevo.viajes.forEach(v => {
       if (modo === 'nube') { v.owner = uid; v.miembros = [uid]; v.roles = { [uid]: 'organizador' }; }

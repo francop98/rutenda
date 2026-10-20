@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — pestaña Gastos
+   Rutenda — pestaña Gastos
    Gastos, ingresos (reintegros) y pagos entre viajeros.
    Divide en partes iguales o por montos, calcula saldos y
    la menor cantidad de transferencias para quedar a mano.
@@ -123,104 +123,198 @@ R.gastos = (function () {
   }
 
   /* ---------- Vista ---------- */
+  // Categorías para cargar rápido durante el viaje
+  const RAPIDAS = ['comida', 'transporte', 'actividades', 'compras', 'otros'];
+  let vistaGastos = (() => { try { return localStorage.getItem('tripbox_vista_gastos') || 'movimientos'; } catch (e) { return 'movimientos'; } })();
+  let filtroPersona = 'todos';
+
+  function monedaSugerida(v) {
+    const ult = v.movimientos.filter(m => m.tipo === 'gasto' && m.moneda).sort((a, b) => (b.creado || '').localeCompare(a.creado || ''))[0];
+    return ult ? ult.moneda : v.monedaBase;
+  }
+
+  /** Gastos agrupados por día (y "antes del viaje"). */
+  function porDia(v, movs) {
+    const grupos = [];
+    const hoy = U.hoyISO();
+    movs.forEach(m => {
+      const antes = v.fechaInicio && m.fecha && m.fecha < v.fechaInicio;
+      const clave = antes ? 'antes' : (m.fecha || 'sin');
+      let g = grupos.find(x => x.clave === clave);
+      if (!g) {
+        const dia = !antes && v.fechaInicio && m.fecha ? U.diasEntre(v.fechaInicio, m.fecha) + 1 : null;
+        const titulo = antes ? 'Antes del viaje' : m.fecha === hoy ? 'Hoy' : m.fecha === U.sumarDias(hoy, -1) ? 'Ayer' : U.fmtFecha(m.fecha, 'dia');
+        g = { clave, titulo, dia: dia && (!v.fechaFin || m.fecha <= v.fechaFin) ? dia : null, movs: [], total: 0 };
+        grupos.push(g);
+      }
+      g.movs.push(m);
+      if (m.tipo === 'gasto') g.total += montoBase(v, m);
+      if (m.tipo === 'ingreso') g.total -= montoBase(v, m);
+    });
+    return grupos;
+  }
+
   function render(v, cont) {
     const t = totales(v);
     const s = saldos(v);
     const tr = transferencias(s);
-    const movs = v.movimientos.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.creado || '').localeCompare(a.creado || ''));
+    const hoy = U.hoyISO();
+    const yo = R.db.yoEn(v);
+    const variosViajeros = v.participantes.length > 1;
+    const enCurso = R.viajes.estadoViaje(v) === 'en_curso';
     const pres = U.numero(v.presupuesto);
     const pctPres = pres ? Math.round((t.neto / pres) * 100) : 0;
-    const maxCat = Math.max(1, ...Object.values(t.porCategoria));
-    const variosViajeros = v.participantes.length > 1;
+    const hoyTotal = v.movimientos.filter(m => m.fecha === hoy).reduce((a, m) => a + (m.tipo === 'gasto' ? montoBase(v, m) : m.tipo === 'ingreso' ? -montoBase(v, m) : 0), 0);
+    const diasCorridos = v.fechaInicio && hoy >= v.fechaInicio ? Math.min(U.diasEntre(v.fechaInicio, v.fechaFin && hoy > v.fechaFin ? v.fechaFin : hoy) + 1, 365) : 0;
+    const promedioDia = diasCorridos ? t.durante / diasCorridos : 0;
+    const miParte = parteDe(v, yo);
+    const miSaldo = s[yo] || 0;
+    if (!['movimientos', 'cuentas', 'resumen'].includes(vistaGastos)) vistaGastos = 'movimientos';
 
     cont.innerHTML = `
-      <div class="bloque-cab cab-seccion">
-        <div>
-          <h2 class="titulo-seccion">Gastos y cuentas</h2>
-          <p class="texto-suave">Todo se convierte a ${esc(v.monedaBase)} para que las cuentas cierren.</p>
+      <section class="gastos-hero">
+        <div class="gh-fila">
+          <div>
+            <small>Gastado en el viaje</small>
+            <strong class="gh-total">${U.fmtMoneda(t.neto, v.monedaBase)}</strong>
+            ${t.antes && t.durante ? `<span class="gh-sub">${U.fmtMoneda(t.antes, v.monedaBase)} antes · ${U.fmtMoneda(t.durante, v.monedaBase)} durante</span>` : ''}
+          </div>
+          ${enCurso ? `<div class="gh-hoy"><small>Hoy</small><strong>${U.fmtMoneda(hoyTotal, v.monedaBase)}</strong>${promedioDia ? `<span>Promedio ${U.fmtMoneda(promedioDia, v.monedaBase)}/día</span>` : ''}</div>` : ''}
         </div>
-        <div class="acciones-fila">
-          <button class="btn btn-texto" data-a="categorias">🏷️ Categorías</button>
-          <button class="btn btn-suave" data-a="ingreso">+ Ingreso</button>
-          <button class="btn btn-primario" data-a="gasto">+ Gasto</button>
+        <div class="gh-datos">
+          ${variosViajeros ? `<span><small>Tu parte</small><strong>${U.fmtMoneda(miParte, v.monedaBase)}</strong></span>
+          <span class="${miSaldo > 0.009 ? 'positivo' : miSaldo < -0.009 ? 'negativo' : ''}"><small>Tu saldo</small><strong>${miSaldo > 0.009 ? 'Te deben ' + U.fmtMoneda(miSaldo, v.monedaBase) : miSaldo < -0.009 ? 'Debés ' + U.fmtMoneda(-miSaldo, v.monedaBase) : 'A mano ✓'}</strong></span>` : ''}
+          <span class="gh-pres"><small>Presupuesto <button class="btn-texto-mini solo-org" data-a="presupuesto">${pres ? 'Editar' : 'Definir'}</button></small>
+            ${pres ? `<strong>${pctPres}% usado</strong><span class="barra-progreso ${pctPres > 100 ? 'excedido' : ''}"><span style="width:${Math.min(100, pctPres)}%"></span></span>` : '<strong class="gh-opcional">Opcional</strong>'}
+          </span>
         </div>
+      </section>
+
+      <section class="gastos-rapido">
+        <button class="btn btn-primario btn-grande" data-a="gasto">+ Cargar gasto</button>
+        <div class="gr-chips">${RAPIDAS.map(id => { const c = categoria(id); return `<button class="gr-chip" data-rapido-cat="${id}"><span>${c.icono}</span>${esc(c.nombre)}</button>`; }).join('')}</div>
+      </section>
+
+      <div class="segmentado segmentado-gastos" role="tablist">
+        <button type="button" data-vista-gastos="movimientos" class="${vistaGastos === 'movimientos' ? 'activo' : ''}">Movimientos</button>
+        <button type="button" data-vista-gastos="cuentas" class="${vistaGastos === 'cuentas' ? 'activo' : ''}">Cuentas${variosViajeros && tr.length ? ` <i class="punto-aviso">${tr.length}</i>` : ''}</button>
+        <button type="button" data-vista-gastos="resumen" class="${vistaGastos === 'resumen' ? 'activo' : ''}">Resumen</button>
       </div>
-
-      <div class="grilla-resumen">
-        <div class="tarjeta-dato">
-          <small>Gasto total</small>
-          <strong>${U.fmtMoneda(t.neto, v.monedaBase)}</strong>
-          ${t.ingresado ? `<span class="texto-suave">${U.fmtMoneda(t.gastado, v.monedaBase)} gastado − ${U.fmtMoneda(t.ingresado, v.monedaBase)} de reintegros</span>` : ''}
-          ${t.antes && t.durante ? `<span class="antes-durante"><span>Antes del viaje <strong>${U.fmtMoneda(t.antes, v.monedaBase)}</strong></span><span>Durante <strong>${U.fmtMoneda(t.durante, v.monedaBase)}</strong></span></span>` : ''}
-        </div>
-        <div class="tarjeta-dato">
-          <small class="dato-cab">Presupuesto <button class="btn-texto-mini" data-a="presupuesto">${pres ? 'Editar' : 'Definir'}</button></small>
-          ${pres ? `<strong>${pctPres}% usado</strong>
-            <div class="barra-progreso ${pctPres > 100 ? 'excedido' : ''}"><span style="width:${Math.min(100, pctPres)}%"></span></div>
-            <span class="texto-suave">${pctPres > 100 ? 'Te pasaste por ' + U.fmtMoneda(t.neto - pres, v.monedaBase) : 'Quedan ' + U.fmtMoneda(pres - t.neto, v.monedaBase)}</span>`
-            : `<strong>Opcional</strong><span class="texto-suave">Si querés, poné un tope y te aviso cuánto queda.</span>`}
-        </div>
-        <div class="tarjeta-dato">
-          <small>Por persona</small>
-          <strong>${U.fmtMoneda(v.participantes.length ? t.neto / v.participantes.length : 0, v.monedaBase)}</strong>
-          <span class="texto-suave">Promedio entre ${U.plural(v.participantes.length, 'viajero', 'viajeros')}</span>
-        </div>
-      </div>
-
-      <div class="gastos-grilla">
-        <div class="bloque">
-          <h3 class="bloque-titulo">Saldos</h3>
-          ${variosViajeros ? `
-            <div class="lista-saldos">${v.participantes.map(id => {
-              const x = s[id] || 0;
-              const p = R.db.persona(id);
-              return `<div class="saldo">
-                ${U.avatar(p, 32)}
-                <span class="saldo-nombre">${esc(nombre(id))}</span>
-                <span class="saldo-monto ${x > 0.009 ? 'positivo' : x < -0.009 ? 'negativo' : ''}">${x > 0.009 ? 'Le deben ' : x < -0.009 ? 'Debe ' : ''}${Math.abs(x) > 0.009 ? U.fmtMoneda(Math.abs(x), v.monedaBase) : 'A mano ✓'}</span>
-              </div>`;
-            }).join('')}</div>
-            ${tr.length ? `
-              <h4 class="subtitulo">Para quedar a mano</h4>
-              <div class="lista-transfer">${tr.map((x, i) => `
-                <div class="transfer">
-                  <span><strong>${esc(nombre(x.de))}</strong> → <strong>${esc(nombre(x.para))}</strong></span>
-                  <span class="transfer-monto">${U.fmtMoneda(x.monto, v.monedaBase)}</span>
-                  <button class="btn btn-suave btn-chico" data-saldar="${i}">Registrar pago</button>
-                </div>`).join('')}</div>`
-              : v.movimientos.length ? '<p class="texto-suave">Todos están a mano. 🙌</p>' : ''}`
-          : '<p class="texto-suave">Viajás solo/a: no hay cuentas para dividir. Si se suma alguien, agregalo en la pestaña Viajeros.</p>'}
-        </div>
-
-        <div class="bloque">
-          <h3 class="bloque-titulo">Por categoría</h3>
-          ${Object.keys(t.porCategoria).length ? `<div class="barras">${categorias().filter(c => t.porCategoria[c.id]).map(c => `
-            <div class="barra-cat">
-              <span class="bc-nombre">${c.icono} ${c.nombre}</span>
-              <span class="bc-barra"><span style="width:${Math.round((t.porCategoria[c.id] / maxCat) * 100)}%"></span></span>
-              <span class="bc-monto">${U.fmtMoneda(t.porCategoria[c.id], v.monedaBase)}</span>
-            </div>`).join('')}</div>` : '<p class="texto-suave">Cuando cargues gastos, acá vas a ver en qué se va la plata.</p>'}
-        </div>
-      </div>
-
-      <div class="bloque">
-        <h3 class="bloque-titulo">Movimientos <span class="contador">${movs.length}</span></h3>
-        ${movs.length ? `<div class="lista-movs">${movs.map(m => filaMovimiento(v, m)).join('')}</div>` : `
-          <div class="vacio vacio-chico">
-            <div class="vacio-icono">💸</div>
-            <p>Cargá cada gasto con quién lo pagó y entre quiénes se divide. Tripbox hace las cuentas.</p>
-          </div>`}
-      </div>`;
+      <div id="vistaGastos">${vistaGastos === 'cuentas' ? cuentasHTML(v, s, tr) : vistaGastos === 'resumen' ? resumenHTML(v, t) : movimientosHTML(v)}</div>`;
 
     cont.querySelector('[data-a="gasto"]').onclick = () => editar(v, null, 'gasto');
-    cont.querySelector('[data-a="presupuesto"]').onclick = () => editarPresupuesto(v);
-    cont.querySelector('[data-a="categorias"]').onclick = () => administrarCategorias();
-    cont.querySelector('[data-a="ingreso"]').onclick = () => editar(v, null, 'ingreso');
-    cont.querySelectorAll('[data-mov]').forEach(b => b.onclick = () => editar(v, b.dataset.mov));
-    cont.querySelectorAll('[data-saldar]').forEach(b => b.onclick = () => {
-      const x = tr[Number(b.dataset.saldar)];
-      registrarPago(v, x);
+    cont.querySelectorAll('[data-rapido-cat]').forEach(b => b.onclick = () => editar(v, null, 'gasto', { categoria: b.dataset.rapidoCat }));
+    const bPres = cont.querySelector('[data-a="presupuesto"]');
+    if (bPres) bPres.onclick = () => editarPresupuesto(v);
+    cont.querySelectorAll('[data-vista-gastos]').forEach(b => b.onclick = () => {
+      vistaGastos = b.dataset.vistaGastos;
+      try { localStorage.setItem('tripbox_vista_gastos', vistaGastos); } catch (e) { /* nada */ }
+      render(v, cont);
     });
+    cont.querySelectorAll('[data-filtro-persona]').forEach(b => b.onclick = () => { filtroPersona = b.dataset.filtroPersona; render(v, cont); });
+    const bCat = cont.querySelector('[data-a="categorias"]');
+    if (bCat) bCat.onclick = () => administrarCategorias();
+    const bIng = cont.querySelector('[data-a="ingreso"]');
+    if (bIng) bIng.onclick = () => editar(v, null, 'ingreso');
+    cont.querySelectorAll('[data-mov]').forEach(b => b.onclick = () => editar(v, b.dataset.mov));
+    cont.querySelectorAll('[data-saldar]').forEach(b => b.onclick = () => registrarPago(v, tr[Number(b.dataset.saldar)]));
+  }
+
+  function movimientosHTML(v) {
+    const yo = R.db.yoEn(v);
+    let movs = v.movimientos.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.creado || '').localeCompare(a.creado || ''));
+    if (filtroPersona === 'yo') movs = movs.filter(m => m.persona === yo || m.para === yo);
+    else if (filtroPersona !== 'todos') movs = movs.filter(m => m.persona === filtroPersona || m.para === filtroPersona);
+    const grupos = porDia(v, movs);
+    return `
+      <div class="gastos-filtros">
+        ${v.participantes.length > 1 ? `<div class="chips-filtro">
+          <button class="${filtroPersona === 'todos' ? 'activo' : ''}" data-filtro-persona="todos">Todos</button>
+          <button class="${filtroPersona === 'yo' ? 'activo' : ''}" data-filtro-persona="yo">Pagué yo</button>
+          ${v.participantes.filter(p => p !== yo).map(p => `<button class="${filtroPersona === p ? 'activo' : ''}" data-filtro-persona="${p}">${esc(nombre(p))}</button>`).join('')}
+        </div>` : '<span></span>'}
+        <button class="btn btn-texto btn-chico" data-a="ingreso">+ Reintegro</button>
+      </div>
+      ${grupos.length ? grupos.map(g => `
+        <section class="bloque dia-gastos">
+          <header class="dg-cab"><strong>${esc(g.titulo)}${g.dia ? ` <small>· Día ${g.dia}</small>` : ''}</strong><span>${U.fmtMoneda(g.total, v.monedaBase)}</span></header>
+          <div class="lista-movs">${g.movs.map(m => filaMovimiento(v, m)).join('')}</div>
+        </section>`).join('') : `
+        <div class="bloque vacio vacio-chico">
+          <div class="vacio-icono">💸</div>
+          <p>${filtroPersona === 'todos' ? 'Cargá cada gasto con quién lo pagó y entre quiénes se divide. Rutenda hace las cuentas.' : 'No hay movimientos con este filtro.'}</p>
+        </div>`}`;
+  }
+
+  function cuentasHTML(v, s, tr) {
+    if (v.participantes.length < 2) return '<div class="bloque"><p class="texto-suave">Viajás solo/a: no hay cuentas para dividir. Si se suma alguien, agregalo en la pestaña Viajeros.</p></div>';
+    const pagado = {};
+    v.participantes.forEach(p => { pagado[p] = 0; });
+    v.movimientos.forEach(m => { if (m.tipo === 'gasto') pagado[m.persona] = (pagado[m.persona] || 0) + montoBase(v, m); });
+    return `
+      <div class="bloque">
+        <h3 class="bloque-titulo">Para quedar a mano</h3>
+        ${tr.length ? `<div class="lista-transfer">${tr.map((x, i) => `
+          <div class="transfer">
+            <span class="tr-quien">${U.avatar(R.db.persona(x.de), 28)} <strong>${esc(nombre(x.de))}</strong> <span class="tr-flecha">le paga a</span> ${U.avatar(R.db.persona(x.para), 28)} <strong>${esc(nombre(x.para))}</strong></span>
+            <span class="transfer-monto">${U.fmtMoneda(x.monto, v.monedaBase)}</span>
+            <button class="btn btn-suave btn-chico" data-saldar="${i}">Ya pagó ✓</button>
+          </div>`).join('')}</div>` : `<p class="texto-suave">${v.movimientos.length ? 'Todos están a mano. 🙌' : 'Cuando haya gastos, acá ves quién le debe a quién.'}</p>`}
+      </div>
+      <div class="bloque">
+        <h3 class="bloque-titulo">Cada uno</h3>
+        <div class="tabla-personas">
+          <div class="tp-fila tp-cab"><span></span><span>Pagó</span><span>Le toca</span><span>Saldo</span></div>
+          ${v.participantes.map(id => {
+            const x = s[id] || 0;
+            return `<div class="tp-fila">
+              <span class="tp-nombre">${U.avatar(R.db.persona(id), 26)} ${esc(nombre(id))}</span>
+              <span>${U.fmtMoneda(pagado[id] || 0, v.monedaBase)}</span>
+              <span>${U.fmtMoneda(parteDe(v, id), v.monedaBase)}</span>
+              <span class="${x > 0.009 ? 'positivo' : x < -0.009 ? 'negativo' : ''}">${Math.abs(x) > 0.009 ? (x > 0 ? '+' : '−') + U.fmtMoneda(Math.abs(x), v.monedaBase) : '✓'}</span>
+            </div>`;
+          }).join('')}
+        </div>
+        <p class="ayuda">"Pagó" es lo que puso de su bolsillo; "le toca" es su parte de los gastos.</p>
+      </div>`;
+  }
+
+  function resumenHTML(v, t) {
+    const maxCat = Math.max(1, ...Object.values(t.porCategoria));
+    // Por día del viaje
+    const dias = R.itinerario.diasDelViaje(v);
+    const porFecha = {};
+    v.movimientos.forEach(m => { if (m.tipo === 'gasto' && m.fecha) porFecha[m.fecha] = (porFecha[m.fecha] || 0) + montoBase(v, m); });
+    const maxDia = Math.max(1, ...dias.map(f => porFecha[f] || 0));
+    // Por moneda
+    const porMoneda = {};
+    v.movimientos.filter(m => m.tipo === 'gasto').forEach(m => { porMoneda[m.moneda] = (porMoneda[m.moneda] || 0) + U.numero(m.monto); });
+    return `
+      <div class="bloque">
+        <h3 class="bloque-titulo">Por categoría</h3>
+        ${Object.keys(t.porCategoria).length ? `<div class="barras">${categorias().filter(c => t.porCategoria[c.id]).sort((a, b) => t.porCategoria[b.id] - t.porCategoria[a.id]).map(c => `
+          <div class="barra-cat">
+            <span class="bc-nombre">${c.icono} ${esc(c.nombre)}</span>
+            <span class="bc-barra"><span style="width:${Math.round((t.porCategoria[c.id] / maxCat) * 100)}%"></span></span>
+            <span class="bc-monto">${U.fmtMoneda(t.porCategoria[c.id], v.monedaBase)}</span>
+          </div>`).join('')}</div>` : '<p class="texto-suave">Cuando cargues gastos, acá vas a ver en qué se va la plata.</p>'}
+        <button class="btn btn-texto btn-chico" data-a="categorias">🏷️ Administrar categorías</button>
+      </div>
+      ${dias.length && Object.keys(porFecha).some(f => dias.includes(f)) ? `
+      <div class="bloque">
+        <h3 class="bloque-titulo">Día por día</h3>
+        <div class="barras-dias">${dias.map((f, i) => `
+          <div class="bd-dia ${f === U.hoyISO() ? 'hoy' : ''}" title="${U.fmtFecha(f, 'dia')}: ${U.fmtMoneda(porFecha[f] || 0, v.monedaBase)}">
+            <span class="bd-barra"><span style="height:${Math.round(((porFecha[f] || 0) / maxDia) * 100)}%"></span></span>
+            <small>${i + 1}</small>
+          </div>`).join('')}</div>
+        <p class="ayuda">Gasto de cada día del viaje (en ${esc(v.monedaBase)}).</p>
+      </div>` : ''}
+      ${Object.keys(porMoneda).length > 1 ? `
+      <div class="bloque">
+        <h3 class="bloque-titulo">Por moneda</h3>
+        <div class="lista-monedas">${Object.entries(porMoneda).map(([mon, x]) => `<span class="chip">${U.fmtMoneda(x, mon)}</span>`).join('')}</div>
+      </div>` : ''}`;
   }
 
   /** Crear y borrar categorías propias (sirven para todos tus viajes). */
@@ -310,11 +404,12 @@ R.gastos = (function () {
   }
 
   /* ---------- Formulario ---------- */
-  function editar(v, id, tipoNuevo) {
+  function editar(v, id, tipoNuevo, preset) {
     const existente = id ? v.movimientos.find(m => m.id === id) : null;
     if (existente && existente.tipo === 'pago') return editarPago(v, existente);
+    const pre = preset || {};
     const m = existente ? JSON.parse(JSON.stringify(existente)) : {
-      tipo: tipoNuevo || 'gasto', concepto: '', categoria: 'comida', monto: '', moneda: v.monedaBase, cotizacion: '',
+      tipo: tipoNuevo || 'gasto', concepto: '', categoria: pre.categoria || 'comida', monto: '', moneda: monedaSugerida(v), cotizacion: '',
       fecha: U.hoyISO(), persona: R.db.yoEn(v),
       division: { modo: 'igual', entre: v.participantes.slice(), montos: {} }
     };
@@ -340,15 +435,15 @@ R.gastos = (function () {
           <button type="button" data-tipo="gasto" class="${esGasto ? 'activo' : ''}">Gasto</button>
           <button type="button" data-tipo="ingreso" class="${!esGasto ? 'activo' : ''}">Ingreso / reintegro</button>
         </div>
-        <label class="campo"><span>Concepto *</span><input id="mConcepto" value="${esc(m.concepto)}" placeholder="${esGasto ? 'Ej: Cena en el centro' : 'Ej: Reintegro de excursión cancelada'}"></label>
+        <div class="grilla-monto grilla-monto-arriba">
+          <label class="campo campo-monto"><span>Monto *</span><input id="mMonto" inputmode="decimal" value="${esc(m.monto)}" placeholder="0"></label>
+          <label class="campo"><span>Moneda</span><select id="mMoneda">${U.opcionesMoneda(m.moneda)}</select></label>
+        </div>
+        <label class="campo"><span>Concepto ${esGasto ? '<small>(opcional)</small>' : '*'}</span><input id="mConcepto" value="${esc(m.concepto)}" placeholder="${esGasto ? 'Ej: Cena en el centro' : 'Ej: Reintegro de excursión cancelada'}"></label>
         ${esGasto ? `<div class="chips-elegir chips-chicos">${categorias().map(c => `<button type="button" class="chip-op ${m.categoria === c.id ? 'activo' : ''}" data-cat="${c.id}">${c.icono} ${esc(c.nombre)}</button>`).join('')}
           <button type="button" class="chip-op chip-nueva" data-a="nuevaCat">+ Nueva categoría</button></div>
           <div class="fila-agregar oculto" id="filaNuevaCat"><input id="mCatIcono" class="input-emoji" maxlength="2" placeholder="🏷️"><input id="mCatNombre" placeholder="Nombre (ej: Regalos, Nafta)"><button type="button" class="btn btn-suave" data-a="crearCat">Crear</button></div>` : ''}
-        <div class="grilla-monto">
-          <label class="campo"><span>Monto *</span><input id="mMonto" inputmode="decimal" value="${esc(m.monto)}" placeholder="0"></label>
-          <label class="campo"><span>Moneda</span><select id="mMoneda">${U.opcionesMoneda(m.moneda)}</select></label>
-          <label class="campo"><span>Fecha</span><input type="date" id="mFecha" value="${esc(m.fecha)}"></label>
-        </div>
+        <label class="campo"><span>Fecha</span><input type="date" id="mFecha" value="${esc(m.fecha)}"></label>
         ${m.moneda !== v.monedaBase ? `<label class="campo"><span>Cotización: 1 ${esc(m.moneda)} = ? ${esc(v.monedaBase)}</span><input id="mCotiz" inputmode="decimal" value="${esc(m.cotizacion)}" placeholder="Ej: 1200"><small class="ayuda" id="mCotizAyuda"></small></label>` : ''}
         <label class="campo"><span>${esGasto ? '¿Quién pagó?' : '¿Quién lo recibió?'}</span>
           <select id="mPersona">${v.participantes.map(p => `<option value="${p}" ${m.persona === p ? 'selected' : ''}>${esc(nombre(p))}</option>`).join('')}</select>
@@ -449,6 +544,7 @@ R.gastos = (function () {
     }
 
     pintar();
+    if (!existente) setTimeout(() => { const x = f.querySelector('#mMonto'); if (x) x.focus(); }, 80);
   }
 
   function guardarForm(v, m, existente, el) {
@@ -465,6 +561,7 @@ R.gastos = (function () {
     else m.division = { modo: 'igual', entre: [m.persona], montos: {} };
     f.querySelectorAll('[data-montode]').forEach(x => { m.division.montos[x.dataset.montode] = U.numero(x.value); });
 
+    if (!m.concepto && m.tipo === 'gasto') m.concepto = categoria(m.categoria).nombre;
     if (!m.concepto) { U.toast('Poné un concepto.'); return false; }
     if (!(m.monto > 0)) { U.toast('El monto tiene que ser mayor a cero.'); return false; }
     if (m.moneda !== v.monedaBase && !(m.cotizacion > 0)) { U.toast(`Cargá la cotización de ${m.moneda} a ${v.monedaBase}.`); return false; }

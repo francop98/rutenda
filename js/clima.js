@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — clima del destino
+   Rutenda — clima del destino
    Open-Meteo (gratis, sin clave):
    - Si faltan 15 días o menos: pronóstico real.
    - Si falta más: cómo estuvo el clima esas mismas fechas el

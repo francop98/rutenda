@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — viajeros, viajes compartidos y compañeros
+   Rutenda — viajeros, viajes compartidos y compañeros
    - Pestaña Viajeros: quiénes viajan, invitar con un enlace,
      roles (organizador, coorganizador, viajero).
    - Pantalla para sumarse a un viaje (#unirse/{codigo}).
@@ -66,7 +66,7 @@ R.participantes = (function () {
               <button class="btn btn-texto peligro" data-a="desactivar">Desactivar enlace</button>
             </div>` : `<button class="btn btn-primario" data-a="invitar">Crear enlace para invitar</button>`}
         </div>` : ''}
-      ${!nube ? '<p class="ayuda">Para compartir el viaje con tus compañeros, Tripbox tiene que estar conectado a tu cuenta en la nube.</p>' : ''}
+      ${!nube ? '<p class="ayuda">Para compartir el viaje con tus compañeros, Rutenda tiene que estar conectado a tu cuenta en la nube.</p>' : ''}
 
       ${organiza ? `
         <div class="bloque">
@@ -117,8 +117,8 @@ R.participantes = (function () {
 
   function compartirEnlace(v) {
     const url = enlace(v.invitacion.codigo);
-    const texto = `¡Sumate a "${v.nombre || v.destino}" en Tripbox! Ahí tenemos el cronograma, los gastos y todo lo del viaje: ${url}`;
-    if (navigator.share) navigator.share({ title: 'Tripbox', text: texto }).catch(() => {});
+    const texto = `¡Sumate a "${v.nombre || v.destino}" en Rutenda! Ahí tenemos el cronograma, los gastos y todo lo del viaje: ${url}`;
+    if (navigator.share) navigator.share({ title: 'Rutenda', text: texto }).catch(() => {});
     else window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
   }
 
@@ -167,9 +167,9 @@ R.participantes = (function () {
 
   /* ---------- Sumarse a un viaje ---------- */
   async function renderUnirse(app, codigo) {
-    document.title = 'Sumarte a un viaje · Tripbox';
+    document.title = 'Sumarte a un viaje · Rutenda';
     if (R.db.modo() !== 'nube') {
-      app.innerHTML = `<div class="vacio"><div class="vacio-icono">🔗</div><h3>Viajes compartidos</h3><p>Para sumarte a un viaje compartido, Tripbox tiene que estar conectado a la nube.</p><a class="btn btn-primario" href="#inicio">Ir al inicio</a></div>`;
+      app.innerHTML = `<div class="vacio"><div class="vacio-icono">🔗</div><h3>Viajes compartidos</h3><p>Para sumarte a un viaje compartido, Rutenda tiene que estar conectado a la nube.</p><a class="btn btn-primario" href="#inicio">Ir al inicio</a></div>`;
       return;
     }
     app.innerHTML = '<div class="pantalla-carga"><span class="marca-logo grande"></span><p>Buscando la invitación…</p></div>';
@@ -255,7 +255,7 @@ R.participantes = (function () {
             ${U.avatar(p, 46)}
             <div>
               <strong>${esc(p.nombre)}</strong>
-              <small>${U.plural(viajes.length, 'viaje juntos', 'viajes juntos')}${p.uid ? ' · con cuenta en Tripbox' : ''}</small>
+              <small>${U.plural(viajes.length, 'viaje juntos', 'viajes juntos')}${p.uid ? ' · con cuenta en Rutenda' : ''}</small>
             </div>
             <div class="comp-acciones">
               <button class="btn-icono" data-editar="${p.id}" title="Cambiar nombre">✎</button>

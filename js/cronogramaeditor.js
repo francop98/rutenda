@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — editor del cronograma
+   Rutenda — editor del cronograma
    Línea de tiempo editable: cada traslado con su medio, fecha y
    hora de salida y llegada; paradas con "¿hacés noche?";
    estadías con noches calculadas (− / +) y escapadas.
@@ -20,6 +20,7 @@ R.cronogramaEditor = (function () {
   function montar(cont, b, opciones) {
     const op = opciones || {};
     let paradaAbierta = null;
+    let avisoEspejo = false;
     let campoParada = null;
     if (b.moverJunto == null) b.moverJunto = true;
 
@@ -124,11 +125,27 @@ R.cronogramaEditor = (function () {
       const escapadas = (b.destinos || []).filter(d => d.soloDia && d.nombre && d.base === e.id);
       const diasEstadia = [];
       if (e.desde && e.hasta) for (let f = e.desde; f <= e.hasta; f = U.sumarDias(f, 1)) diasEstadia.push(f);
+      const dest = (b.destinos || []).find(d => d.id === e.id);
+      if (dest && dest.dePaso) return `
+        <div class="cr-estadia cr-de-paso">
+          <span class="cr-punto">📍</span>
+          <div class="cr-estadia-cuerpo">
+            <strong>${esc(e.nombre)} <span class="chip chip-gris">De paso</span></strong>
+            <small>${e.desde ? 'Pasás el ' + U.fmtFecha(e.desde, 'dia') + ', ' : ''}sin hacer noche: no te pido alojamiento.</small>
+            <button type="button" class="btn-texto-mini" data-cr-depaso="${e.id}|no">Hago noche acá</button>
+          </div>
+        </div>`;
+      const mismoDia = !b.sinFechas && e.desde && e.hasta && e.noches === 0;
       return `
         <div class="cr-estadia">
           <span class="cr-punto">🏡</span>
           <div class="cr-estadia-cuerpo">
             <strong>${esc(e.nombre)}</strong>
+            ${mismoDia ? `<div class="cr-noche cr-pregunta-paso">Llegás y te vas el mismo día. ¿Dormís acá?
+              <span class="segmentado segmentado-chico">
+                <button type="button" data-cr-noches="${ti}|1">Sí, sumo una noche</button>
+                <button type="button" data-cr-depaso="${e.id}|si">No, es de paso</button>
+              </span></div>` : ''}
             ${b.sinFechas ? '<small>Las noches se calculan cuando cargues las fechas.</small>' : `
             <div class="cr-noches">
               <span>${e.desde ? 'Llegás el ' + U.fmtFecha(e.desde, 'corto') : 'Llegada a definir'}</span>
@@ -172,6 +189,7 @@ R.cronogramaEditor = (function () {
         const s = seg(`${ti}|${si}`);
         s.medio = m;
         if (s.estado === 'confirmado') s.estado = 'estimado';
+        if (C().espejarMedio(b.recorrido, s, b.recorrido[Number(ti)]) && !avisoEspejo) { avisoEspejo = true; U.toast('Cambié también el medio de la vuelta (podés cambiarlo aparte).'); }
         pintar();
         if (m === 'otro') { const i = cont.querySelector(`[data-cr-otro="${ti}|${si}"]`); if (i) i.focus(); }
       });
@@ -213,7 +231,10 @@ R.cronogramaEditor = (function () {
       });
       q('[data-cr-unir]').forEach(x => x.onclick = () => {
         const [ti, si] = x.dataset.crUnir.split('|').map(Number);
-        C().unir(b.recorrido[ti], si);
+        const t = b.recorrido[ti];
+        const nombre = t.segmentos[si].hasta.nombre;
+        if (C().desespejarParada(b.recorrido, t, si)) U.toast(`Saqué ${nombre} también de la vuelta.`);
+        C().unir(t, si);
         pintar();
       });
       q('[data-cr-parada]').forEach(x => x.onclick = () => { paradaAbierta = Number(x.dataset.crParada); pintar(); });
@@ -224,7 +245,10 @@ R.cronogramaEditor = (function () {
         const l = campoParada.obtener();
         if (!l.nombre) { U.toast('Escribí la ciudad por la que pasás.'); return; }
         const t = b.recorrido[paradaAbierta];
-        C().dividir(t, t.segmentos.length - 1, l);
+        // La parada va antes del destino (o justo después de tu casa en la ida, si es tu conexión)
+        const idx = t.segmentos.length - 1;
+        C().dividir(t, idx, l);
+        if (C().espejarParada(b.recorrido, t, idx)) U.toast(`También la sumé a la vuelta. Si volvés por otro lado, quitala ahí.`);
         paradaAbierta = null;
         pintar();
       };
@@ -233,6 +257,8 @@ R.cronogramaEditor = (function () {
 
       q('[data-cr-noches]').forEach(x => x.onclick = () => {
         const [ti, delta] = x.dataset.crNoches.split('|').map(Number);
+        const dest = (b.destinos || []).find(d => d.id === b.recorrido[ti].destId);
+        if (dest && delta > 0) dest.dePaso = false;
         const llegaTramo = b.recorrido[ti];
         const ultimoSeg = llegaTramo.segmentos[llegaTramo.segmentos.length - 1];
         const sale = b.recorrido[ti + 1];
@@ -252,6 +278,14 @@ R.cronogramaEditor = (function () {
             if (z.estado === 'confirmado') z.estado = 'estimado';
           });
         }
+        pintar();
+      });
+      q('[data-cr-depaso]').forEach(x => x.onclick = () => {
+        const [id, val] = x.dataset.crDepaso.split('|');
+        const d = (b.destinos || []).find(y => y.id === id);
+        if (!d) return;
+        d.dePaso = val === 'si';
+        if (d.dePaso) U.toast(`${d.nombre} quedó de paso: no te pido alojamiento ahí.`);
         pintar();
       });
       q('[data-cr-escapada]').forEach(x => x.onchange = () => {

@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — viajes
+   Rutenda — viajes
    Asistente de creación/edición (multidestino, país automático,
    salida del país, situaciones especiales, lo ya resuelto y
    viajeros), portada personalizada, pestañas y tarjetas.
@@ -134,6 +134,10 @@ R.viajes = (function () {
     };
     if (!b.destinos.length) b.destinos.push(nuevoDestino(false));
     b.sinFechas = editando ? !b.fechaInicio : false;
+    // Ciudad de conexión (ej. vivís en Bahía Blanca y el vuelo sale de Buenos Aires)
+    const conexionPrevia = editando ? R.recorrido.conexionDe(b.recorrido) : null;
+    b.conexion = conexionPrevia ? { lugar: conexionPrevia.lugar, medio: conexionPrevia.medio } : null;
+    b.conexionAplicada = conexionPrevia ? conexionPrevia.lugar.nombre : '';
     b.extrasManuales = [];
     b.resuelto = {};
     b.paqueteIncluye = ['vuelos', 'alojamiento'];
@@ -193,6 +197,14 @@ R.viajes = (function () {
       if (n === 'Destinos') return `
         <h4 class="titulo-paso">¿Desde dónde salís?</h4>
         <div id="lugarOrigen"></div>
+        <div class="bloque-conexion ${b.conexion ? 'activo' : ''}">
+          <label class="check"><input type="checkbox" id="aConexion" ${b.conexion ? 'checked' : ''}> Primero viajo a otra ciudad para salir desde ahí <small>(ej: vivís en Bahía Blanca y el vuelo sale de Buenos Aires)</small></label>
+          ${b.conexion ? `
+            <div id="lugarConexion"></div>
+            <span class="etiqueta-campo">¿Cómo llegás hasta ahí?</span>
+            <div class="medios medios-chicos">${['micro', 'auto', 'avion', 'tren'].map(k => { const m = R.recorrido.MEDIOS[k]; return `<button type="button" class="chip-medio ${b.conexion.medio === k ? 'activo' : ''}" data-conexion-medio="${k}"><span>${m.icono}</span>${m.nombre.replace(' propio', '')}</button>`; }).join('')}</div>
+            <p class="ayuda">La sumo a la ida y a la vuelta: no la cargás dos veces. Si volvés por otro lado, lo cambiás en el cronograma.</p>` : ''}
+        </div>
         <h4 class="titulo-paso">¿A dónde vas?</h4>
         <p class="ayuda">Si es un viaje combinado, agregá cada destino en orden.</p>
         <div class="lista-destinos">${b.destinos.map((d, i) => `
@@ -214,6 +226,10 @@ R.viajes = (function () {
 
       if (n === 'Cronograma') {
         b.recorrido = R.recorrido.construir(b.origen, b.destinos, b.recorrido, 'avion');
+        const nueva = b.conexion && b.conexion.lugar && b.conexion.lugar.nombre ? b.conexion.lugar.nombre : '';
+        if (b.conexionAplicada && normal(b.conexionAplicada) !== normal(nueva)) R.recorrido.quitarConexion(b.recorrido, { nombre: b.conexionAplicada });
+        if (nueva) R.recorrido.aplicarConexion(b.recorrido, b.conexion);
+        b.conexionAplicada = nueva;
         return `
         <h4 class="titulo-paso">¿Cómo y cuándo viajás?</h4>
         <p class="ayuda">Para cada traslado elegí el medio y cargá cuándo sale y cuándo llega (la hora es opcional). Las noches en cada lugar se calculan solas. Si en un tramo cambiás de medio, usá "Pasar por otra ciudad".</p>
@@ -295,6 +311,7 @@ R.viajes = (function () {
       const n = nombrePaso();
       if (n === 'Destinos') {
         if (camposLugar.origen) b.origen = camposLugar.origen.obtener();
+        if (b.conexion && camposLugar.conexion) b.conexion.lugar = camposLugar.conexion.obtener();
         camposLugar.destinos.forEach((c, i) => { if (c && b.destinos[i]) Object.assign(b.destinos[i], c.obtener()); });
         b.nombre = v('aNombre');
       }
@@ -316,6 +333,7 @@ R.viajes = (function () {
       if (n === 'Destinos') {
         b.destinos = b.destinos.filter((d, i) => d.nombre || i === 0);
         if (!b.destinos.some(d => d.nombre && !d.soloDia)) return 'Contanos a dónde vas (al menos un destino donde te quedes).';
+        if (b.conexion && !(b.conexion.lugar && b.conexion.lugar.nombre)) return 'Escribí la ciudad desde donde sale el viaje (o destildá esa opción).';
       }
       if (n === 'Cronograma' && !b.sinFechas) {
         const v = { recorrido: b.recorrido, destinos: b.destinos, tareas: {} };
@@ -353,6 +371,10 @@ R.viajes = (function () {
           alCambiar: () => { avisar(); }
         }));
         avisar();
+        const chkCon = cont.querySelector('#aConexion');
+        chkCon.onchange = () => { leerPaso(); b.conexion = chkCon.checked ? { lugar: { nombre: '' }, medio: 'micro' } : null; pintar(); if (b.conexion) { const i = cont.querySelector('#lugarConexion .lugar-input'); if (i) i.focus(); } };
+        camposLugar.conexion = b.conexion ? R.lugares.campo(cont.querySelector('#lugarConexion'), { valor: b.conexion.lugar, placeholder: 'Ciudad desde donde sale el viaje (ej: Buenos Aires)' }) : null;
+        cont.querySelectorAll('[data-conexion-medio]').forEach(x => x.onclick = () => { leerPaso(); b.conexion.medio = x.dataset.conexionMedio; pintar(); });
         cont.querySelector('[data-a="masDestino"]').onclick = () => { leerPaso(); b.destinos.push(nuevoDestino(false)); pintar(); };
         cont.querySelector('[data-a="masEscapada"]').onclick = () => { leerPaso(); b.destinos.push(nuevoDestino(true)); pintar(); };
         cont.querySelectorAll('[data-quitar-destino]').forEach(x => x.onclick = () => { leerPaso(); b.destinos.splice(Number(x.dataset.quitarDestino), 1); pintar(); });
@@ -552,7 +574,7 @@ R.viajes = (function () {
       <section class="portada-viaje" style="background:${U.portada(v.destino)}">
         ${U.paisaje(v)}
         <div class="portada-contenido">
-          <a href="#inicio" class="volver">← Mis viajes</a>
+          <a href="#viajes" class="volver">← Mis viajes</a>
           <div class="portada-fila">
             <div>
               <span class="etiqueta-clara">${tipo.icono} ${esc(tipo.nombre)}${etiquetaTransporte(v) ? ' · ' + esc(etiquetaTransporte(v)) : ''}${v.perfil.internacional ? ' · 🌎 Internacional' : ''}${v.perfil.paquete ? ' · 📦 Paquete' : ''}</span>

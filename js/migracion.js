@@ -1,6 +1,6 @@
 /* =========================================================
-   Tripbox — pasar los datos del dispositivo a la cuenta
-   Si antes usaste Tripbox sin la nube, la primera vez que
+   Rutenda — pasar los datos del dispositivo a la cuenta
+   Si antes usaste Rutenda sin la nube, la primera vez que
    ingresás con tu cuenta te ofrece subir esos viajes (con sus
    archivos) para tenerlos en todos tus dispositivos.
    ========================================================= */

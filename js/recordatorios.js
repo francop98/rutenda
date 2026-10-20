@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — recordatorios
+   Rutenda — recordatorios
    - Calcula qué avisarte y cuándo (check-in, pasos que vencen,
      valija, el día antes, el día a día del viaje).
    - Los muestra en el inicio de la app (avisos de hoy).
@@ -52,7 +52,7 @@ R.recordatorios = (function () {
 
     // Valija una semana antes, repaso el día antes
     if (!R.motor.resuelta(v, 's_valija')) agregar(U.sumarDias(v.fechaInicio, -7), 'valija', `🧳 Falta una semana para ${nombre}`, 'Buen momento para armar la valija con la lista paso a paso.', 'valija');
-    agregar(U.sumarDias(v.fechaInicio, -1), 'manana', `🌅 Mañana empieza ${nombre}`, 'Documentos, pasajes y valija: repasá todo en Tripbox.', 'itinerario');
+    agregar(U.sumarDias(v.fechaInicio, -1), 'manana', `🌅 Mañana empieza ${nombre}`, 'Documentos, pasajes y valija: repasá todo en Rutenda.', 'itinerario');
 
     // Durante el viaje: el resumen de cada día y la valija de vuelta
     R.itinerario.diasDelViaje(v).forEach(f => {

@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — pestaña Documentos
+   Rutenda — pestaña Documentos
    Pasajes, reservas, seguros, identidad… guardados en el
    navegador (IndexedDB) y vinculados a pasos de la guía.
    ========================================================= */

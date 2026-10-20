@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — sincronización con Firebase
+   Rutenda — sincronización con Firebase
    Estructura en Firestore:
      usuarios/{uid}                    perfil, preferencias, listas de valija, recordatorios
      usuarios/{uid}/suscripciones/{id} notificaciones push
@@ -163,7 +163,7 @@ R.nube = (function () {
   }
 
   function errorDeEnvio(e) {
-    console.error('Tripbox: no se pudo sincronizar', e);
+    console.error('Rutenda: no se pudo sincronizar', e);
     if (R.util) R.util.toast(e && e.code === 'permission-denied' ? 'No tenés permiso para cambiar eso en este viaje.' : 'No se pudo guardar en la nube. Se reintenta al volver la conexión.');
   }
 

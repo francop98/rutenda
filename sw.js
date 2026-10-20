@@ -1,23 +1,26 @@
 /* =========================================================
-   Tripbox — service worker
+   Rutenda — service worker
    Hace que la app se pueda instalar, abrir sin conexión y
    recibir recordatorios. Al cambiar archivos, subir el número
    de VERSION para que los celulares descarguen la versión nueva.
    ========================================================= */
-const VERSION = 'tripbox-v7';
+const VERSION = 'rutenda-10.1';
 const ARCHIVOS = [
   './',
   './index.html',
   './styles.css',
   './main.js',
   './manifest.webmanifest',
-  './iconos/icono-192.png',
-  './iconos/icono-512.png',
-  './iconos/icono-maskable-192.png',
-  './iconos/icono-maskable-512.png',
-  './iconos/apple-touch-icon.png',
-  './iconos/favicon-32.png',
-  './apple-touch-icon.png',
+  './assets/icono-192.png',
+  './assets/icono-512.png',
+  './assets/icono-maskable-192.png',
+  './assets/icono-maskable-512.png',
+  './assets/apple-touch-icon.png',
+  './assets/favicon-32.png',
+  './assets/favicon.svg',
+  './assets/simbolo-claro.svg',
+  './assets/simbolo-oscuro.svg',
+  './assets/logo-pdf.png',
   './js/aeropuertos.js',
   './js/aeropuertosdatos.js',
   './js/almacenamiento.js',
@@ -31,6 +34,7 @@ const ARCHIVOS = [
   './js/formulariospasos.js',
   './js/gastos.js',
   './js/itinerario.js',
+  './js/itinerariopdf.js',
   './js/lugares.js',
   './js/mapa.js',
   './js/migracion.js',
@@ -93,10 +97,10 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (err) { d = { cuerpo: e.data && e.data.text() }; }
-  e.waitUntil(self.registration.showNotification(d.titulo || 'Tripbox', {
+  e.waitUntil(self.registration.showNotification(d.titulo || 'Rutenda', {
     body: d.cuerpo || '',
-    icon: './iconos/icono-192.png',
-    badge: './iconos/favicon-32.png',
+    icon: './assets/icono-192.png',
+    badge: './assets/favicon-32.png',
     tag: d.id || undefined,
     data: { url: d.url || '#inicio' }
   }));

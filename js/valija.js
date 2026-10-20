@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — armador de valija
+   Rutenda — armador de valija
    - Pestaña Valija de cada viaje: lista libre (escribís lo que
      quieras), listas personalizadas que se COPIAN al viaje,
      sugerencias según el viaje y armado paso a paso.

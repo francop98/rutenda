@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — base de aeropuertos (datos)
+   Rutenda — base de aeropuertos (datos)
    Aeropuertos con vuelos regulares y código IATA.
    Fuente: OurAirports (dominio público) — https://ourairports.com/data/
    Formato: [IATA, nombre, ciudad, país (ISO), latitud, longitud, grande (1/0)]

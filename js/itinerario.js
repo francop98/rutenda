@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — pestaña Itinerario
+   Rutenda — pestaña Itinerario
    - Cronograma del viaje (con avisos) y su editor.
    - Día por día: dónde amanecés, traslados con horarios,
      check-in / check-out, escapadas, actividades, clima y
@@ -123,6 +123,7 @@ R.itinerario = (function () {
         </div>
         <div class="acciones-fila">
           <button class="btn btn-suave btn-chico solo-org" data-a="cronograma">📅 Cronograma</button>
+          <button class="btn btn-suave btn-chico" data-a="pdf">📄 PDF</button>
           <button class="btn btn-suave btn-chico" data-a="compartir">↗ Compartir</button>
           <button class="btn btn-primario btn-chico solo-org" data-a="nuevo">+ Actividad</button>
         </div>
@@ -154,6 +155,7 @@ R.itinerario = (function () {
     cont.querySelectorAll('[data-a^="cronograma"]').forEach(b => b.onclick = () => editarCronograma(v));
     cont.querySelector('[data-a="nuevo"]').onclick = () => editar(v);
     cont.querySelector('[data-a="compartir"]').onclick = () => compartir(v);
+    cont.querySelector('[data-a="pdf"]').onclick = () => R.itinerarioPdf.descargar(v);
     cont.querySelector('[data-a="ics"]').onclick = () => descargarICS(v);
     cont.querySelectorAll('[data-agregar]').forEach(b => b.onclick = () => editar(v, null, b.dataset.agregar));
     cont.querySelectorAll('[data-evento]').forEach(b => b.onclick = () => editar(v, b.dataset.evento));
@@ -273,7 +275,7 @@ R.itinerario = (function () {
     if (!diasDelViaje(v).length) {
       C().todosLosSegmentos(v.recorrido).forEach(x => lineas.push(`• ${C().etiquetaSegmento(x.seg)}`));
     }
-    lineas.push('Armado con Tripbox');
+    lineas.push('Armado con Rutenda');
     return lineas.join('\n');
   }
 
@@ -285,7 +287,8 @@ R.itinerario = (function () {
         <div class="opciones-compartir">
           <button class="btn btn-primario btn-bloque" data-a="nativo">↗ Compartir (WhatsApp, mail…)</button>
           <button class="btn btn-suave btn-bloque" data-a="copiar">📋 Copiar texto</button>
-          <button class="btn btn-suave btn-bloque" data-a="pdf">📄 Guardar como PDF / imprimir</button>
+          <button class="btn btn-suave btn-bloque" data-a="pdf">📄 Descargar PDF</button>
+          ${navigator.canShare ? '<button class="btn btn-suave btn-bloque" data-a="pdfCompartir">📤 Compartir el PDF</button>' : ''}
           <button class="btn btn-suave btn-bloque" data-a="ics">📆 Agregar al calendario</button>
         </div>
         <pre class="vista-texto">${esc(texto)}</pre>`
@@ -300,7 +303,9 @@ R.itinerario = (function () {
     el.querySelector('[data-a="copiar"]').onclick = async () => {
       try { await navigator.clipboard.writeText(texto); U.toast('Itinerario copiado.'); } catch (e) { U.toast('No se pudo copiar.'); }
     };
-    el.querySelector('[data-a="pdf"]').onclick = () => { U.cerrarModal(); imprimir(v); };
+    el.querySelector('[data-a="pdf"]').onclick = () => R.itinerarioPdf.descargar(v);
+    const pc = el.querySelector('[data-a="pdfCompartir"]');
+    if (pc) pc.onclick = () => R.itinerarioPdf.descargar(v, { compartir: true });
     el.querySelector('[data-a="ics"]').onclick = () => descargarICS(v);
   }
 
@@ -354,7 +359,7 @@ R.itinerario = (function () {
     (v.destinos || []).filter(d => d.soloDia && d.fecha && !d.fechaPendiente).forEach(d => agregar(d.fecha, '', '', '', '', `☀️ Escapada a ${d.nombre}`, '', d.nombre));
     (v.itinerario || []).filter(e => e.fecha && !(e.origen || '').startsWith('t_segmento__')).forEach(e => agregar(e.fecha, e.hora, '', '', '', e.titulo, [e.confirmacion && 'Código ' + e.confirmacion, e.notas].filter(Boolean).join(' · '), e.lugar));
     if (v.fechaInicio && v.fechaFin) agregar(v.fechaInicio, '', '', U.sumarDias(v.fechaFin, 1), '', `🧳 Viaje: ${v.nombre || R.viajes.destinoCompleto(v)}`, '', '');
-    return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Tripbox//ES', 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${icsTexto(v.nombre || 'Tripbox')}`].concat(ev).concat(['END:VCALENDAR']).join('\r\n');
+    return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Rutenda//ES', 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${icsTexto(v.nombre || 'Rutenda')}`].concat(ev).concat(['END:VCALENDAR']).join('\r\n');
   }
 
   function descargarICS(v) {

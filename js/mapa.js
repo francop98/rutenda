@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — mapa del recorrido
+   Rutenda — mapa del recorrido
    Leaflet + OpenStreetMap (gratis). Se carga solo cuando
    abrís el mapa, para no hacer más pesada la app.
    ========================================================= */
@@ -55,7 +55,7 @@ R.mapa = (function () {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(mapa);
-    const colores = { origen: '#22605e', destino: '#2f7d7b', escapada: '#d9825b', parada: '#8e9896' };
+    const colores = { origen: '#142824', destino: '#1F3A36', escapada: '#d9825b', parada: '#8e9896' };
     pts.forEach(p => {
       L.circleMarker([p.lat, p.lon], { radius: p.tipo === 'parada' ? 6 : 9, color: '#fff', weight: 2, fillColor: colores[p.tipo], fillOpacity: 1 })
         .addTo(mapa).bindPopup(p.etiqueta);

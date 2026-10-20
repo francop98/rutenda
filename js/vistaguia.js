@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — pestaña Guía (paso a paso)
+   Rutenda — pestaña Guía (paso a paso)
    Próximo paso recomendado, lo que sigue, fases, detalle de
    cada paso, pasos propios y "cambio de planes".
    ========================================================= */
@@ -421,7 +421,7 @@ R.vistaGuia = (function () {
     const p = existente || { titulo: '', fase: 'experiencias', impacto: 3, fechaManual: '', desc: '', dependeDe: [] };
     U.modal({
       titulo: existente ? 'Editar paso' : 'Nuevo paso propio',
-      subtitulo: 'Sumá lo que la guía no contempla. Tripbox lo va a priorizar junto con el resto.',
+      subtitulo: 'Sumá lo que la guía no contempla. Rutenda lo va a priorizar junto con el resto.',
       cuerpo: `
         <label class="campo"><span>¿Qué hay que hacer? *</span><input id="pTitulo" value="${esc(p.titulo)}" placeholder="Ej: Reservar la cena de aniversario"></label>
         <div class="grilla-2">

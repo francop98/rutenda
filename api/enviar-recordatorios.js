@@ -36,7 +36,7 @@ module.exports = async (req, res) => {
 
     // Si hay muchos el mismo día, se agrupan en una sola notificación
     const mensajes = deHoy.length > 3
-      ? [{ id: 'resumen_' + hoy, titulo: `Tripbox: ${deHoy.length} cosas para hoy`, cuerpo: deHoy.map(r => r.titulo.replace(/^\S+\s/, '')).join(' · '), url: '#inicio' }]
+      ? [{ id: 'resumen_' + hoy, titulo: `Rutenda: ${deHoy.length} cosas para hoy`, cuerpo: deHoy.map(r => r.titulo.replace(/^\S+\s/, '')).join(' · '), url: '#inicio' }]
       : deHoy;
 
     for (const s of subs.docs) {

@@ -1,6 +1,6 @@
 rules_version = '2';
 // =========================================================
-// Tripbox — reglas de Firestore
+// Rutenda — reglas de Firestore
 // Organizador y coorganizadores editan todo el viaje.
 // Viajeros ven todo y cargan sus gastos, documentos y valija.
 // =========================================================

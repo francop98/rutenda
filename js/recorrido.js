@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — cronograma del viaje
+   Rutenda — cronograma del viaje
    Única fuente de verdad de la cronología.
 
    El viaje es una secuencia de traslados (segmentos) agrupados
@@ -112,6 +112,99 @@ R.recorrido = (function () {
   }
 
   /* ---------------------------------------------------------
+     Ida y vuelta espejadas: lo que cargás en la ida se propone
+     igual en la vuelta (misma ciudad de conexión, mismo medio).
+     --------------------------------------------------------- */
+  const mismo = (a, b) => !!a && !!b && normal(a.nombre) === normal(b.nombre);
+  const tramoTipo = (recorrido, tipo) => (recorrido || []).find(t => t.tipo === tipo) || null;
+
+  /** Después de agregar la parada (segmentos idx/idx+1 de la ida), la suma a la vuelta. */
+  function espejarParada(recorrido, ida, idx) {
+    const vuelta = tramoTipo(recorrido, 'vuelta');
+    if (!vuelta || !ida || ida.tipo !== 'ida') return false;
+    const a = ida.segmentos[idx], b = ida.segmentos[idx + 1];
+    if (!a || !b) return false;
+    const P = a.hasta, A = a.desde, B = b.hasta;
+    if (vuelta.segmentos.some(s => mismo(s.hasta, P))) return false;
+    let k = vuelta.segmentos.findIndex(s => mismo(s.desde, B) && mismo(s.hasta, A));
+    if (k < 0 && mismo(A, ida.desde)) k = vuelta.segmentos.findIndex(s => mismo(s.hasta, A));
+    if (k < 0 || vuelta.segmentos[k].estado === 'confirmado') return false;
+    dividir(vuelta, k, P);
+    vuelta.segmentos[k].medio = b.medio; vuelta.segmentos[k].medioOtro = b.medioOtro || '';
+    vuelta.segmentos[k + 1].medio = a.medio; vuelta.segmentos[k + 1].medioOtro = a.medioOtro || '';
+    return true;
+  }
+
+  /** Al quitar una parada de la ida, también se quita de la vuelta (si no estaba confirmada). */
+  function desespejarParada(recorrido, ida, idx) {
+    const vuelta = tramoTipo(recorrido, 'vuelta');
+    if (!vuelta || !ida || ida.tipo !== 'ida') return false;
+    const a = ida.segmentos[idx], b = ida.segmentos[idx + 1];
+    if (!a || !b) return false;
+    const P = a.hasta, A = a.desde;
+    const j = vuelta.segmentos.findIndex((s, i) => i < vuelta.segmentos.length - 1 && mismo(s.hasta, P) && mismo(vuelta.segmentos[i + 1].hasta, A));
+    if (j < 0 || vuelta.segmentos[j].estado === 'confirmado' || vuelta.segmentos[j + 1].estado === 'confirmado') return false;
+    unir(vuelta, j);
+    return true;
+  }
+
+  /** Cambiar el medio de un traslado de la ida cambia el de su par en la vuelta. */
+  function espejarMedio(recorrido, seg, tramo) {
+    if (!tramo || tramo.tipo !== 'ida') return false;
+    const vuelta = tramoTipo(recorrido, 'vuelta');
+    if (!vuelta) return false;
+    let par = vuelta.segmentos.find(s => mismo(s.desde, seg.hasta) && mismo(s.hasta, seg.desde));
+    // Primer tramo de la ida (desde tu casa) ↔ último de la vuelta (a tu casa)
+    if (!par && tramo.segmentos.length > 1 && tramo.segmentos[0] === seg) {
+      const ult = vuelta.segmentos[vuelta.segmentos.length - 1];
+      if (vuelta.segmentos.length > 1 && mismo(ult.desde, seg.hasta) && mismo(ult.hasta, seg.desde)) par = ult;
+    }
+    if (!par || par.estado === 'confirmado') return false;
+    par.medio = seg.medio; par.medioOtro = seg.medioOtro || '';
+    return true;
+  }
+
+  /**
+   * Ciudad de conexión del viaje (ej. vivís en Bahía Blanca y el vuelo sale de Buenos Aires):
+   * la suma a la ida y a la vuelta con el medio elegido para llegar hasta ahí.
+   */
+  function aplicarConexion(recorrido, conexion) {
+    const ida = tramoTipo(recorrido, 'ida');
+    if (!ida || !conexion || !conexion.lugar || !conexion.lugar.nombre) return false;
+    if (mismo(ida.desde, conexion.lugar) || mismo(ida.hasta, conexion.lugar)) return false;
+    if (ida.segmentos.some(s => mismo(s.hasta, conexion.lugar))) {
+      // Ya está: solo actualizar el medio hasta la conexión
+      const s0 = ida.segmentos[0];
+      if (mismo(s0.hasta, conexion.lugar) && s0.estado !== 'confirmado' && conexion.medio) { s0.medio = conexion.medio; espejarMedio(recorrido, s0, ida); }
+      return false;
+    }
+    const principal = ida.segmentos[0].medio;
+    dividir(ida, 0, conexion.lugar);
+    ida.segmentos[0].medio = conexion.medio || 'micro';
+    ida.segmentos[1].medio = principal;
+    espejarParada(recorrido, ida, 0);
+    return true;
+  }
+
+  /** Quita la conexión de la ida y de la vuelta. */
+  function quitarConexion(recorrido, lugarConexion) {
+    const ida = tramoTipo(recorrido, 'ida');
+    if (!ida || !lugarConexion) return false;
+    const i = ida.segmentos.findIndex((s, k) => k < ida.segmentos.length - 1 && mismo(s.hasta, lugarConexion));
+    if (i < 0) return false;
+    desespejarParada(recorrido, ida, i);
+    unir(ida, i);
+    return true;
+  }
+
+  /** Ciudad de conexión actual (primera parada de la ida), si hay. */
+  function conexionDe(recorrido) {
+    const ida = tramoTipo(recorrido, 'ida');
+    if (!ida || ida.segmentos.length < 2) return null;
+    return { lugar: ida.segmentos[0].hasta, medio: ida.segmentos[0].medio };
+  }
+
+  /* ---------------------------------------------------------
      Lectura
      --------------------------------------------------------- */
   function todosLosSegmentos(recorrido) {
@@ -155,7 +248,7 @@ R.recorrido = (function () {
       if (entra) agregarParadas(entra);
       const desde = entra ? fechaLlega(entra.segmentos[entra.segmentos.length - 1]) : (i === 0 ? v.fechaInicio || '' : '');
       const hasta = sale ? fechaSale(sale.segmentos[0]) : (i === destinos.length - 1 ? v.fechaFin || '' : '');
-      r.push({ id: d.id, tipo: 'destino', nombre: d.nombre, lugar: d, desde, hasta, noches: desde && hasta ? Math.max(0, dias(desde, hasta)) : null, destId: d.id });
+      r.push({ id: d.id, tipo: 'destino', nombre: d.nombre, lugar: d, desde, hasta, noches: desde && hasta ? Math.max(0, dias(desde, hasta)) : null, destId: d.id, dePaso: !!d.dePaso });
     });
     const vuelta = tramos.find(t => t.tipo === 'vuelta');
     if (vuelta) agregarParadas(vuelta);
@@ -303,7 +396,10 @@ R.recorrido = (function () {
         // Estadía en un destino
         if (t.sale.fecha === llega && x.tramo.tipo !== 'vuelta') {
           const d = (v.destinos || []).find(z => z.id === x.tramo.destId);
-          add('aviso', `En ${d ? d.nombre : s.hasta.nombre} llegás y te vas el mismo día. Si no dormís ahí, cargalo como escapada de un día.`, t.id);
+          if (!d || !d.dePaso) add('aviso', `En ${d ? d.nombre : s.hasta.nombre} llegás y te vas el mismo día. Si no dormís ahí, marcalo como "de paso" y no te pido alojamiento.`, t.id);
+        } else if (t.sale.fecha > llega && x.tramo.tipo !== 'vuelta') {
+          const d = (v.destinos || []).find(z => z.id === x.tramo.destId);
+          if (d && d.dePaso) add('aviso', `Marcaste ${d.nombre} como de paso, pero te vas otro día. ¿Dormís ahí?`, t.id);
         }
         // Tiempo libre entre check-out y salida
         const aloj = datosAlojamiento(v, x.tramo.destId);
@@ -373,7 +469,7 @@ R.recorrido = (function () {
   }
 
   return {
-    MEDIOS, TIPOS_TRAMO, ESTADOS, construir, dividir, unir, segmentos, todosLosSegmentos, usaMedio, medioPrincipal,
+    MEDIOS, TIPOS_TRAMO, ESTADOS, construir, dividir, unir, espejarParada, desespejarParada, espejarMedio, aplicarConexion, quitarConexion, conexionDe, segmentos, todosLosSegmentos, usaMedio, medioPrincipal,
     etiquetaSegmento, estadias, completo, recalcular, validar, desplazarDesde, autocompletar, normalizarSegmento,
     duracion, fmtDuracion, difHoraria, offsetMin, momento, fechaSale, fechaLlega, medio
   };

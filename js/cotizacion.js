@@ -1,5 +1,5 @@
 /* =========================================================
-   Tripbox — cotización del día
+   Rutenda — cotización del día
    - Pesos argentinos: DolarApi (dólar tarjeta, oficial y blue;
      euro, real, peso chileno y uruguayo).
    - Otras monedas: ExchangeRate-API (acceso abierto).
