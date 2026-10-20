@@ -54,6 +54,10 @@ R.db = (function () {
     v.movimientos = v.movimientos || [];
     v.cambios = v.cambios || [];
     v.valija = v.valija || { items: [], listas: [] };
+    if (R.recorrido) {
+      if (!Array.isArray(v.recorrido)) v.recorrido = R.recorrido.construir(v.origen, v.destinos, [], v.perfil.transporte);
+      if (v.recorrido.length) v.perfil.transporte = R.recorrido.medioPrincipal(v.recorrido);
+    }
     v.monedaBase = v.monedaBase || 'ARS';
     return v;
   }

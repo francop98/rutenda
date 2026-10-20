@@ -23,7 +23,10 @@ R.motor = (function () {
     const escapadas = destinos.filter(d => d.soloDia);
     const varios = conAloj.length > 1;
     const concreta = (t, id, ctx) => Object.assign({}, t, {
-      id, base: t.id, ctx: ctx || null, destId: ctx && ctx.destino ? ctx.destino.id : (ctx && ctx.hasta ? ctx.hasta.id : null),
+      id, base: t.id, ctx: ctx || null,
+      destId: ctx ? (ctx.destId || (ctx.destino ? ctx.destino.id : (ctx.hasta ? ctx.hasta.id : null))) : null,
+      segId: ctx && ctx.seg ? ctx.seg.id : null,
+      fechaBaseValor: typeof t.fechaBase === 'function' ? t.fechaBase(v, ctx || {}) : null,
       titulo: typeof t.titulo === 'function' ? t.titulo(v, ctx || {}) : t.titulo,
       desc: typeof t.desc === 'function' ? t.desc(v, ctx || {}) : t.desc,
       consejo: typeof t.consejo === 'function' ? t.consejo(v, ctx || {}) : t.consejo,
@@ -42,6 +45,12 @@ R.motor = (function () {
         lugares.forEach(d => base.push(concreta(t, `${t.id}__${d.id}`, { destino: d, varios })));
       } else if (t.porTramo) {
         for (let i = 1; i < conAloj.length; i++) base.push(concreta(t, `${t.id}__${conAloj[i].id}`, { desde: conAloj[i - 1], hasta: conAloj[i] }));
+      } else if (t.porSegmento) {
+        R.recorrido.segmentos(v).filter(x => !t.soloMedio || x.seg.medio === t.soloMedio).forEach(x => {
+          const datosVuelo = ((v.tareas['t_segmento__' + x.seg.id] || {}).datos || {}).tramos;
+          const ctx = Object.assign({}, x, { fechaVuelo: datosVuelo && datosVuelo[0] ? datosVuelo[0].fechaSalida : '' });
+          base.push(concreta(t, `${t.id}__${x.seg.id}`, ctx));
+        });
       } else if (t.porEscapada) {
         escapadas.forEach(d => base.push(concreta(t, `${t.id}__${d.id}`, { destino: d })));
       } else {
@@ -56,17 +65,22 @@ R.motor = (function () {
 
     // Una dependencia a un paso repetido apunta a la copia del mismo destino o, si no hay, a todas.
     const porBase = {};
-    todas.forEach(t => { (porBase[t.base] = porBase[t.base] || []).push(t.id); });
+    const porId = {};
+    todas.forEach(t => { (porBase[t.base] = porBase[t.base] || []).push(t.id); porId[t.id] = t; });
     const mapear = (ids, t) => {
       const r = [];
       ids.forEach(id => {
         const copias = porBase[id];
         if (!copias) { r.push(id); return; }
         const repetido = copias.some(c => c.includes('__'));
+        // Un paso de un tramo espera al paso equivalente de ese mismo tramo
+        if (t.segId && repetido && copias.some(c => porId[c].segId)) {
+          copias.filter(c => porId[c].segId === t.segId).forEach(c => r.push(c));
+          return;
+        }
+        // Un paso de un destino solo espera a los pasos equivalentes de ese mismo destino
         if (t.destId && repetido) {
-          // Un paso de un destino solo espera al paso equivalente de ese mismo destino.
-          const mismo = copias.find(c => c.endsWith('__' + t.destId));
-          if (mismo) r.push(mismo);
+          copias.filter(c => porId[c].destId === t.destId).forEach(c => r.push(c));
           return;
         }
         copias.forEach(c => r.push(c));
@@ -87,6 +101,7 @@ R.motor = (function () {
 
   function fechaLimite(v, t) {
     if (t.fechaManual) return t.fechaManual;
+    if (t.fechaBaseValor) return t.anticipacion == null ? t.fechaBaseValor : R.util.sumarDias(t.fechaBaseValor, -t.anticipacion);
     if (t.anticipacion == null) return null;
     if (t.ref === 'fin') return v.fechaFin ? R.util.sumarDias(v.fechaFin, t.anticipacion) : null;
     return v.fechaInicio ? R.util.sumarDias(v.fechaInicio, -t.anticipacion) : null;
@@ -158,8 +173,11 @@ R.motor = (function () {
       const datosPaso = v.tareas[t.id] || {};
       const tieneFormulario = !!(R.formularios && R.formularios.tiene(t));
       const faltanDatos = !t.rec && tieneFormulario && est === 'hecha' && !datosPaso.datos && !datosPaso.sinDatosOk;
+      const esperaVentana = !!t.ventanaDias && !RESUELTO.has(est) && !!t.fechaBaseValor && R.util.diasEntre(hoy, t.fechaBaseValor) > t.ventanaDias;
       return Object.assign({}, t, {
-        postergado: !!datosPaso.postergado && !RESUELTO.has(est),
+        esperaVentana,
+        habilitaEl: esperaVentana ? R.util.sumarDias(t.fechaBaseValor, -t.ventanaDias) : null,
+        postergado: (!!datosPaso.postergado || esperaVentana) && !RESUELTO.has(est),
         tieneFormulario,
         faltanDatos,
         dependeDe: deps,
@@ -265,6 +283,12 @@ R.motor = (function () {
     return { pendientes, hechas: todas.filter(t => t.estado === 'hecha').length, total: todas.filter(t => t.estado !== 'no_aplica').length };
   }
 
+  /** Pendientes: lo que dejaste para más tarde, lo empezado y lo que todavía no se puede hacer (ej. check-in). */
+  function pendientes(v) {
+    return analizar(v).filter(t => !t.rec && !t.resuelta && (t.postergado || t.estado === 'en_curso'))
+      .sort((a, b) => (a.esperaVentana - b.esperaVentana) || (b.score - a.score));
+  }
+
   function enMarcha(v) { return analizar(v).filter(t => t.estado === 'en_curso'); }
 
   /** Ordena una lista de pasos respetando dependencias y luego prioridad. */
@@ -355,7 +379,7 @@ R.motor = (function () {
   }
 
   return {
-    lista, idsDe, estado, resuelta, posponer, enMarcha, deducidasRecientes, recomendaciones, fechaLimite, analizar, nombre, proximos, progreso,
+    lista, idsDe, estado, resuelta, posponer, enMarcha, pendientes, deducidasRecientes, recomendaciones, fechaLimite, analizar, nombre, proximos, progreso,
     progresoPorFase, setEstado, ordenarPlan, replanificar, pasosARevisar
   };
 })();

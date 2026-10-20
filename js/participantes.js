@@ -91,7 +91,7 @@ R.participantes = (function () {
 
   /** Si el transporte ya estaba resuelto, cambiar viajeros puede afectar pasajes y alojamiento. */
   function avisarCambioParticipantes(v) {
-    const afecta = ['t_principal', 'a_reserva'].some(base => R.motor.idsDe(v, base).some(id => R.motor.estado(v, id) === 'hecha'));
+    const afecta = ['t_segmento', 'a_reserva'].some(base => R.motor.idsDe(v, base).some(id => R.motor.estado(v, id) === 'hecha'));
     if (!afecta) return;
     setTimeout(() => {
       U.confirmar('Cambiaste los viajeros y ya tenías pasajes o alojamiento resueltos. ¿Querés que te arme un plan para revisar lo afectado?', {

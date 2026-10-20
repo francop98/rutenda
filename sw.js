@@ -4,7 +4,7 @@
    Al cambiar archivos, subir el número de VERSION para que
    los celulares descarguen la versión nueva.
    ========================================================= */
-const VERSION = 'tripbox-v5';
+const VERSION = 'tripbox-v6';
 const ARCHIVOS = [
   './',
   './index.html',
@@ -15,6 +15,10 @@ const ARCHIVOS = [
   './iconos/icono-512.png',
   './iconos/icono-maskable-512.png',
   './iconos/apple-touch-icon.png',
+  './iconos/icono-maskable-192.png',
+  './iconos/favicon-32.png',
+  './apple-touch-icon.png',
+  './js/recorrido.js',
   "./js/aeropuertos.js",
   "./js/aeropuertosdatos.js",
   "./js/almacenamiento.js",

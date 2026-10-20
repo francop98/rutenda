@@ -11,7 +11,7 @@ R.documentos = (function () {
   const LIMITE_MB = 25;
 
   const CATEGORIAS = [
-    { id: 'pasaje', nombre: 'Pasajes', icono: '🎫', tarea: 't_principal' },
+    { id: 'pasaje', nombre: 'Pasajes', icono: '🎫', tarea: 't_segmento' },
     { id: 'reserva', nombre: 'Reservas', icono: '🏡', tarea: 'a_reserva' },
     { id: 'identidad', nombre: 'Identidad y visas', icono: '🛂', tarea: 'doc_copias' },
     { id: 'seguro', nombre: 'Seguros', icono: '🛡️', tarea: 'p_seguro' },

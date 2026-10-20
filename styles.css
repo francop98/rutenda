@@ -1043,3 +1043,117 @@ body.sin-sesion .nav-inferior { display: none !important; }
 .lista-valija label span { overflow-wrap: anywhere; }
 .origen-lista { max-width: 38%; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 760px) { .origen-lista { display: none; } }
+
+/* =========================================================
+   v6 — recorrido, pendientes, checklist, espaciados
+   ========================================================= */
+/* Fondo congelado con carteles abiertos (también en iPhone) */
+body.sin-scroll { position: fixed; left: 0; right: 0; width: 100%; overflow: hidden; }
+.modal-cuerpo { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+
+/* Indicador de pasos para celular */
+.paso-movil { display: none; align-items: center; gap: 8px; margin-bottom: 18px; font-size: .84rem; color: var(--tinta-suave); flex-wrap: wrap; }
+.paso-movil strong { color: var(--tinta); font-size: 1rem; }
+.pm-puntos { display: flex; gap: 5px; margin-left: auto; }
+.pm-puntos i { width: 8px; height: 8px; border-radius: 50%; background: var(--linea); }
+.pm-puntos i.listo { background: var(--salvia); }
+.pm-puntos i.actual { background: var(--mar); width: 20px; border-radius: 99px; }
+.paso-movil.visible { display: flex; }
+
+/* Recorrido por tramos */
+.lista-tramos { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; }
+.tramo-recorrido { padding: 14px 16px; border: 1px solid var(--linea); border-radius: var(--radio); background: var(--arena); }
+.tr-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.tr-tipo { padding: 3px 10px; border-radius: 999px; font-size: .74rem; font-weight: 700; background: var(--mar-claro); color: var(--mar-oscuro); }
+.tr-vuelta { background: var(--terracota-claro); color: var(--terracota-oscuro); }
+.tr-entre { background: var(--sol-claro); color: #8a6417; }
+.segmento { padding: 10px 0; border-top: 1px dashed var(--linea); }
+.segmento:first-of-type { border-top: 0; padding-top: 0; }
+.seg-etiqueta { display: block; font-weight: 700; color: var(--tinta-suave); margin-bottom: 8px; }
+.medios { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.chip-medio { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 2px; border: 1px solid var(--linea); border-radius: 12px; background: var(--papel); font-size: .72rem; font-weight: 600; color: var(--tinta-suave); }
+.chip-medio span { font-size: 1.3rem; }
+.chip-medio.activo { border-color: var(--mar); background: var(--mar-claro); color: var(--mar-oscuro); }
+.campo-otro { width: 100%; margin-top: 10px; padding: 10px 12px; border-radius: var(--radio-chico); border: 1px solid var(--linea); background: var(--papel); }
+.parada { margin-top: 10px; padding: 8px 12px; border-radius: 10px; background: var(--papel); font-size: .88rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.agregar-parada { margin-top: 12px; padding: 12px; border-radius: var(--radio-chico); background: var(--papel); border: 1px solid var(--linea); }
+.tramo-recorrido > .btn { margin-top: 10px; }
+.grupo-resuelto { display: block; margin: 12px 0 6px; font-weight: 700; color: var(--tinta-suave); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+.campo-escapada input[type="date"] { margin-bottom: 6px; }
+
+/* Tildes visibles al seleccionar */
+.chip-check.activo::before, .chip-check:has(input:checked)::before { content: '✓'; font-weight: 800; color: var(--mar); margin-right: 2px; }
+.division-fila input[type="checkbox"], .lista-valija input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none; width: 24px; height: 24px; flex: none; border-radius: 50%;
+  border: 2px solid var(--linea); background: var(--papel); display: grid; place-items: center; cursor: pointer; transition: all .15s;
+}
+.division-fila input[type="checkbox"]:checked, .lista-valija input[type="checkbox"]:checked { background: var(--salvia); border-color: var(--salvia); }
+.division-fila input[type="checkbox"]:checked::after, .lista-valija input[type="checkbox"]:checked::after { content: '✓'; color: #fff; font-size: .8rem; font-weight: 800; }
+.lista-valija input[type="checkbox"]:disabled { opacity: .4; }
+.seleccionar-todos { display: inline-block; margin: 2px 0 8px; font-size: .84rem; }
+.division-pct { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--tinta-suave); }
+.division-pct .division-monto { width: 80px; }
+.input-emoji { flex: 0 0 56px !important; text-align: center; }
+.chip-nueva { border-style: dashed; color: var(--mar); }
+.chip-propia button { border: 0; background: transparent; color: var(--tinta-tenue); padding: 0 2px 0 4px; font-size: 1rem; }
+
+/* Pendientes */
+.fila-pendiente { cursor: default; flex-wrap: wrap; }
+.fila-pendiente:hover { background: transparent; }
+.fila-pendiente .fs-texto { cursor: pointer; }
+.fp-acciones { display: flex; gap: 4px; align-items: center; }
+
+/* Valija: ida y vuelta, checklist */
+.segmentado-valija { margin: 14px 0 0; }
+.lista-valija.checklist li { padding: 12px 4px; }
+.lista-valija.checklist label span { font-size: 1rem; }
+.lista-valija li.no-vuelve span { color: var(--tinta-tenue); text-decoration: line-through; font-style: italic; }
+
+/* Mis listas: campos más grandes */
+.lista-personal .fila-valija { flex-direction: column; align-items: stretch; gap: 8px; margin-top: 14px; }
+.lista-personal .fila-valija input { padding: 13px 14px; font-size: 1rem; }
+.lista-personal .fila-valija select { max-width: none; padding: 12px; }
+.lista-personal .fila-valija .btn { width: 100%; }
+.titulo-lista { font-size: 1.4rem; padding: 6px 0; }
+
+/* Más aire entre etiquetas y campos */
+.campo { gap: 8px; margin-bottom: 18px; }
+.titulo-paso { margin: 18px 0 12px; }
+.asistente-cuerpo > .titulo-paso:first-child { margin-top: 4px; }
+.ayuda { margin-top: 0; margin-bottom: 14px; line-height: 1.45; }
+.checks-grilla { gap: 10px; margin-bottom: 16px; }
+.fila-agregar { gap: 10px; margin-top: 14px; }
+.lugar-info { margin-top: 8px; }
+.form-grilla { gap: 0 14px; }
+
+@media (max-width: 760px) {
+  .pasos-asistente { display: none; }
+  .paso-movil { display: flex; }
+  .medios { grid-template-columns: repeat(3, 1fr); }
+  .campo { gap: 9px; margin-bottom: 20px; }
+  .campo > span { font-size: .9rem; }
+  .check { padding: 10px 0; gap: 12px; }
+  .modal-cuerpo { padding: 12px 20px 20px; }
+  .modal-cab { padding: 20px 20px 8px; }
+  .bloque { padding: 20px 18px; }
+  .chip-check { padding: 10px 14px; }
+  .fila-agregar { flex-wrap: wrap; }
+  .fila-agregar > input:not(.input-emoji) { flex: 1 1 100%; }
+  .fila-agregar > .btn { flex: 1; }
+  .asistente-paisaje { height: 80px; }
+  /* Texto superior sin pegarse a los bordes redondeados */
+  .portada-viaje { padding: 22px 22px 60px; }
+  .etiqueta-clara { white-space: normal; line-height: 1.4; padding: 5px 12px; }
+  .volver { display: inline-block; padding: 4px 0; }
+  .hero { padding: 30px 22px 72px; }
+  .encabezado-simple { padding: 26px 4px 6px; }
+  .cab-seccion { padding: 0 2px; }
+  .fp-acciones { width: 100%; padding-left: 40px; }
+}
+/* Los checkbox dentro de .campo no heredan el estilo de los campos de texto */
+.campo input[type="checkbox"] { width: auto; min-width: 0; padding: 0; box-shadow: none; }
+.campo .check input[type="checkbox"] { -webkit-appearance: auto; appearance: auto; width: 20px; height: 20px; background: initial; border: initial; }
+.campo .division-fila input[type="checkbox"] { width: 24px; height: 24px; min-width: 24px; border-radius: 50%; border: 2px solid var(--linea); background: var(--papel); }
+.campo .division-fila input[type="checkbox"]:checked { background: var(--salvia); border-color: var(--salvia); }
+.campo .division-monto { width: 90px; flex: none; text-align: right; }
+.division-fila input[type="checkbox"]:checked::after, .lista-valija input[type="checkbox"]:checked::after { line-height: 1; }

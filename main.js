@@ -44,6 +44,8 @@
 
   /** Vuelve a dibujar la vista actual sin perder la posición del scroll. */
   function refrescar() {
+    // Si hay un cartel abierto, el fondo está congelado: no tocar el scroll
+    if (U.fondoBloqueado() !== null) { render(); return; }
     const y = window.scrollY;
     render();
     window.scrollTo(0, y);

@@ -42,7 +42,7 @@ R.guia = (function () {
   const esInter = v => !!v.perfil.internacional;
   const req = v => R.requisitos.analizar(v);
   const paisesCon = (v, niveles) => req(v).porPais.filter(p => niveles.includes(p.nivel)).map(p => p.pais).join(', ');
-  const usa = medio => v => v.perfil.transporte === medio;
+  const usa = medio => v => R.recorrido.usaMedio(v, medio);
 
   const tareas = [
     /* ---------- Definir ---------- */
@@ -130,17 +130,17 @@ R.guia = (function () {
 
     /* ---------- Transporte ---------- */
     {
-      id: 't_principal', fase: 'transporte',
-      titulo: v => (TRANSPORTE[v.perfil.transporte] || TRANSPORTE.avion).reservar,
-      desc: v => {
-        const lista = (v.destinos || []).filter(d => !d.soloDia);
-        if (lista.length > 1) return `Ida hasta ${lista[0].nombre} y vuelta desde ${lista[lista.length - 1].nombre}. Define a qué hora llegás y te vas.`;
-        return 'Reservá el transporte principal de ida y vuelta. Es lo que define a qué hora llegás y te vas.';
-      },
-      consejo: 'Antes de pagar, revisá equipaje incluido, condiciones de cambio y escalas. Después subí el pasaje a Documentos.',
-      porque: 'Los precios suben y los lugares se agotan; además fija los horarios de todo lo demás.',
-      impacto: 5, anticipacion: 60, dependeDe: ['d_fechas', 'd_participantes'],
-      aplica: v => v.perfil.transporte !== 'auto', docCategoria: 'pasaje'
+      id: 't_segmento', fase: 'transporte', porSegmento: true,
+      titulo: (v, c) => (R.recorrido.MEDIOS[c.seg.medio] || R.recorrido.MEDIOS.otro).titulo(c.seg.desde.nombre, c.seg.hasta.nombre, c.seg),
+      desc: (v, c) => `${R.recorrido.TIPOS_TRAMO[c.tipo]}${c.partes > 1 ? ` (parte ${c.indice + 1} de ${c.partes})` : ''}: ${c.seg.desde.nombre} → ${c.seg.hasta.nombre} en ${(R.recorrido.MEDIOS[c.seg.medio] || R.recorrido.MEDIOS.otro).nombre.toLowerCase()}.`,
+      consejo: (v, c) => c.seg.medio === 'auto'
+        ? 'Calculá no más de 8–9 horas de manejo por día y, si se puede, alterná conductores.'
+        : 'Antes de pagar, revisá equipaje incluido, condiciones de cambio y escalas. Después subí el pasaje a Documentos.',
+      porque: (v, c) => (R.recorrido.MEDIOS[c.seg.medio] || R.recorrido.MEDIOS.otro).porque,
+      impacto: (v, c) => (R.recorrido.MEDIOS[c.seg.medio] || R.recorrido.MEDIOS.otro).impacto,
+      anticipacion: (v, c) => (R.recorrido.MEDIOS[c.seg.medio] || R.recorrido.MEDIOS.otro).anticipacion,
+      fechaBase: (v, c) => c.fecha || '',
+      dependeDe: ['d_fechas', 'd_participantes'], docCategoria: 'pasaje'
     },
     {
       id: 'pq_paquete', fase: 'transporte', titulo: 'Cargar los datos del paquete',
@@ -148,21 +148,6 @@ R.guia = (function () {
       consejo: 'Pedile a la agencia el detalle de vuelos, hoteles y traslados por escrito y subí los vouchers.',
       porque: 'Define qué ya está resuelto y qué falta organizar por tu cuenta.',
       impacto: 5, anticipacion: 45, dependeDe: [], aplica: v => !!v.perfil.paquete, docCategoria: 'reserva'
-    },
-    {
-      id: 't_tramo', fase: 'transporte', porTramo: true,
-      titulo: (v, c) => `Cómo ir de ${c.desde.nombre} a ${c.hasta.nombre}`,
-      desc: (v, c) => `Resolvé el traslado entre ${c.desde.nombre} y ${c.hasta.nombre}: vuelo, micro, auto, ferry…`,
-      consejo: 'Entre destinos, mirá horarios que no te hagan perder el check-out ni llegar de madrugada.',
-      porque: 'Une un destino con el siguiente; si cambia, mueve todo lo demás.',
-      impacto: 4, anticipacion: 45, dependeDe: ['d_fechas'], despuesDe: ['t_principal', 't_ruta'], docCategoria: 'pasaje'
-    },
-    {
-      id: 't_ruta', fase: 'transporte', titulo: 'Planificar la ruta en auto',
-      desc: 'Definí el recorrido, paradas para descansar, peajes y dónde cargar combustible.',
-      consejo: 'Calculá no más de 8–9 horas de manejo por día y, si se puede, alterná conductores.',
-      porque: 'Define a qué hora llegás y si hace falta una noche intermedia.',
-      impacto: 4, anticipacion: 21, dependeDe: ['d_fechas'], aplica: usa('auto')
     },
     {
       id: 't_auto_revision', rec: true, fase: 'transporte', titulo: 'Poner el auto a punto',
@@ -176,7 +161,7 @@ R.guia = (function () {
       desc: 'Seleccioná asientos y confirmá cuánto equipaje incluye tu tarifa (y si conviene sumar valija).',
       consejo: 'Sumar equipaje al reservar suele ser más barato que pagarlo en el aeropuerto.',
       porque: 'Detalle importante pero que se puede resolver más cerca de la fecha.',
-      impacto: 2, anticipacion: 14, dependeDe: ['t_principal'], aplica: usa('avion')
+      impacto: 2, anticipacion: 14, dependeDe: ['t_segmento'], aplica: usa('avion')
     },
 
     /* ---------- Alojamiento ---------- */
@@ -186,7 +171,7 @@ R.guia = (function () {
       desc: 'Elegí dónde vas a dormir cada noche del viaje.',
       consejo: 'Priorizá tarifas con cancelación gratuita: te dan margen si algo cambia. Subí la reserva a Documentos.',
       porque: 'Importante, pero suele tener más disponibilidad y cancelación flexible que el transporte.',
-      impacto: 4, anticipacion: 45, dependeDe: ['d_fechas'], despuesDe: ['t_principal', 't_ruta', 't_tramo'], docCategoria: 'reserva'
+      impacto: 4, anticipacion: 45, dependeDe: ['d_fechas'], despuesDe: ['t_segmento'], docCategoria: 'reserva'
     },
     {
       id: 'a_confirmar', rec: true, fase: 'alojamiento', porDestino: true,
@@ -203,7 +188,7 @@ R.guia = (function () {
       desc: 'Elegí una cobertura para todas las fechas del viaje (en algunos destinos es obligatoria).',
       consejo: 'Revisá si alguna de tus tarjetas ya incluye asistencia y qué cubre realmente antes de contratar otra.',
       porque: 'Te protege ante lo imprevisto; conviene contratarlo con fechas ya firmes.',
-      impacto: 4, anticipacion: 15, dependeDe: ['d_fechas'], despuesDe: ['t_principal'], aplica: esInter, docCategoria: 'seguro'
+      impacto: 4, anticipacion: 15, dependeDe: ['d_fechas'], despuesDe: ['t_segmento'], aplica: esInter, docCategoria: 'seguro'
     },
     {
       id: 'p_vacunas', fase: 'proteccion',
@@ -250,7 +235,7 @@ R.guia = (function () {
       desc: 'Reservá el auto para los días que lo vas a usar.',
       consejo: 'Revisá qué cubre el seguro incluido, la franquicia y la política de combustible.',
       porque: 'En temporada alta los autos se agotan; mejor reservar con fechas firmes.',
-      impacto: 3, anticipacion: 30, dependeDe: ['d_fechas'], despuesDe: ['t_principal'],
+      impacto: 3, anticipacion: 30, dependeDe: ['d_fechas'], despuesDe: ['t_segmento'],
       aplica: v => !!v.perfil.alquilaAuto, docCategoria: 'reserva'
     },
     {
@@ -258,7 +243,7 @@ R.guia = (function () {
       desc: 'Definí cómo vas del aeropuerto o terminal al alojamiento (y viceversa al volver).',
       consejo: 'Si llegás de noche, conviene tenerlo reservado de antemano.',
       porque: 'Necesita saber horarios de llegada y dirección del alojamiento.',
-      impacto: 3, anticipacion: 7, dependeDe: ['a_reserva'], despuesDe: ['t_principal'],
+      impacto: 3, anticipacion: 7, dependeDe: ['a_reserva'], despuesDe: ['t_segmento'],
       aplica: v => v.perfil.transporte !== 'auto'
     },
     {
@@ -297,7 +282,7 @@ R.guia = (function () {
       desc: 'Distribuí actividades en los días del viaje en la pestaña Itinerario.',
       consejo: 'Dejá huecos libres: los mejores momentos muchas veces son los no planeados.',
       porque: 'Ordena todo lo anterior; se arma mejor con transporte y alojamiento definidos.',
-      impacto: 2, anticipacion: 10, dependeDe: ['d_fechas'], despuesDe: ['t_principal', 'a_reserva', 'e_excursiones']
+      impacto: 2, anticipacion: 10, dependeDe: ['d_fechas'], despuesDe: ['t_segmento', 'a_reserva', 'e_excursiones']
     },
 
     /* ---------- Conectividad ---------- */
@@ -329,7 +314,7 @@ R.guia = (function () {
       desc: 'Pedí asistencia en aeropuertos o terminales y confirmá que el alojamiento y las actividades sean accesibles.',
       consejo: 'La asistencia especial suele pedirse con al menos 48 h de anticipación.',
       porque: 'Asegura que todos viajen cómodos y sin sorpresas.',
-      impacto: 4, anticipacion: 21, dependeDe: [], despuesDe: ['t_principal', 'a_reserva'], aplica: v => !!v.perfil.accesibilidad
+      impacto: 4, anticipacion: 21, dependeDe: [], despuesDe: ['t_segmento', 'a_reserva'], aplica: v => !!v.perfil.accesibilidad
     },
     {
       id: 'x_equipo', fase: 'experiencias', titulo: 'Reservar equipo y clases',
@@ -362,11 +347,13 @@ R.guia = (function () {
       impacto: 4, anticipacion: 21, dependeDe: ['d_fechas'], aplica: v => !!v.perfil.mascotas
     },
     {
-      id: 's_checkin', fase: 'salida', titulo: 'Hacer el check-in online',
-      desc: 'Se habilita normalmente entre 24 y 48 h antes del vuelo.',
+      id: 's_checkin', fase: 'salida', porSegmento: true, soloMedio: 'avion',
+      titulo: (v, c) => `Check-in online: ${c.seg.desde.nombre} → ${c.seg.hasta.nombre}`,
+      desc: 'Se habilita normalmente entre 24 y 48 h antes del vuelo. Hasta entonces queda en tus pendientes.',
       consejo: 'Guardá la tarjeta de embarque en el teléfono y subila a Documentos.',
       porque: 'Tiene una ventana de tiempo concreta antes del vuelo.',
-      impacto: 3, anticipacion: 1, dependeDe: ['t_principal'], aplica: usa('avion'), docCategoria: 'pasaje'
+      impacto: 3, anticipacion: 1, ventanaDias: 2, fechaBase: (v, c) => c.fechaVuelo || c.fecha || '',
+      dependeDe: ['t_segmento'], docCategoria: 'pasaje'
     },
     {
       id: 's_casa', rec: true, fase: 'salida', titulo: 'Dejar la casa lista',
@@ -387,7 +374,7 @@ R.guia = (function () {
       desc: 'Revisá que tengas todo: documentos, reservas, horarios de salida y cómo llegar al alojamiento.',
       consejo: 'Calculá con margen el horario para salir hacia el aeropuerto o terminal.',
       porque: 'El último control antes de salir.',
-      impacto: 3, anticipacion: 1, dependeDe: ['a_reserva'], despuesDe: ['t_principal', 't_ruta']
+      impacto: 3, anticipacion: 1, dependeDe: ['a_reserva'], despuesDe: ['t_segmento']
     },
 
     /* ---------- Durante y al volver ---------- */
@@ -397,7 +384,7 @@ R.guia = (function () {
   const motivosCambio = [
     { id: 'fechas', nombre: 'Cambiaron las fechas', icono: '📅', afecta: ['d_fechas'] },
     { id: 'destino', nombre: 'Cambió el destino', icono: '🧭', afecta: ['d_destino'] },
-    { id: 'transporte', nombre: 'Se canceló o cambió el vuelo / transporte', icono: '✈️', afecta: ['t_principal', 't_ruta', 't_tramo', 'pq_paquete'] },
+    { id: 'transporte', nombre: 'Se canceló o cambió el vuelo / transporte', icono: '✈️', afecta: ['t_segmento', 'pq_paquete'] },
     { id: 'alojamiento', nombre: 'Se cayó o cambió el alojamiento', icono: '🏡', afecta: ['a_reserva', 'pq_paquete'] },
     { id: 'participantes', nombre: 'Cambiaron los viajeros', icono: '👥', afecta: ['d_participantes'] }
   ];

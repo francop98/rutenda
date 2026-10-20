@@ -22,7 +22,8 @@ R.vistaGuia = (function () {
   }
 
   function chipEstado(t) {
-    if (t.postergado) return '<span class="chip chip-gris">Más tarde</span>';
+    if (t.esperaVentana) return '<span class="chip chip-gris">Más adelante</span>';
+    if (t.postergado || t.estado === 'en_curso') return '<span class="chip chip-gris">Pendiente</span>';
     if (t.faltanDatos) return '<span class="chip chip-sol">Faltan datos</span>';
     if (t.estado === 'pendiente') return t.bloqueada ? '<span class="chip chip-gris">Esperando</span>' : '';
     const e = R.guia.ESTADOS[t.estado];
@@ -40,8 +41,7 @@ R.vistaGuia = (function () {
     const top = proximos[0];
     const info = R.motor.analizar(v);
     const faltanDatos = info.filter(t => t.faltanDatos);
-    const enMarcha = info.filter(t => t.estado === 'en_curso');
-    const postergados = info.filter(t => t.postergado);
+    const pendientes = R.motor.pendientes(v);
 
     cont.innerHTML = `
       ${aRevisar.length ? `
@@ -52,16 +52,19 @@ R.vistaGuia = (function () {
 
       <div class="guia-grilla">
         <div class="col-principal">
-          ${top ? tarjetaProximo(v, top) : tarjetaSinProximo(v, prog, enMarcha.length + postergados.length)}
-          ${enMarcha.length ? `
-            <div class="bloque bloque-marcha">
-              <h3 class="bloque-titulo">En marcha <span class="contador">${enMarcha.length}</span></h3>
-              <div class="lista-siguientes">${enMarcha.map(t => `
-                <div class="fila-siguiente fila-datos">
-                  <span class="num">▶</span>
-                  <span class="fs-texto" data-tarea="${t.id}"><strong>${esc(t.titulo)}</strong><small>${esc(R.guia.fase(t.fase).nombre)}</small></span>
-                  <button class="btn btn-primario btn-chico" data-rapido="hecha" data-id="${t.id}">✓ Listo</button>
-                  <button class="btn btn-texto btn-chico" data-rapido="pendiente" data-id="${t.id}">Pausar</button>
+          ${top ? tarjetaProximo(v, top) : tarjetaSinProximo(v, prog, pendientes.length)}
+          ${pendientes.length ? `
+            <div class="bloque bloque-marcha" id="pendientes">
+              <h3 class="bloque-titulo">Pendientes <span class="contador">${pendientes.length}</span></h3>
+              <p class="texto-suave rec-intro">Lo que dejaste para más tarde y lo que todavía no se puede hacer.</p>
+              <div class="lista-siguientes">${pendientes.map(t => `
+                <div class="fila-siguiente fila-pendiente">
+                  <span class="num">${t.esperaVentana ? '⏳' : R.guia.fase(t.fase).icono}</span>
+                  <span class="fs-texto" data-tarea="${t.id}"><strong>${esc(t.titulo)}</strong><small>${t.esperaVentana ? `Se habilita el ${U.fmtFecha(t.habilitaEl, 'largo')}` : esc(R.guia.fase(t.fase).nombre)}${t.diasRestantes != null && t.diasRestantes < 0 && !t.esperaVentana ? ' · atrasado' : ''}</small></span>
+                  <span class="fp-acciones">
+                    <button class="btn btn-primario btn-chico" data-rapido="hecha" data-id="${t.id}">✓ Listo</button>
+                    ${t.esperaVentana ? '' : `<button class="btn btn-texto btn-chico" data-reactivar="${t.id}">A la guía</button>`}
+                  </span>
                 </div>`).join('')}</div>
             </div>` : ''}
           ${proximos.length > 1 ? `
@@ -117,7 +120,9 @@ R.vistaGuia = (function () {
       </div>`;
 
     cont.querySelectorAll('[data-tarea]').forEach(x => x.addEventListener('click', e => {
-      if (e.target.closest('[data-rapido]')) return;
+      // Los botones de adentro (Listo, Más tarde, etc.) no abren el detalle
+      const boton = e.target.closest('button');
+      if (boton && boton !== x) return;
       abrirTarea(v, x.dataset.tarea);
     }));
     cont.querySelectorAll('[data-rapido]').forEach(x => x.addEventListener('click', e => {
@@ -133,7 +138,14 @@ R.vistaGuia = (function () {
       R.motor.posponer(v, b.dataset.posponer, true);
       guardar(v);
       R.app.refrescar();
-      U.toast('Te lo vuelvo a sugerir más adelante. Está en el recorrido con la marca "Más tarde".');
+      U.toast('Pasó a Pendientes. Seguimos con lo siguiente.');
+    });
+    cont.querySelectorAll('[data-reactivar]').forEach(b => b.onclick = () => {
+      R.motor.posponer(v, b.dataset.reactivar, false);
+      if (R.motor.estado(v, b.dataset.reactivar) === 'en_curso') R.motor.setEstado(v, b.dataset.reactivar, 'pendiente');
+      guardar(v);
+      R.app.refrescar();
+      U.toast('Volvió a la guía.');
     });
     const bValija = cont.querySelector('[data-a="abrirValija"]');
     if (bValija) bValija.onclick = () => { location.hash = `#viaje/${v.id}/valija`; };
@@ -227,19 +239,18 @@ R.vistaGuia = (function () {
         <div class="pp-acciones">
           <button class="btn btn-primario" data-rapido="hecha" data-id="${t.id}">${t.tieneFormulario ? '✓ Listo, cargar datos' : '✓ Listo'}</button>
           ${t.base === 's_valija' ? '<button class="btn btn-suave" data-a="abrirValija">🧳 Abrir el armador</button>' : ''}
-          <button class="btn btn-suave" data-rapido="en_curso" data-id="${t.id}" title="Queda en marcha y la guía sigue con lo siguiente">▶ Empezar y seguir</button>
-          <button class="btn btn-texto" data-posponer="${t.id}" title="Te lo vuelvo a sugerir más adelante">Más tarde</button>
+          <button class="btn btn-suave" data-posponer="${t.id}" title="Pasa a Pendientes y seguís con lo siguiente">⏭ Más tarde</button>
           <button class="btn btn-texto" data-rapido="no_aplica" data-id="${t.id}">No aplica</button>
         </div>
-        <p class="pp-estado">${t.estado === 'revisar' ? 'Quedó a revisar por un cambio de planes.' : '"Empezar y seguir" lo deja en marcha y te muestro el siguiente; "Más tarde" lo saltea por ahora.'}</p>
+        <p class="pp-estado">${t.estado === 'revisar' ? 'Quedó a revisar por un cambio de planes.' : '"Más tarde" lo pasa a tus Pendientes y seguís con lo siguiente.'}</p>
       </article>`;
   }
 
   function tarjetaSinProximo(v, prog, enEspera) {
     if (enEspera && prog.pct < 100) {
       return `<article class="proximo-paso">
-        <div class="pp-cuerpo"><span class="pp-icono">▶</span>
-        <div><h2>Lo demás ya está en marcha</h2><p>Tenés pasos empezados o para más tarde. Cuando los termines, marcá Listo y seguimos.</p></div></div>
+        <div class="pp-cuerpo"><span class="pp-icono">📋</span>
+        <div><h2>Solo quedan tus pendientes</h2><p>Todo lo demás está resuelto. Revisá la lista de pendientes cuando puedas.</p></div></div>
       </article>`;
     }
     if (prog.pct >= 100) {
@@ -296,7 +307,7 @@ R.vistaGuia = (function () {
       U.toast(`Listo. También di por resuelto: ${deducidas.map(t => t.titulo).slice(0, 3).join(', ')}${deducidas.length > 3 ? '…' : ''}.`);
       return;
     }
-    if (nuevo === 'en_curso') { U.toast('Quedó en marcha. Seguimos con lo siguiente.'); return; }
+
     if (progDespues === 100 && progAntes < 100) {
       celebrar();
     } else if (nuevo === 'hecha' && destrabadas.length) {
@@ -331,11 +342,12 @@ R.vistaGuia = (function () {
       subtitulo: `${f.icono} ${f.nombre}`,
       ancho: true,
       cuerpo: `
-        <div class="segmentado segmentado-estado">${Object.entries(R.guia.ESTADOS).filter(([k]) => k !== 'revisar' || t.estado === 'revisar').map(([k, e]) =>
+        <div class="segmentado segmentado-estado">${Object.entries(R.guia.ESTADOS).filter(([k]) => (k !== 'revisar' || t.estado === 'revisar') && (k !== 'en_curso' || t.estado === 'en_curso')).map(([k, e]) =>
           `<button type="button" data-estado="${k}" class="${t.estado === k ? 'activo' : ''}">${e.nombre}</button>`).join('')}</div>
         ${datos.incluidoEnPaquete ? '<p class="aviso-suave">📦 Incluido en el paquete que compraste.</p>' : ''}
         ${datos.deducido && t.estado === 'hecha' ? '<p class="aviso-suave">✓ Lo di por resuelto porque completaste un paso que lo necesitaba.</p>' : ''}
-        ${t.postergado ? '<p class="aviso-suave">⏭ Lo dejaste para más tarde. <button type="button" class="btn-texto-mini" data-a="reactivar">Volver a sugerirlo</button></p>' : ''}
+        ${t.esperaVentana ? `<p class="aviso-suave">⏳ Se habilita el ${U.fmtFecha(t.habilitaEl, 'largo')}. Hasta entonces queda en tus pendientes.</p>`
+          : t.postergado ? '<p class="aviso-suave">📋 Está en tus pendientes. <button type="button" class="btn-texto-mini" data-a="reactivar">Volver a la guía</button></p>' : ''}
         ${t.desc ? `<p class="detalle-desc">${esc(t.desc)}</p>` : ''}
         ${t.tieneFormulario ? `
           <div class="detalle-datos">

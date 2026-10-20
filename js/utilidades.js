@@ -150,6 +150,24 @@ R.util = (function () {
 
   /* ---------- Modal ---------- */
   let modalActivo = null;
+  let scrollGuardado = null;
+
+  /** Congela el fondo mientras hay un cartel abierto (también en iPhone). */
+  function bloquearFondo() {
+    if (scrollGuardado !== null) return;
+    scrollGuardado = window.scrollY || 0;
+    document.body.style.top = `-${scrollGuardado}px`;
+    document.body.classList.add('sin-scroll');
+  }
+  function liberarFondo() {
+    if (scrollGuardado === null) return;
+    const y = scrollGuardado;
+    scrollGuardado = null;
+    document.body.classList.remove('sin-scroll');
+    document.body.style.top = '';
+    window.scrollTo(0, y);
+  }
+  function fondoBloqueado() { return scrollGuardado; }
 
   function modal(opciones) {
     const { titulo, cuerpo, acciones = [], ancho, alAbrir, alCerrar, subtitulo } = opciones;
@@ -171,7 +189,7 @@ R.util = (function () {
           `<button type="button" class="btn ${a.clase || 'btn-suave'}" data-accion="${i}">${esc(a.texto)}</button>`).join('')}</div>` : ''}
       </div>`;
     capa.appendChild(el);
-    document.body.classList.add('sin-scroll');
+    bloquearFondo();
     el.addEventListener('mousedown', e => { if (e.target === el) cerrarModal(); });
     el.querySelector('.modal-x').addEventListener('click', cerrarModal);
     el.querySelectorAll('[data-accion]').forEach(b => {
@@ -191,7 +209,7 @@ R.util = (function () {
     const { el, alCerrar } = modalActivo;
     modalActivo = null;
     el.remove();
-    document.body.classList.remove('sin-scroll');
+    liberarFondo();
     if (alCerrar) alCerrar();
   }
 
@@ -229,7 +247,7 @@ R.util = (function () {
   }
 
   return {
-    MONEDAS, id, esc, aISO, hoyISO, aFecha, sumarDias, diasEntre, fmtFecha, fmtRango, plural,
+    MONEDAS, fondoBloqueado, id, esc, aISO, hoyISO, aFecha, sumarDias, diasEntre, fmtFecha, fmtRango, plural,
     redondear, fmtMoneda, fmtTamano, numero, hash, portada, colorPersona, iniciales, avatar,
     anillo, saludo, frase, paisaje, modal, cerrarModal, confirmar, toast, opcionesMoneda
   };

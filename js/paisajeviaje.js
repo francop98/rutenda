@@ -45,7 +45,7 @@ R.paisaje = (function () {
       hitos = {
         alojamiento: resuelto('a_reserva'),
         experiencias: resuelto('e_excursiones') || resuelto('e_imperdibles') || resuelto('e_escapada'),
-        transporte: resuelto('t_principal') || resuelto('t_ruta')
+        transporte: resuelto('t_segmento')
       };
     }
     p = Math.max(0, Math.min(1, p == null ? 0.5 : p));

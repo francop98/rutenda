@@ -20,7 +20,16 @@ R.gastos = (function () {
     { id: 'compras', nombre: 'Compras', icono: '🛍️' },
     { id: 'otros', nombre: 'Otros', icono: '📌' }
   ];
-  function categoria(id) { return CATEGORIAS.find(c => c.id === id) || CATEGORIAS[CATEGORIAS.length - 1]; }
+  /** Categorías base + las que creó el usuario. */
+  function categorias() { return CATEGORIAS.concat((R.db.prefs().categoriasGasto || [])); }
+  function categoria(id) { return categorias().find(c => c.id === id) || CATEGORIAS[CATEGORIAS.length - 1]; }
+  function crearCategoria(nombreCat, icono) {
+    const lista = (R.db.prefs().categoriasGasto || []).slice();
+    const c = { id: U.id('cat'), nombre: nombreCat.trim(), icono: (icono || '').trim() || '🏷️', propia: true };
+    lista.push(c);
+    R.db.guardarPrefs({ categoriasGasto: lista });
+    return c;
+  }
   function nombre(id) { const p = R.db.persona(id); return p ? p.nombre : 'Alguien'; }
 
   /* ---------- Cálculos ---------- */
@@ -34,6 +43,8 @@ R.gastos = (function () {
     if (!entre.length) return r;
     if (m.division.modo === 'montos') {
       entre.forEach(id => { r[id] = U.numero((m.division.montos || {})[id]) * factor(v, m); });
+    } else if (m.division.modo === 'porcentajes') {
+      entre.forEach(id => { r[id] = montoBase(v, m) * U.numero((m.division.porcentajes || {})[id]) / 100; });
     } else {
       const cada = montoBase(v, m) / entre.length;
       entre.forEach(id => { r[id] = cada; });
@@ -126,6 +137,7 @@ R.gastos = (function () {
           <p class="texto-suave">Todo se convierte a ${esc(v.monedaBase)} para que las cuentas cierren.</p>
         </div>
         <div class="acciones-fila">
+          <button class="btn btn-texto" data-a="categorias">🏷️ Categorías</button>
           <button class="btn btn-suave" data-a="ingreso">+ Ingreso</button>
           <button class="btn btn-primario" data-a="gasto">+ Gasto</button>
         </div>
@@ -178,7 +190,7 @@ R.gastos = (function () {
 
         <div class="bloque">
           <h3 class="bloque-titulo">Por categoría</h3>
-          ${Object.keys(t.porCategoria).length ? `<div class="barras">${CATEGORIAS.filter(c => t.porCategoria[c.id]).map(c => `
+          ${Object.keys(t.porCategoria).length ? `<div class="barras">${categorias().filter(c => t.porCategoria[c.id]).map(c => `
             <div class="barra-cat">
               <span class="bc-nombre">${c.icono} ${c.nombre}</span>
               <span class="bc-barra"><span style="width:${Math.round((t.porCategoria[c.id] / maxCat) * 100)}%"></span></span>
@@ -198,11 +210,36 @@ R.gastos = (function () {
 
     cont.querySelector('[data-a="gasto"]').onclick = () => editar(v, null, 'gasto');
     cont.querySelector('[data-a="presupuesto"]').onclick = () => editarPresupuesto(v);
+    cont.querySelector('[data-a="categorias"]').onclick = () => administrarCategorias();
     cont.querySelector('[data-a="ingreso"]').onclick = () => editar(v, null, 'ingreso');
     cont.querySelectorAll('[data-mov]').forEach(b => b.onclick = () => editar(v, b.dataset.mov));
     cont.querySelectorAll('[data-saldar]').forEach(b => b.onclick = () => {
       const x = tr[Number(b.dataset.saldar)];
       registrarPago(v, x);
+    });
+  }
+
+  /** Crear y borrar categorías propias (sirven para todos tus viajes). */
+  function administrarCategorias() {
+    const propias = R.db.prefs().categoriasGasto || [];
+    const { el } = U.modal({
+      titulo: 'Categorías de gastos',
+      subtitulo: 'Las que crees sirven para todos tus viajes.',
+      cuerpo: `
+        <div class="chips-elegir">${CATEGORIAS.map(c => `<span class="chip-op">${c.icono} ${esc(c.nombre)}</span>`).join('')}
+          ${propias.map(c => `<span class="chip-op chip-propia">${c.icono} ${esc(c.nombre)} <button type="button" data-borrar-cat="${c.id}" aria-label="Borrar">×</button></span>`).join('')}</div>
+        <div class="fila-agregar"><input id="cIcono" class="input-emoji" maxlength="2" placeholder="🏷️"><input id="cNombre" placeholder="Nueva categoría (ej: Regalos)"><button type="button" class="btn btn-primario" data-a="crear">Crear</button></div>`,
+      acciones: [{ texto: 'Listo', clase: 'btn-primario', onClick: () => { R.app.refrescar(); } }]
+    });
+    el.querySelector('[data-a="crear"]').onclick = () => {
+      const n = el.querySelector('#cNombre').value.trim();
+      if (!n) return;
+      crearCategoria(n, el.querySelector('#cIcono').value);
+      administrarCategorias();
+    };
+    el.querySelectorAll('[data-borrar-cat]').forEach(b => b.onclick = () => {
+      R.db.guardarPrefs({ categoriasGasto: (R.db.prefs().categoriasGasto || []).filter(c => c.id !== b.dataset.borrarCat) });
+      administrarCategorias();
     });
   }
 
@@ -300,7 +337,9 @@ R.gastos = (function () {
           <button type="button" data-tipo="ingreso" class="${!esGasto ? 'activo' : ''}">Ingreso / reintegro</button>
         </div>
         <label class="campo"><span>Concepto *</span><input id="mConcepto" value="${esc(m.concepto)}" placeholder="${esGasto ? 'Ej: Cena en el centro' : 'Ej: Reintegro de excursión cancelada'}"></label>
-        ${esGasto ? `<div class="chips-elegir chips-chicos">${CATEGORIAS.map(c => `<button type="button" class="chip-op ${m.categoria === c.id ? 'activo' : ''}" data-cat="${c.id}">${c.icono} ${c.nombre}</button>`).join('')}</div>` : ''}
+        ${esGasto ? `<div class="chips-elegir chips-chicos">${categorias().map(c => `<button type="button" class="chip-op ${m.categoria === c.id ? 'activo' : ''}" data-cat="${c.id}">${c.icono} ${esc(c.nombre)}</button>`).join('')}
+          <button type="button" class="chip-op chip-nueva" data-a="nuevaCat">+ Nueva categoría</button></div>
+          <div class="fila-agregar oculto" id="filaNuevaCat"><input id="mCatIcono" class="input-emoji" maxlength="2" placeholder="🏷️"><input id="mCatNombre" placeholder="Nombre (ej: Regalos, Nafta)"><button type="button" class="btn btn-suave" data-a="crearCat">Crear</button></div>` : ''}
         <div class="grilla-monto">
           <label class="campo"><span>Monto *</span><input id="mMonto" inputmode="decimal" value="${esc(m.monto)}" placeholder="0"></label>
           <label class="campo"><span>Moneda</span><select id="mMoneda">${U.opcionesMoneda(m.moneda)}</select></label>
@@ -315,13 +354,16 @@ R.gastos = (function () {
             <span>${esGasto ? '¿Entre quiénes se divide?' : '¿A quiénes les corresponde?'}</span>
             <div class="segmentado segmentado-chico">
               <button type="button" data-modo="igual" class="${m.division.modo === 'igual' ? 'activo' : ''}">Partes iguales</button>
-              <button type="button" data-modo="montos" class="${m.division.modo === 'montos' ? 'activo' : ''}">Montos distintos</button>
+              <button type="button" data-modo="montos" class="${m.division.modo === 'montos' ? 'activo' : ''}">Montos</button>
+              <button type="button" data-modo="porcentajes" class="${m.division.modo === 'porcentajes' ? 'activo' : ''}">Porcentajes</button>
             </div>
+            <button type="button" class="btn-texto-mini seleccionar-todos" data-a="todos">${m.division.entre.length === v.participantes.length ? 'Quitar a todos' : 'Seleccionar a todos'}</button>
             <div class="lista-division">${v.participantes.map(p => `
               <label class="division-fila">
                 <input type="checkbox" data-entre="${p}" ${m.division.entre.includes(p) ? 'checked' : ''}>
                 <span>${esc(nombre(p))}</span>
                 ${m.division.modo === 'montos' ? `<input class="division-monto" data-montode="${p}" inputmode="decimal" value="${esc(m.division.montos[p] || '')}" placeholder="0" ${m.division.entre.includes(p) ? '' : 'disabled'}>`
+                  : m.division.modo === 'porcentajes' ? `<span class="division-pct"><input class="division-monto" data-pctde="${p}" inputmode="decimal" value="${esc((m.division.porcentajes || {})[p] || '')}" placeholder="0" ${m.division.entre.includes(p) ? '' : 'disabled'}>%</span>`
                   : `<small class="division-parte" data-partede="${p}"></small>`}
               </label>`).join('')}</div>
             <p class="ayuda" id="mControl"></p>
@@ -341,6 +383,8 @@ R.gastos = (function () {
       const checks = f.querySelectorAll('[data-entre]');
       if (checks.length) m.division.entre = Array.from(checks).filter(x => x.checked).map(x => x.dataset.entre);
       f.querySelectorAll('[data-montode]').forEach(x => { m.division.montos[x.dataset.montode] = x.value; });
+      m.division.porcentajes = m.division.porcentajes || {};
+      f.querySelectorAll('[data-pctde]').forEach(x => { m.division.porcentajes[x.dataset.pctde] = x.value; });
     }
 
     function recalcular() {
@@ -355,6 +399,11 @@ R.gastos = (function () {
         });
         control.textContent = n ? `${U.fmtMoneda(total / n, m.moneda)} cada uno.` : 'Elegí al menos una persona.';
         control.classList.toggle('error', !n);
+      } else if (m.division.modo === 'porcentajes') {
+        const suma = m.division.entre.reduce((a, p) => a + U.numero(m.division.porcentajes[p]), 0);
+        const dif = U.redondear(100 - suma);
+        control.textContent = Math.abs(dif) < 0.01 ? 'Los porcentajes suman 100% ✓' : dif > 0 ? `Falta asignar ${dif}%` : `Te pasaste por ${-dif}%`;
+        control.classList.toggle('error', Math.abs(dif) >= 0.01);
       } else {
         const suma = m.division.entre.reduce((a, p) => a + U.numero(m.division.montos[p]), 0);
         const dif = U.redondear(total - suma);
@@ -366,6 +415,23 @@ R.gastos = (function () {
     function enlazar() {
       f.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => { leer(); m.tipo = b.dataset.tipo; el.querySelector('.modal-cab h3').textContent = existente ? 'Editar movimiento' : (m.tipo === 'gasto' ? 'Nuevo gasto' : 'Nuevo ingreso'); pintar(); });
       f.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { m.categoria = b.dataset.cat; f.querySelectorAll('[data-cat]').forEach(x => x.classList.toggle('activo', x === b)); });
+      const nueva = f.querySelector('[data-a="nuevaCat"]');
+      if (nueva) nueva.onclick = () => { f.querySelector('#filaNuevaCat').classList.remove('oculto'); f.querySelector('#mCatNombre').focus(); };
+      const crear = f.querySelector('[data-a="crearCat"]');
+      if (crear) crear.onclick = () => {
+        const n = f.querySelector('#mCatNombre').value.trim();
+        if (!n) { U.toast('Poné un nombre para la categoría.'); return; }
+        leer();
+        m.categoria = crearCategoria(n, f.querySelector('#mCatIcono').value).id;
+        pintar();
+      };
+      const todos = f.querySelector('[data-a="todos"]');
+      if (todos) todos.onclick = () => {
+        leer();
+        m.division.entre = m.division.entre.length === v.participantes.length ? [] : v.participantes.slice();
+        pintar();
+      };
+      f.querySelectorAll('[data-pctde]').forEach(x => x.oninput = recalcular);
       f.querySelectorAll('[data-modo]').forEach(b => b.onclick = () => { leer(); m.division.modo = b.dataset.modo; pintar(); });
       const moneda = f.querySelector('#mMoneda');
       moneda.onchange = () => { leer(); pintar(); };
@@ -398,12 +464,20 @@ R.gastos = (function () {
     if (!(m.monto > 0)) { U.toast('El monto tiene que ser mayor a cero.'); return false; }
     if (m.moneda !== v.monedaBase && !(m.cotizacion > 0)) { U.toast(`Cargá la cotización de ${m.moneda} a ${v.monedaBase}.`); return false; }
     if (!m.division.entre.length) { U.toast('Elegí entre quiénes se divide.'); return false; }
-    if (m.division.modo === 'montos') {
+    m.division.porcentajes = m.division.porcentajes || {};
+    f.querySelectorAll('[data-pctde]').forEach(x => { m.division.porcentajes[x.dataset.pctde] = U.numero(x.value); });
+    if (m.division.modo === 'porcentajes') {
+      const sumaPct = m.division.entre.reduce((a, p) => a + U.numero(m.division.porcentajes[p]), 0);
+      if (Math.abs(sumaPct - 100) >= 0.01) { U.toast('Los porcentajes tienen que sumar 100%.'); return false; }
+      Object.keys(m.division.porcentajes).forEach(p => { if (!m.division.entre.includes(p)) delete m.division.porcentajes[p]; });
+      m.division.montos = {};
+    } else if (m.division.modo === 'montos') {
       const suma = m.division.entre.reduce((a, p) => a + U.numero(m.division.montos[p]), 0);
       if (Math.abs(suma - m.monto) >= 0.01) { U.toast('Los montos por persona tienen que sumar el total.'); return false; }
       Object.keys(m.division.montos).forEach(p => { if (!m.division.entre.includes(p)) delete m.division.montos[p]; });
     } else {
       m.division.montos = {};
+      m.division.porcentajes = {};
     }
     if (m.tipo === 'ingreso') delete m.categoria;
     else m.categoria = m.categoria || 'otros';
@@ -441,5 +515,5 @@ R.gastos = (function () {
     U.toast('Movimiento eliminado.');
   }
 
-  return { CATEGORIAS, render, saldos, transferencias, totales, montoBase, partes, parteDe, personaTieneMovimientos };
+  return { CATEGORIAS, categorias, render, saldos, transferencias, totales, montoBase, partes, parteDe, personaTieneMovimientos };
 })();

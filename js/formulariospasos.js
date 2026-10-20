@@ -19,7 +19,8 @@ R.formularios = (function () {
     micro: { nombre: 'Micro', empresa: 'Empresa', numero: 'N° de servicio', concepto: 'Pasajes de micro' },
     tren: { nombre: 'Tren', empresa: 'Empresa', numero: 'N° de servicio', concepto: 'Pasajes de tren' },
     barco: { nombre: 'Barco / ferry', empresa: 'Naviera', numero: 'N° de servicio', concepto: 'Barco / ferry' },
-    auto: { nombre: 'Auto', empresa: 'Vehículo', numero: 'Patente', concepto: 'Traslado en auto' }
+    auto: { nombre: 'Auto', empresa: 'Vehículo', numero: 'Patente', concepto: 'Viaje en auto' },
+    otro: { nombre: 'Otro', empresa: 'Empresa', numero: 'N° / referencia', concepto: 'Transporte' }
   };
 
   const destinosAloj = v => (v.destinos || []).filter(d => !d.soloDia);
@@ -49,14 +50,13 @@ R.formularios = (function () {
   }
 
   const transporte = {
-    modo: (v, d, ctx) => ctx && ctx.hasta ? (d.modo || 'avion') : (v.perfil.transporte || 'avion'),
+    modo: (v, d, ctx) => (ctx && ctx.seg ? ctx.seg.medio : v.perfil.transporte) || 'avion',
     pasos: (v, d, ctx) => {
       const modo = transporte.modo(v, d, ctx);
-      const primero = ctx && ctx.hasta ? [{ id: 'modo', tipo: 'segmentado', etiqueta: '¿Cómo vas?', opciones: Object.keys(MODOS).map(k => ({ v: k, t: MODOS[k].nombre })) }] : [];
       return [
-        { titulo: 'Los tramos', intro: 'Cargá cada tramo. Si es combinado, agregá un tramo por cada vuelo o servicio.', campos: primero.concat([
-          { id: 'tramos', tipo: 'lista', etiquetaItem: it => it.sentido || 'Tramo', textoAgregar: '+ Agregar otro tramo', nuevo: () => ({ sentido: 'Tramo', escalas: 'Directo' }), subcampos: camposTramo(modo) }
-        ]) },
+        { titulo: 'El viaje', intro: 'Si es con escala o en varios servicios, agregá uno por cada vuelo o pasaje.', campos: [
+          { id: 'tramos', tipo: 'lista', etiquetaItem: (it, i) => it.sentido || `Tramo ${i + 1}`, textoAgregar: '+ Agregar otro vuelo / pasaje', nuevo: () => ({ escalas: 'Directo' }), subcampos: camposTramo(modo) }
+        ] },
         { titulo: 'La reserva', campos: [
           { id: 'codigo', tipo: 'texto', etiqueta: 'Código de reserva', ancho: 'medio' },
           { id: 'equipaje', tipo: 'segmentado', etiqueta: 'Equipaje incluido', opciones: ['Solo de mano', 'Mano + bodega', 'Sin definir'], si: () => modo === 'avion' },
@@ -66,23 +66,20 @@ R.formularios = (function () {
       ];
     },
     inicial: (v, ctx) => {
-      if (ctx && ctx.hasta) {
-        return { modo: 'avion', tramos: [{ sentido: 'Tramo', desde: ctx.desde.nombre, hasta: ctx.hasta.nombre, fechaSalida: ctx.hasta.desde || '', escalas: 'Directo' }] };
-      }
-      const lista = destinosAloj(v);
-      const primero = lista[0] || { nombre: v.destino }, ultimo = lista[lista.length - 1] || primero;
-      const origen = (v.origen && v.origen.nombre) || '';
+      const c = ctx || {};
+      const seg = c.seg || { desde: v.origen || {}, hasta: { nombre: v.destino } };
       return {
         equipaje: 'Sin definir',
-        tramos: [
-          { sentido: 'Ida', desde: origen, hasta: primero.nombre, fechaSalida: v.fechaInicio || '', escalas: 'Directo' },
-          { sentido: 'Vuelta', desde: ultimo.nombre, hasta: origen, fechaSalida: v.fechaFin || '', escalas: 'Directo' }
-        ]
+        tramos: [{ sentido: R.recorrido.TIPOS_TRAMO[c.tipo] || 'Tramo', desde: seg.desde.nombre || '', hasta: seg.hasta.nombre || '', fechaSalida: c.fecha || '', escalas: 'Directo' }]
       };
     },
     costo: { categoria: 'transporte' },
     archivos: { categoria: 'pasaje', ayuda: 'Pasajes, e-tickets o la confirmación de la compra.' },
-    concepto: (v, d, ctx) => ctx && ctx.hasta ? `Traslado ${ctx.desde.nombre} → ${ctx.hasta.nombre}` : (MODOS[v.perfil.transporte] || MODOS.avion).concepto,
+    concepto: (v, d, ctx) => {
+      const seg = ctx && ctx.seg;
+      if (!seg) return 'Transporte';
+      return `${(MODOS[seg.medio] || MODOS.otro).concepto} ${seg.desde.nombre} → ${seg.hasta.nombre}`;
+    },
     itinerario: (v, d, ctx) => (d.tramos || []).filter(t => t.fechaSalida).map(t => ({
       fecha: t.fechaSalida, hora: t.horaSalida || '', tipo: 'vuelo',
       titulo: `${conAero(t.desde, t.desdeAeropuerto)} → ${conAero(t.hasta, t.hastaAeropuerto)}`,
@@ -94,8 +91,7 @@ R.formularios = (function () {
   };
 
   const DEF = {
-    t_principal: transporte,
-    t_tramo: transporte,
+    t_segmento: transporte,
 
     a_reserva: {
       pasos: () => [
@@ -339,21 +335,33 @@ R.formularios = (function () {
   };
 
   const BASES_PAQUETE = {
-    vuelos: ['t_principal', 't_tramo'], alojamiento: ['a_reserva'], traslados: ['mv_traslado'],
+    vuelos: ['t_segmento'], alojamiento: ['a_reserva'], traslados: ['mv_traslado'],
     excursiones: ['e_excursiones'], seguro: ['p_seguro'], auto: ['mv_auto']
   };
 
   /** Marca como resuelto (incluido en el paquete) lo que el paquete cubre. */
   function aplicarPaquete(v) {
     const incluye = (v.perfil.paquete && v.perfil.paquete.incluye) || [];
-    incluye.forEach(k => (BASES_PAQUETE[k] || []).forEach(base => R.motor.idsDe(v, base).forEach(id => {
+    const lista = R.motor.lista(v);
+    const esVuelo = id => { const t = lista.find(x => x.id === id); return !t || !t.ctx || !t.ctx.seg || t.ctx.seg.medio === 'avion'; };
+    incluye.forEach(k => (BASES_PAQUETE[k] || []).forEach(base => R.motor.idsDe(v, base).filter(id => k !== 'vuelos' || esVuelo(id)).forEach(id => {
       const previo = v.tareas[id] || {};
       if (previo.estado === 'hecha' && !previo.incluidoEnPaquete) return;
       v.tareas[id] = Object.assign({}, previo, { estado: 'hecha', incluidoEnPaquete: true, fechaHecha: previo.fechaHecha || new Date().toISOString() });
     })));
   }
 
-  function def(t) { return t ? DEF[t.base || t.id] : null; }
+  /** ¿Este paso queda cubierto por lo que incluye el paquete? */
+  function incluidoEnPaquete(t, incluye) {
+    return (incluye || []).some(k => (BASES_PAQUETE[k] || []).includes(t.base) && (k !== 'vuelos' || !t.ctx || !t.ctx.seg || t.ctx.seg.medio === 'avion'));
+  }
+
+  function def(t) {
+    if (!t) return null;
+    // El viaje en auto propio no tiene pasaje que cargar
+    if ((t.base || t.id) === 't_segmento' && t.ctx && t.ctx.seg && t.ctx.seg.medio === 'auto') return null;
+    return DEF[t.base || t.id];
+  }
   function tiene(t) { return !!def(t); }
 
   /* ---------------------------------------------------------
@@ -401,7 +409,8 @@ R.formularios = (function () {
     if (!datos.costo) {
       const gasto = v.movimientos.find(m => m.origenTarea === tareaId);
       datos.costo = gasto
-        ? { monto: gasto.monto, moneda: gasto.moneda, cotizacion: gasto.cotizacion, persona: gasto.persona, entre: gasto.division.entre.slice() }
+        ? { monto: gasto.monto, moneda: gasto.moneda, cotizacion: gasto.cotizacion, persona: gasto.persona, entre: gasto.division.entre.slice(),
+            modo: gasto.division.modo || 'igual', reparto: Object.assign({}, gasto.division.montos || {}, gasto.division.porcentajes || {}) }
         : { monto: '', moneda: v.monedaBase, cotizacion: '', persona: v.participantes.includes('yo') ? 'yo' : v.participantes[0], entre: v.participantes.slice() };
     }
     let archivosNuevos = [];
@@ -490,8 +499,20 @@ R.formularios = (function () {
           ${c.moneda !== v.monedaBase ? `<label class="campo completo"><span>Cotización: 1 ${esc(c.moneda)} = ? ${esc(v.monedaBase)}</span><input data-costo="cotizacion" inputmode="decimal" value="${esc(c.cotizacion)}"></label>` : ''}
           ${varios ? `
             <label class="campo completo"><span>¿Quién pagó?</span><select data-costo="persona">${v.participantes.map(pid => `<option value="${pid}" ${pid === c.persona ? 'selected' : ''}>${esc((R.db.persona(pid) || {}).nombre)}</option>`).join('')}</select></label>
-            <div class="campo completo"><span>¿Entre quiénes se divide? (partes iguales)</span><div class="checks-grilla">${v.participantes.map(pid =>
-              `<label class="chip-check ${c.entre.includes(pid) ? 'activo' : ''}"><input type="checkbox" data-entre="${pid}" ${c.entre.includes(pid) ? 'checked' : ''}> ${esc((R.db.persona(pid) || {}).nombre)}</label>`).join('')}</div></div>` : ''}
+            <div class="campo completo"><span>¿Entre quiénes se divide?</span>
+              <div class="segmentado segmentado-chico" data-seg-costo>
+                ${[['igual', 'Partes iguales'], ['montos', 'Montos'], ['porcentajes', 'Porcentajes']].map(([k, t]) => `<button type="button" data-modo-costo="${k}" class="${(c.modo || 'igual') === k ? 'activo' : ''}">${t}</button>`).join('')}
+              </div>
+              <button type="button" class="btn-texto-mini seleccionar-todos" data-a="todosCosto">${c.entre.length === v.participantes.length ? 'Quitar a todos' : 'Seleccionar a todos'}</button>
+              <div class="lista-division">${v.participantes.map(pid => `
+                <label class="division-fila">
+                  <input type="checkbox" data-entre="${pid}" ${c.entre.includes(pid) ? 'checked' : ''}>
+                  <span>${esc((R.db.persona(pid) || {}).nombre)}</span>
+                  ${(c.modo || 'igual') === 'montos' ? `<input class="division-monto" data-reparto="${pid}" inputmode="decimal" value="${esc((c.reparto || {})[pid] || '')}" placeholder="0" ${c.entre.includes(pid) ? '' : 'disabled'}>`
+                    : (c.modo || 'igual') === 'porcentajes' ? `<span class="division-pct"><input class="division-monto" data-reparto="${pid}" inputmode="decimal" value="${esc((c.reparto || {})[pid] || '')}" placeholder="0" ${c.entre.includes(pid) ? '' : 'disabled'}>%</span>`
+                    : `<small class="division-parte">${c.entre.includes(pid) && U.numero(c.monto) > 0 ? U.fmtMoneda(U.numero(c.monto) / c.entre.length, c.moneda) : ''}</small>`}
+                </label>`).join('')}</div>
+            </div>` : ''}
         </div>`;
     }
 
@@ -525,6 +546,8 @@ R.formularios = (function () {
       cont.querySelectorAll('[data-costo]').forEach(x => { datos.costo[x.dataset.costo] = x.value.trim(); });
       const entre = cont.querySelectorAll('[data-entre]');
       if (entre.length) datos.costo.entre = Array.from(entre).filter(x => x.checked).map(x => x.dataset.entre);
+      datos.costo.reparto = datos.costo.reparto || {};
+      cont.querySelectorAll('[data-reparto]').forEach(x => { datos.costo.reparto[x.dataset.reparto] = x.value; });
     }
 
     function validar(p) {
@@ -537,6 +560,9 @@ R.formularios = (function () {
         if (U.numero(c.monto) > 0) {
           if (c.moneda !== v.monedaBase && !(U.numero(c.cotizacion) > 0)) return `Cargá la cotización de ${c.moneda} a ${v.monedaBase}.`;
           if (v.participantes.length > 1 && !c.entre.length) return 'Elegí entre quiénes se divide.';
+          const suma = c.entre.reduce((a, pid) => a + U.numero((c.reparto || {})[pid]), 0);
+          if (c.modo === 'montos' && Math.abs(suma - U.numero(c.monto)) >= 0.01) return `Los montos por persona suman ${U.fmtMoneda(suma, c.moneda)} y el total es ${U.fmtMoneda(U.numero(c.monto), c.moneda)}.`;
+          if (c.modo === 'porcentajes' && Math.abs(suma - 100) >= 0.01) return `Los porcentajes suman ${suma}%: tienen que sumar 100%.`;
         }
       }
       return null;
@@ -569,7 +595,10 @@ R.formularios = (function () {
         pintar();
       });
       cont.querySelectorAll('select[data-campo], input[type="checkbox"][data-campo], select[data-costo="moneda"]').forEach(x => x.onchange = () => { leer(); pintar(); });
-      cont.querySelectorAll('[data-entre]').forEach(x => x.onchange = () => { x.closest('.chip-check').classList.toggle('activo', x.checked); });
+      cont.querySelectorAll('[data-entre]').forEach(x => x.onchange = () => { leer(); pintar(); });
+      cont.querySelectorAll('[data-modo-costo]').forEach(b => b.onclick = () => { leer(); datos.costo.modo = b.dataset.modoCosto; pintar(); });
+      const todosCosto = cont.querySelector('[data-a="todosCosto"]');
+      if (todosCosto) todosCosto.onclick = () => { leer(); datos.costo.entre = datos.costo.entre.length === v.participantes.length ? [] : v.participantes.slice(); pintar(); };
       cont.querySelectorAll('[data-agregar]').forEach(b => b.onclick = () => {
         leer();
         const c = (p.campos || []).find(x => x.id === b.dataset.agregar);
@@ -602,6 +631,13 @@ R.formularios = (function () {
       if (archivo) archivo.onchange = () => { archivosNuevos = archivosNuevos.concat(Array.from(archivo.files)); pintar(); };
     }
 
+    function divisionDesdeCosto(c, entre) {
+      const modo = v.participantes.length > 1 ? (c.modo || 'igual') : 'igual';
+      const valores = {};
+      entre.forEach(pid => { valores[pid] = U.numero((c.reparto || {})[pid]); });
+      return { modo, entre, montos: modo === 'montos' ? valores : {}, porcentajes: modo === 'porcentajes' ? valores : {} };
+    }
+
     async function guardar() {
       const boton = cont.querySelector('[data-a="seguir"]');
       boton.disabled = true;
@@ -632,7 +668,7 @@ R.formularios = (function () {
             categoria: d.costo.categoria, monto: U.numero(costo.monto), moneda: costo.moneda,
             cotizacion: costo.moneda !== v.monedaBase ? U.numero(costo.cotizacion) : 1,
             fecha: U.hoyISO(), persona: v.participantes.length > 1 ? costo.persona : (costo.persona || v.participantes[0]),
-            division: { modo: 'igual', entre, montos: {} }, creado: new Date().toISOString()
+            division: divisionDesdeCosto(costo, entre), creado: new Date().toISOString()
           });
           gastoCargado = true;
         }
@@ -676,5 +712,5 @@ R.formularios = (function () {
     return lineas.filter(Boolean);
   }
 
-  return { tiene, abrir, resumen, aplicarPaquete, MODOS };
+  return { tiene, abrir, resumen, aplicarPaquete, incluidoEnPaquete, MODOS };
 })();
