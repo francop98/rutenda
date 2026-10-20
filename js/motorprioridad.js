@@ -20,8 +20,10 @@ R.motor = (function () {
   function lista(v) {
     const destinos = v.destinos || [];
     const conAloj = destinos.filter(d => !d.soloDia);
+    // Donde dormís: destinos y paradas en las que hacés noche
+    const estadias = R.recorrido.estadias(v).map(e => Object.assign({}, e.lugar, { id: e.id, nombre: e.nombre, desde: e.desde, hasta: e.hasta, parada: e.tipo === 'parada' }));
     const escapadas = destinos.filter(d => d.soloDia);
-    const varios = conAloj.length > 1;
+    const varios = estadias.length > 1;
     const concreta = (t, id, ctx) => Object.assign({}, t, {
       id, base: t.id, ctx: ctx || null,
       destId: ctx ? (ctx.destId || (ctx.destino ? ctx.destino.id : (ctx.hasta ? ctx.hasta.id : null))) : null,
@@ -41,7 +43,7 @@ R.motor = (function () {
     const base = [];
     R.guia.tareas.filter(t => !t.aplica || t.aplica(v)).forEach(t => {
       if (t.porDestino) {
-        const lugares = conAloj.length ? conAloj : [{ id: 'unico', nombre: v.destino || 'destino' }];
+        const lugares = estadias.length ? estadias : (conAloj.length ? conAloj : [{ id: 'unico', nombre: v.destino || 'destino' }]);
         lugares.forEach(d => base.push(concreta(t, `${t.id}__${d.id}`, { destino: d, varios })));
       } else if (t.porTramo) {
         for (let i = 1; i < conAloj.length; i++) base.push(concreta(t, `${t.id}__${conAloj[i].id}`, { desde: conAloj[i - 1], hasta: conAloj[i] }));

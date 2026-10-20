@@ -54,7 +54,8 @@ R.util = (function () {
     if (!a) return 'Fechas a definir';
     if (!b || a === b) return fmtFecha(a);
     const fa = aFecha(a), fb = aFecha(b);
-    if (fa.getFullYear() === fb.getFullYear()) return fmtFecha(a, 'corto') + ' – ' + fmtFecha(b);
+    if (fa.getFullYear() === fb.getFullYear() && fa.getMonth() === fb.getMonth()) return fa.getDate() + ' al ' + fmtFecha(b);
+    if (fa.getFullYear() === fb.getFullYear()) return fmtFecha(a, 'corto') + ' al ' + fmtFecha(b);
     return fmtFecha(a) + ' – ' + fmtFecha(b);
   }
   function plural(n, uno, varios) { return n + ' ' + (Math.abs(n) === 1 ? uno : varios); }
@@ -211,6 +212,7 @@ R.util = (function () {
     el.remove();
     liberarFondo();
     if (alCerrar) alCerrar();
+    if (R.app && R.app.trasCerrarModal) setTimeout(R.app.trasCerrarModal, 0);
   }
 
   document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });

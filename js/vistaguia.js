@@ -237,11 +237,12 @@ R.vistaGuia = (function () {
             <ul>${t.razones.slice(0, 3).map(r => `<li><span>${ICONO_RAZON[r.tipo] || '•'}</span>${esc(r.texto)}</li>`).join('')}</ul>
           </div>` : ''}
         <div class="pp-acciones">
-          <button class="btn btn-primario" data-rapido="hecha" data-id="${t.id}">${t.tieneFormulario ? '✓ Listo, cargar datos' : '✓ Listo'}</button>
+          <button class="btn btn-primario" data-rapido="hecha" data-id="${t.id}">${t.abreCronograma ? '📅 Cargar las fechas' : t.tieneFormulario ? '✓ Listo, cargar datos' : '✓ Listo'}</button>
           ${t.base === 's_valija' ? '<button class="btn btn-suave" data-a="abrirValija">🧳 Abrir el armador</button>' : ''}
           <button class="btn btn-suave" data-posponer="${t.id}" title="Pasa a Pendientes y seguís con lo siguiente">⏭ Más tarde</button>
           <button class="btn btn-texto" data-rapido="no_aplica" data-id="${t.id}">No aplica</button>
         </div>
+        <p class="pp-viajero">Lo resuelve quien organiza el viaje. Vos podés cargar tus gastos, documentos y tu valija.</p>
         <p class="pp-estado">${t.estado === 'revisar' ? 'Quedó a revisar por un cambio de planes.' : '"Más tarde" lo pasa a tus Pendientes y seguís con lo siguiente.'}</p>
       </article>`;
   }
@@ -293,6 +294,7 @@ R.vistaGuia = (function () {
      --------------------------------------------------------- */
   /** Cambia el estado; "Listo" en un paso con formulario abre la carga de datos. */
   function cambiarEstado(v, id, nuevo) {
+    if (nuevo === 'hecha' && id === 'd_fechas') { R.itinerario.editarCronograma(v); return; }
     if (nuevo === 'hecha' && R.motor.estado(v, id) !== 'hecha') {
       const t = R.motor.lista(v).find(x => x.id === id);
       if (t && R.formularios.tiene(t) && R.formularios.abrir(v, id)) return;
@@ -394,7 +396,7 @@ R.vistaGuia = (function () {
     };
     el.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => {
       const d = v.documentos.find(x => x.id === b.dataset.doc);
-      if (d) R.documentos.abrir(d);
+      if (d) R.documentos.abrir(d, v);
     });
     const ed = el.querySelector('[data-a="editarPropia"]');
     if (ed) ed.onclick = () => editarPropia(v, id);
@@ -478,10 +480,7 @@ R.vistaGuia = (function () {
       cuerpo: `
         <div class="motivos">${R.guia.motivosCambio.map(m => `
           <label class="motivo"><input type="checkbox" value="${m.id}"><span class="motivo-icono">${m.icono}</span><span>${esc(m.nombre)}</span></label>`).join('')}</div>
-        <div id="cFechas" class="grilla-2 oculto">
-          <label class="campo"><span>Nueva salida</span><input type="date" id="cInicio" value="${esc(v.fechaInicio)}"></label>
-          <label class="campo"><span>Nuevo regreso</span><input type="date" id="cFin" value="${esc(v.fechaFin)}"></label>
-        </div>
+        <p id="cFechas" class="aviso-suave oculto">📅 Después te abro el cronograma para que cambies las fechas y horarios de cada traslado.</p>
         <p id="cDestino" class="aviso-suave oculto">🧭 Después de armar el plan te abro el viaje para que actualices los destinos (podés agregar, quitar o cambiar el orden).</p>
         <label class="campo"><span>¿Qué pasó? (opcional, queda en el historial)</span><textarea id="cNota" rows="2" placeholder="Ej: la aerolínea canceló el vuelo del 12"></textarea></label>
         ${v.cambios.length ? `<details class="historial-cambios"><summary>Historial de cambios (${v.cambios.length})</summary>${v.cambios.slice().reverse().map(c => `
@@ -492,20 +491,16 @@ R.vistaGuia = (function () {
           texto: 'Armar plan', clase: 'btn-primario', onClick: el2 => {
             const motivos = Array.from(el2.querySelectorAll('.motivo input:checked')).map(x => x.value);
             if (!motivos.length) { U.toast('Marcá al menos una cosa que haya cambiado.'); return false; }
-            if (motivos.includes('fechas')) {
-              const ini = el2.querySelector('#cInicio').value, fin = el2.querySelector('#cFin').value;
-              if (ini && fin && fin < ini) { U.toast('El regreso no puede ser antes de la salida.'); return false; }
-              v.fechaInicio = ini; v.fechaFin = fin;
-              R.viajes.recalcularTramos(v);
-            }
             R.motor.replanificar(v, motivos, el2.querySelector('#cNota').value.trim());
-            R.viajes.marcarRaizResuelta(v, motivos.filter(m => m !== 'destino'));
+            R.viajes.marcarRaizResuelta(v, motivos.filter(m => m !== 'destino' && m !== 'fechas'));
             guardar(v);
             U.cerrarModal();
             R.app.refrescar();
             if (motivos.includes('destino')) {
               R.viajes.abrirAsistente(v);
               U.toast('Actualizá los destinos. El plan te queda en la guía: "Ver plan ordenado".');
+            } else if (motivos.includes('fechas')) {
+              R.itinerario.editarCronograma(v, { alGuardar: () => mostrarPlan(v, R.motor.ordenarPlan(v, R.motor.pasosARevisar(v))) });
             } else {
               mostrarPlan(v, R.motor.ordenarPlan(v, R.motor.pasosARevisar(v)));
             }

@@ -1,0 +1,20 @@
+rules_version = '2';
+// =========================================================
+// Tripbox — reglas de Storage (archivos de cada viaje)
+// Solo los miembros del viaje ven y suben archivos (máx. 25 MB).
+// =========================================================
+service firebase.storage {
+  match /b/{bucket}/o {
+    function miembro(viajeId) {
+      return request.auth != null
+        && request.auth.uid in firestore.get(/databases/(default)/documents/viajes/$(viajeId)).data.miembros;
+    }
+    match /viajes/{viajeId}/archivos/{archivoId} {
+      allow read, delete: if miembro(viajeId);
+      allow create, update: if miembro(viajeId) && request.resource.size < 25 * 1024 * 1024;
+    }
+    match /{todo=**} {
+      allow read, write: if false;
+    }
+  }
+}

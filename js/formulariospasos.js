@@ -70,7 +70,11 @@ R.formularios = (function () {
       const seg = c.seg || { desde: v.origen || {}, hasta: { nombre: v.destino } };
       return {
         equipaje: 'Sin definir',
-        tramos: [{ sentido: R.recorrido.TIPOS_TRAMO[c.tipo] || 'Tramo', desde: seg.desde.nombre || '', hasta: seg.hasta.nombre || '', fechaSalida: c.fecha || '', escalas: 'Directo' }]
+        tramos: [{
+          sentido: R.recorrido.TIPOS_TRAMO[c.tipo] || 'Tramo', desde: seg.desde.nombre || '', hasta: seg.hasta.nombre || '',
+          fechaSalida: (seg.sale && seg.sale.fecha) || c.fecha || '', horaSalida: (seg.sale && seg.sale.hora) || '',
+          fechaLlegada: (seg.llega && seg.llega.fecha) || '', horaLlegada: (seg.llega && seg.llega.hora) || '', escalas: 'Directo'
+        }]
       };
     },
     costo: { categoria: 'transporte' },
@@ -80,15 +84,46 @@ R.formularios = (function () {
       if (!seg) return 'Transporte';
       return `${(MODOS[seg.medio] || MODOS.otro).concepto} ${seg.desde.nombre} → ${seg.hasta.nombre}`;
     },
-    itinerario: (v, d, ctx) => (d.tramos || []).filter(t => t.fechaSalida).map(t => ({
-      fecha: t.fechaSalida, hora: t.horaSalida || '', tipo: 'vuelo',
-      titulo: `${conAero(t.desde, t.desdeAeropuerto)} → ${conAero(t.hasta, t.hastaAeropuerto)}`,
-      lugar: t.desde || '', confirmacion: d.codigo || '',
-      notas: unir(unir(t.empresa, t.numero), t.horaLlegada ? `Llega ${t.fechaLlegada && t.fechaLlegada !== t.fechaSalida ? U.fmtFecha(t.fechaLlegada, 'corto') + ' ' : ''}${t.horaLlegada}` : '', t.escalas === 'Con escalas' ? `Escala: ${t.escalaEn || 'sí'}` : 'Directo')
-    })),
+    // No genera eventos: el cronograma muestra cada traslado con sus datos
+    alGuardar: (v, d, ctx) => confirmarEnCronograma(v, d, ctx),
     resumen: (d) => (d.tramos || []).map(t => unir(t.sentido, `${conAero(t.desde, t.desdeAeropuerto)} → ${conAero(t.hasta, t.hastaAeropuerto)}`, unir(t.empresa, t.numero), fh(t.fechaSalida, t.horaSalida), t.escalas === 'Con escalas' ? 'con escala' + (t.escalaEn ? ' en ' + t.escalaEn : '') : 'directo'))
       .concat(d.codigo ? [`Código: ${d.codigo}`] : []).concat(d.equipaje && d.equipaje !== 'Sin definir' ? [`Equipaje: ${d.equipaje}`] : [])
   };
+
+  /**
+   * Con el pasaje cargado, el traslado queda "confirmado" con sus fechas y horas reales.
+   * Si cambia la llegada, ofrece correr lo que sigue.
+   */
+  function confirmarEnCronograma(v, d, ctx) {
+    const id = ctx && ctx.seg && ctx.seg.id;
+    const x = R.recorrido.todosLosSegmentos(v.recorrido).find(z => z.seg.id === id);
+    const tramos = (d.tramos || []).filter(t => t.fechaSalida);
+    if (!x || !tramos.length) return;
+    const s = x.seg;
+    const primero = tramos[0], ultimo = tramos[tramos.length - 1];
+    const llegadaAntes = R.recorrido.fechaLlega(s);
+    s.sale = { fecha: primero.fechaSalida, hora: primero.horaSalida || '' };
+    s.llega = { fecha: ultimo.fechaLlegada || (tramos.length === 1 ? primero.fechaSalida : ultimo.fechaSalida) || '', hora: ultimo.horaLlegada || '' };
+    s.estado = 'confirmado';
+    const llegadaNueva = R.recorrido.fechaLlega(s);
+    R.recorrido.recalcular(v);
+    const delta = llegadaAntes && llegadaNueva ? U.diasEntre(llegadaAntes, llegadaNueva) : 0;
+    const siguientes = R.recorrido.todosLosSegmentos(v.recorrido);
+    const hayDespues = siguientes.slice(siguientes.findIndex(z => z.seg.id === id) + 1).some(z => z.seg.sale.fecha);
+    if (delta && hayDespues) {
+      setTimeout(() => {
+        U.confirmar(`Con este pasaje llegás ${Math.abs(delta) === 1 ? 'un día' : Math.abs(delta) + ' días'} ${delta > 0 ? 'después' : 'antes'} de lo que tenías en el cronograma. ¿Corro también lo que sigue para mantener las noches en cada lugar?`, {
+          titulo: 'Cambió la llegada', textoSi: 'Sí, correr lo que sigue', textoNo: 'No, lo acomodo yo'
+        }).then(ok => {
+          if (!ok) return;
+          R.recorrido.desplazarDesde(v, id, delta);
+          R.db.guardarViaje(v);
+          R.app.refrescar();
+          U.toast('Listo: corrí el resto del cronograma.');
+        });
+      }, 400);
+    }
+  }
 
   const DEF = {
     t_segmento: transporte,
@@ -411,10 +446,20 @@ R.formularios = (function () {
       datos.costo = gasto
         ? { monto: gasto.monto, moneda: gasto.moneda, cotizacion: gasto.cotizacion, persona: gasto.persona, entre: gasto.division.entre.slice(),
             modo: gasto.division.modo || 'igual', reparto: Object.assign({}, gasto.division.montos || {}, gasto.division.porcentajes || {}) }
-        : { monto: '', moneda: v.monedaBase, cotizacion: '', persona: v.participantes.includes('yo') ? 'yo' : v.participantes[0], entre: v.participantes.slice() };
+        : { monto: '', moneda: v.monedaBase, cotizacion: '', persona: R.db.yoEn(v), entre: v.participantes.slice() };
     }
-    let archivosNuevos = [];
+    let archivosNuevos = op.archivo ? [op.archivo] : [];
     let paso = 0;
+    let aviso = op.aviso || '';
+    function aplicarLeido(pre) {
+      if (!pre) return;
+      Object.keys(pre).forEach(k => {
+        if (k === 'costo') { datos.costo.monto = pre.costo.monto; if (pre.costo.moneda) datos.costo.moneda = pre.costo.moneda; }
+        else datos[k] = pre[k];
+      });
+    }
+    aplicarLeido(op.prellenar);
+    const escaneable = ['t_segmento', 'a_reserva', 'mv_auto', 'e_excursiones', 'p_seguro', 'pq_paquete'].includes(t.base || t.id);
 
     function pasos() {
       const lista = d.pasos(v, datos, ctx).map(p => Object.assign({ tipo: 'campos' }, p));
@@ -441,6 +486,8 @@ R.formularios = (function () {
       cont.innerHTML = `
         ${lista.length > 1 ? `<div class="pasos-asistente">${lista.map((x, i) =>
           `<span class="paso-a ${i === paso ? 'actual' : ''} ${i < paso ? 'listo' : ''}"><i>${i < paso ? '✓' : i + 1}</i>${esc(x.titulo)}</span>`).join('')}</div>` : ''}
+        ${aviso ? `<div class="aviso-leido">✨ ${esc(aviso)}</div>` : ''}
+        ${escaneable && paso === 0 && R.escaneo && R.escaneo.disponible() ? '<button type="button" class="btn btn-suave btn-escanear" data-a="escanear">📷 Escanear reserva o pasaje</button>' : ''}
         <div class="form-paso">${cuerpoPaso(p)}</div>
         <div class="asistente-pie">
           <button type="button" class="btn btn-texto" data-a="sinDatos">${previo.datos ? 'Cancelar' : 'Marcar listo sin cargar datos'}</button>
@@ -449,6 +496,8 @@ R.formularios = (function () {
           <button type="button" class="btn btn-primario" data-a="seguir">${ultimo ? 'Guardar ✓' : 'Siguiente →'}</button>
         </div>`;
       enlazar(p);
+      const cotiz = cont.querySelector('[data-costo="cotizacion"]');
+      if (cotiz) R.cotizacion.enlazarCampo(cotiz, cont.querySelector('[data-cotiz-ayuda]'), datos.costo.moneda, v.monedaBase);
     }
 
     function cuerpoPaso(p) {
@@ -496,7 +545,7 @@ R.formularios = (function () {
         <div class="form-grilla">
           <label class="campo medio"><span>${esc((d.costo && d.costo.etiqueta) || 'Costo total')}</span><input data-costo="monto" inputmode="decimal" value="${esc(c.monto)}" placeholder="0"></label>
           <label class="campo medio"><span>Moneda</span><select data-costo="moneda">${U.opcionesMoneda(c.moneda)}</select></label>
-          ${c.moneda !== v.monedaBase ? `<label class="campo completo"><span>Cotización: 1 ${esc(c.moneda)} = ? ${esc(v.monedaBase)}</span><input data-costo="cotizacion" inputmode="decimal" value="${esc(c.cotizacion)}"></label>` : ''}
+          ${c.moneda !== v.monedaBase ? `<label class="campo completo"><span>Cotización: 1 ${esc(c.moneda)} = ? ${esc(v.monedaBase)}</span><input data-costo="cotizacion" inputmode="decimal" value="${esc(c.cotizacion)}"><small class="ayuda" data-cotiz-ayuda></small></label>` : ''}
           ${varios ? `
             <label class="campo completo"><span>¿Quién pagó?</span><select data-costo="persona">${v.participantes.map(pid => `<option value="${pid}" ${pid === c.persona ? 'selected' : ''}>${esc((R.db.persona(pid) || {}).nombre)}</option>`).join('')}</select></label>
             <div class="campo completo"><span>¿Entre quiénes se divide?</span>
@@ -629,6 +678,24 @@ R.formularios = (function () {
       cont.querySelectorAll('[data-rerender]').forEach(x => x.onchange = () => { leer(); pintar(); });
       const archivo = cont.querySelector('#fpArchivos');
       if (archivo) archivo.onchange = () => { archivosNuevos = archivosNuevos.concat(Array.from(archivo.files)); pintar(); };
+      const esc2 = cont.querySelector('[data-a="escanear"]');
+      if (esc2) esc2.onclick = () => {
+        const input = document.createElement('input');
+        input.type = 'file'; input.accept = 'image/*,application/pdf';
+        input.onchange = async () => {
+          const f = input.files[0];
+          if (!f) return;
+          leer();
+          esc2.disabled = true; esc2.textContent = 'Leyendo… 🔎';
+          try {
+            aplicarLeido(R.escaneo.aFormulario(t.base || t.id, await R.escaneo.analizar(f, t.titulo)));
+            archivosNuevos.push(f);
+            aviso = 'Completé lo que pude leer: revisalo antes de guardar.';
+          } catch (e) { U.toast(e.message || 'No se pudo leer el archivo.'); }
+          pintar();
+        };
+        input.click();
+      };
     }
 
     function divisionDesdeCosto(c, entre) {

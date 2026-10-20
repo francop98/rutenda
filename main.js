@@ -4,14 +4,18 @@
      #inicio                 → mis viajes
      #viaje/{id}/{pestaña}   → un viaje (guia, itinerario, documentos, viajeros, gastos)
      #personas               → compañeros de viaje
+     #valijas                → mis listas de valija
+     #unirse/{codigo}        → sumarse a un viaje compartido
    ========================================================= */
 (function () {
   const U = R.util;
   const { esc } = U;
   const app = document.getElementById('app');
   let rutaAnterior = '';
+  let listo = false;
 
   function render() {
+    if (!listo) return;
     if (!R.auth.usuarioActual()) {
       document.body.classList.add('sin-sesion');
       document.title = 'Tripbox · Ingresá';
@@ -19,13 +23,16 @@
       return;
     }
     document.body.classList.remove('sin-sesion');
+    app.classList.remove('rol-viajero');
     const hash = location.hash.replace(/^#/, '') || 'inicio';
     const [vista, id, pestana] = hash.split('/');
     document.querySelectorAll('[data-nav]').forEach(a => {
       a.classList.toggle('activo', a.dataset.nav === vista || (vista === 'viaje' && a.dataset.nav === 'inicio'));
     });
 
-    if (vista === 'viaje' && id) {
+    if (vista === 'unirse' && id) {
+      R.participantes.renderUnirse(app, id);
+    } else if (vista === 'viaje' && id) {
       const v = R.db.viaje(id);
       if (!v) { location.hash = '#inicio'; return; }
       document.title = `${v.nombre || v.destino} · Tripbox`;
@@ -40,6 +47,26 @@
       document.title = 'Tripbox · Tu viaje, paso a paso';
       renderInicio();
     }
+  }
+
+  /**
+   * Cambios que llegan de la nube (otra persona o tu otro dispositivo):
+   * se redibuja sin interrumpir lo que estás escribiendo ni un cartel abierto.
+   */
+  let refrescoPendiente = false;
+  function refrescarRemoto() {
+    if (U.fondoBloqueado() !== null) { refrescoPendiente = true; return; }
+    const activo = document.activeElement;
+    if (activo && app.contains(activo) && /INPUT|TEXTAREA|SELECT/.test(activo.tagName)) {
+      refrescoPendiente = true;
+      activo.addEventListener('blur', () => setTimeout(trasCerrarModal, 50), { once: true });
+      return;
+    }
+    refrescoPendiente = false;
+    refrescar();
+  }
+  function trasCerrarModal() {
+    if (refrescoPendiente && U.fondoBloqueado() === null) { refrescoPendiente = false; refrescar(); }
   }
 
   /** Vuelve a dibujar la vista actual sin perder la posición del scroll. */
@@ -60,12 +87,15 @@
     boton.title = `${u.nombre} · Mi cuenta`;
   }
 
-  function arrancarSesion() {
-    R.db.cargar(R.auth.usuarioActual());
+  async function arrancarSesion(u) {
+    app.innerHTML = '<div class="pantalla-carga"><span class="marca-logo grande"></span><p>Cargando tus viajes…</p></div>';
+    await R.db.cargar(u || R.auth.usuarioActual());
     pintarUsuario();
     if (!location.hash || location.hash === '#') location.hash = '#inicio';
     render();
     window.scrollTo(0, 0);
+    R.migracion.ofrecer();
+    if (R.recordatorios) { R.recordatorios.actualizar(); R.recordatorios.revisar(); }
   }
 
   /* ---------- App instalable ---------- */
@@ -100,7 +130,7 @@
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }
 
-  window.R.app = { render, refrescar, pintarUsuario, puedeInstalar, instalar };
+  window.R.app = { render, refrescar, refrescarRemoto, trasCerrarModal, pintarUsuario, puedeInstalar, instalar };
 
   /* ---------------------------------------------------------
      Pantalla de inicio
@@ -134,6 +164,10 @@
           <button class="btn-icono" data-a="ocultarInstalar" aria-label="Ahora no">×</button>
         </div>` : ''}
 
+      ${R.recordatorios ? R.recordatorios.avisosHTML() : ''}
+
+      ${enCurso.map(v => R.itinerario.hoyHTML(v)).join('')}
+
       ${destacado ? destacadoHTML(destacado) : ''}
 
       ${!viajes.length ? comoFunciona() : ''}
@@ -143,7 +177,7 @@
       ${seccion('Viajes realizados', pasados)}
 
       <footer class="pie">
-        <p>Tus datos se guardan en este dispositivo.</p>
+        <p>${R.db.modo() === 'nube' ? '☁️ Tus datos están guardados en tu cuenta y se sincronizan en tus dispositivos.' : 'Tus datos se guardan en este dispositivo.'}</p>
         <div class="pie-acciones">
           <button class="btn btn-texto btn-chico" data-a="exportar">Descargar copia de seguridad</button>
           <label class="btn btn-texto btn-chico">Restaurar copia<input type="file" accept="application/json" id="importar" hidden></label>
@@ -164,6 +198,8 @@
     };
     app.querySelector('[data-a="exportar"]').onclick = exportar;
     app.querySelector('#importar').onchange = importar;
+    enCurso.forEach(v => R.itinerario.enlazarHoy(app, v));
+    if (R.recordatorios) R.recordatorios.enlazarAvisos(app);
   }
 
   function leerOculto(clave) { try { return localStorage.getItem('tripbox_oculto_' + clave) === '1'; } catch (e) { return false; } }
@@ -251,8 +287,8 @@
   }
 
   /* ---------- Arranque ---------- */
-  if (R.auth.usuarioActual()) R.db.cargar(R.auth.usuarioActual());
-  pintarUsuario();
+  R.db.alCambiar(() => { if (listo && R.auth.usuarioActual()) { refrescarRemoto(); if (R.recordatorios) R.recordatorios.actualizar(); } });
+  R.auth.alCambiarUsuario(u => { if (!u) { listo = true; render(); } });
   document.getElementById('btnNuevoViajeBarra').onclick = () => R.viajes.abrirAsistente();
   document.getElementById('btnUsuario').onclick = () => R.auth.abrirMiCuenta();
   document.getElementById('btnNuevoViajeNav').onclick = () => R.viajes.abrirAsistente();
@@ -266,5 +302,9 @@
     if (cambioDeVista) window.scrollTo(0, 0);
   });
   rutaAnterior = location.hash.split('/').slice(0, 2).join('/');
-  render();
+  app.innerHTML = '<div class="pantalla-carga"><span class="marca-logo grande"></span><p>Abriendo Tripbox…</p></div>';
+  R.auth.iniciar().then(async u => {
+    listo = true;
+    if (u) await arrancarSesion(u); else render();
+  });
 })();

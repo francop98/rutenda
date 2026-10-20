@@ -94,14 +94,17 @@ R.gastos = (function () {
   }
 
   function totales(v) {
-    let gastado = 0, ingresado = 0;
+    let gastado = 0, ingresado = 0, antes = 0, durante = 0;
     const porCategoria = {};
     v.movimientos.forEach(m => {
       const mb = montoBase(v, m);
+      const signo = m.tipo === 'gasto' ? 1 : m.tipo === 'ingreso' ? -1 : 0;
       if (m.tipo === 'gasto') { gastado += mb; porCategoria[m.categoria] = (porCategoria[m.categoria] || 0) + mb; }
       if (m.tipo === 'ingreso') ingresado += mb;
+      // Antes del viaje (reservas, pasajes) o durante
+      if (signo) { if (v.fechaInicio && m.fecha && m.fecha < v.fechaInicio) antes += signo * mb; else durante += signo * mb; }
     });
-    return { gastado, ingresado, neto: gastado - ingresado, porCategoria };
+    return { gastado, ingresado, neto: gastado - ingresado, porCategoria, antes, durante };
   }
 
   function personaTieneMovimientos(v, id) {
@@ -148,6 +151,7 @@ R.gastos = (function () {
           <small>Gasto total</small>
           <strong>${U.fmtMoneda(t.neto, v.monedaBase)}</strong>
           ${t.ingresado ? `<span class="texto-suave">${U.fmtMoneda(t.gastado, v.monedaBase)} gastado − ${U.fmtMoneda(t.ingresado, v.monedaBase)} de reintegros</span>` : ''}
+          ${t.antes && t.durante ? `<span class="antes-durante"><span>Antes del viaje <strong>${U.fmtMoneda(t.antes, v.monedaBase)}</strong></span><span>Durante <strong>${U.fmtMoneda(t.durante, v.monedaBase)}</strong></span></span>` : ''}
         </div>
         <div class="tarjeta-dato">
           <small class="dato-cab">Presupuesto <button class="btn-texto-mini" data-a="presupuesto">${pres ? 'Editar' : 'Definir'}</button></small>
@@ -311,7 +315,7 @@ R.gastos = (function () {
     if (existente && existente.tipo === 'pago') return editarPago(v, existente);
     const m = existente ? JSON.parse(JSON.stringify(existente)) : {
       tipo: tipoNuevo || 'gasto', concepto: '', categoria: 'comida', monto: '', moneda: v.monedaBase, cotizacion: '',
-      fecha: U.hoyISO(), persona: v.participantes.includes('yo') ? 'yo' : v.participantes[0],
+      fecha: U.hoyISO(), persona: R.db.yoEn(v),
       division: { modo: 'igual', entre: v.participantes.slice(), montos: {} }
     };
     m.division = m.division || { modo: 'igual', entre: v.participantes.slice(), montos: {} };
@@ -345,7 +349,7 @@ R.gastos = (function () {
           <label class="campo"><span>Moneda</span><select id="mMoneda">${U.opcionesMoneda(m.moneda)}</select></label>
           <label class="campo"><span>Fecha</span><input type="date" id="mFecha" value="${esc(m.fecha)}"></label>
         </div>
-        ${m.moneda !== v.monedaBase ? `<label class="campo"><span>Cotización: 1 ${esc(m.moneda)} = ? ${esc(v.monedaBase)}</span><input id="mCotiz" inputmode="decimal" value="${esc(m.cotizacion)}" placeholder="Ej: 1200"></label>` : ''}
+        ${m.moneda !== v.monedaBase ? `<label class="campo"><span>Cotización: 1 ${esc(m.moneda)} = ? ${esc(v.monedaBase)}</span><input id="mCotiz" inputmode="decimal" value="${esc(m.cotizacion)}" placeholder="Ej: 1200"><small class="ayuda" id="mCotizAyuda"></small></label>` : ''}
         <label class="campo"><span>${esGasto ? '¿Quién pagó?' : '¿Quién lo recibió?'}</span>
           <select id="mPersona">${v.participantes.map(p => `<option value="${p}" ${m.persona === p ? 'selected' : ''}>${esc(nombre(p))}</option>`).join('')}</select>
         </label>
@@ -413,6 +417,7 @@ R.gastos = (function () {
     }
 
     function enlazar() {
+      if (f.querySelector('#mCotiz')) R.cotizacion.enlazarCampo(f.querySelector('#mCotiz'), f.querySelector('#mCotizAyuda'), m.moneda, v.monedaBase);
       f.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => { leer(); m.tipo = b.dataset.tipo; el.querySelector('.modal-cab h3').textContent = existente ? 'Editar movimiento' : (m.tipo === 'gasto' ? 'Nuevo gasto' : 'Nuevo ingreso'); pintar(); });
       f.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { m.categoria = b.dataset.cat; f.querySelectorAll('[data-cat]').forEach(x => x.classList.toggle('activo', x === b)); });
       const nueva = f.querySelector('[data-a="nuevaCat"]');

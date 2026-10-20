@@ -27,7 +27,9 @@ R.documentos = (function () {
   function esPDF(d) { return d.tipoMime === 'application/pdf' || /\.pdf$/i.test(d.nombreArchivo || ''); }
   function iconoDoc(d) { return esPDF(d) ? '📄' : esImagen(d) ? '🖼️' : categoria(d.categoria).icono; }
 
+  let viajeActual = null;
   function render(v, cont) {
+    viajeActual = v.id;
     urlsVivas.forEach(u => URL.revokeObjectURL(u));
     urlsVivas = [];
     const docs = v.documentos.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
@@ -37,9 +39,12 @@ R.documentos = (function () {
       <div class="bloque-cab cab-seccion">
         <div>
           <h2 class="titulo-seccion">Documentos del viaje</h2>
-          <p class="texto-suave">Todo a mano, en un solo lugar. Se guardan en este dispositivo.</p>
+          <p class="texto-suave">Todo a mano, en un solo lugar. ${R.db.modo() === 'nube' ? 'Se guardan en tu cuenta y quedan disponibles sin conexión una vez abiertos.' : 'Se guardan en este dispositivo.'}</p>
         </div>
-        <button class="btn btn-primario" data-a="subir">+ Subir documento</button>
+        <div class="acciones-fila">
+          ${R.escaneo && R.escaneo.disponible() ? '<button class="btn btn-suave" data-a="escanear" title="Leo la reserva y completo el paso de la guía">📷 Escanear reserva</button>' : ''}
+          <button class="btn btn-primario" data-a="subir">+ Subir documento</button>
+        </div>
       </div>
       ${grupos.length ? grupos.map(g => `
         <div class="bloque">
@@ -54,6 +59,8 @@ R.documentos = (function () {
         </div>`}`;
 
     cont.querySelectorAll('[data-a="subir"],[data-a="subir2"]').forEach(b => b.onclick = () => subir(v));
+    const esc1 = cont.querySelector('[data-a="escanear"]');
+    if (esc1) esc1.onclick = () => R.escaneo.escanearYAbrir(v);
     cont.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => abrir(v.documentos.find(d => d.id === b.dataset.abrir)));
     cont.querySelectorAll('[data-descargar]').forEach(b => b.onclick = () => descargar(v.documentos.find(d => d.id === b.dataset.descargar)));
     cont.querySelectorAll('[data-borrar]').forEach(b => b.onclick = () => borrar(v, b.dataset.borrar));
@@ -61,8 +68,12 @@ R.documentos = (function () {
     // Miniaturas de imágenes
     cont.querySelectorAll('[data-miniatura]').forEach(async img => {
       try {
-        const blob = await R.db.obtenerArchivo(img.dataset.miniatura);
-        if (!blob) return;
+        const blob = await R.db.obtenerArchivo(img.dataset.miniatura, v.id);
+        if (!blob) {
+          const url = R.db.modo() === 'nube' ? await R.nube.urlArchivo(v.id, img.dataset.miniatura) : null;
+          if (url) { img.src = url; img.parentElement.classList.add('con-imagen'); }
+          return;
+        }
         const url = URL.createObjectURL(blob);
         urlsVivas.push(url);
         img.src = url;
@@ -187,7 +198,7 @@ R.documentos = (function () {
     for (const a of archivos) {
       if (a.size > LIMITE_MB * 1048576) throw new Error(`"${a.name}" supera ${LIMITE_MB} MB.`);
       const archivoId = U.id('arc');
-      await R.db.guardarArchivo(archivoId, a);
+      await R.db.guardarArchivo(archivoId, a, v.id);
       v.documentos.push({
         id: U.id('doc'),
         nombre: op.nombre || a.name.replace(/\.[^.]+$/, ''),
@@ -196,6 +207,7 @@ R.documentos = (function () {
         tareaId: op.tareaId || '',
         nota: op.nota || '',
         archivoId,
+        viajeId: v.id,
         tipoMime: a.type,
         tamano: a.size,
         fecha: new Date().toISOString()
@@ -203,21 +215,30 @@ R.documentos = (function () {
     }
   }
 
-  async function blobDe(d) {
-    const blob = await R.db.obtenerArchivo(d.archivoId);
+  async function blobDe(d, v) {
+    const blob = await R.db.obtenerArchivo(d.archivoId, d.viajeId || (v && v.id) || viajeActual);
     if (!blob) throw new Error('No se encontró el archivo');
     return blob;
   }
 
-  async function abrir(d) {
+  /** Si no se pudo traer el archivo, se abre directo desde la nube. */
+  async function abrirDesdeNube(d, v) {
+    const id = d.viajeId || (v && v.id) || viajeActual;
+    const url = R.db.modo() === 'nube' && id ? await R.nube.urlArchivo(id, d.archivoId) : null;
+    if (!url) return false;
+    if (!window.open(url, '_blank')) location.href = url;
+    return true;
+  }
+
+  async function abrir(d, v) {
     if (!d) return;
     try {
-      const url = URL.createObjectURL(await blobDe(d));
+      const url = URL.createObjectURL(await blobDe(d, v));
       const w = window.open(url, '_blank');
       if (!w) descargarURL(url, d);
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (e) {
-      U.toast('Este archivo no está guardado en este dispositivo.');
+      if (!(await abrirDesdeNube(d, v))) U.toast('Este archivo no está guardado en este dispositivo.');
     }
   }
 
@@ -230,14 +251,14 @@ R.documentos = (function () {
     a.remove();
   }
 
-  async function descargar(d) {
+  async function descargar(d, v) {
     if (!d) return;
     try {
-      const url = URL.createObjectURL(await blobDe(d));
+      const url = URL.createObjectURL(await blobDe(d, v));
       descargarURL(url, d);
       setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (e) {
-      U.toast('Este archivo no está guardado en este dispositivo.');
+      if (!(await abrirDesdeNube(d, v))) U.toast('Este archivo no está guardado en este dispositivo.');
     }
   }
 
@@ -246,7 +267,7 @@ R.documentos = (function () {
     if (!d) return;
     const ok = await U.confirmar(`Se va a eliminar "${d.nombre}".`, { titulo: 'Eliminar documento', textoSi: 'Eliminar', peligro: true });
     if (!ok) return;
-    try { await R.db.eliminarArchivo(d.archivoId); } catch (e) { /* ya no estaba */ }
+    try { await R.db.eliminarArchivo(d.archivoId, v.id); } catch (e) { /* ya no estaba */ }
     v.documentos = v.documentos.filter(x => x.id !== id);
     R.db.guardarViaje(v);
     R.app.refrescar();

@@ -39,11 +39,14 @@ R.valija = (function () {
   ];
 
   /* ---------- Datos del viaje ---------- */
-  function valijaDe(v) {
-    v.valija = v.valija || { items: [], listas: [] };
-    v.valija.items = v.valija.items || [];
-    v.valija.listas = v.valija.listas || [];
-    return v.valija;
+  /** La valija de una persona del viaje (por defecto, la tuya). Cada viajero arma la suya. */
+  function valijaDe(v, personaId) {
+    const pid = personaId || R.db.yoEn(v);
+    v.valijas = v.valijas || {};
+    const val = v.valijas[pid] = v.valijas[pid] || { items: [], listas: [] };
+    val.items = val.items || [];
+    val.listas = val.listas || [];
+    return val;
   }
   function existe(v, texto) { return valijaDe(v).items.some(i => normal(i.texto) === normal(texto)); }
   function agregarItem(v, texto, cat, origen) {
@@ -55,14 +58,14 @@ R.valija = (function () {
    * Ida: lo que hay que guardar para salir.
    * Vuelta: lo que llevaste (y lo que compraste allá) para asegurarte de volver con todo.
    */
-  function itemsDe(v, modo) {
-    const items = valijaDe(v).items;
+  function itemsDe(v, modo, personaId) {
+    const items = valijaDe(v, personaId).items;
     return modo === 'vuelta' ? items.filter(i => i.hecho || i.soloVuelta) : items.filter(i => !i.soloVuelta);
   }
   const listo = (i, modo) => modo === 'vuelta' ? (i.vuelta || i.noVuelve) : i.hecho;
-  function progreso(v, modo) {
+  function progreso(v, modo, personaId) {
     const m = modo || 'ida';
-    const items = itemsDe(v, m);
+    const items = itemsDe(v, m, personaId);
     const hechos = items.filter(i => listo(i, m)).length;
     return { hechos, total: items.length, pct: items.length ? Math.round(hechos / items.length * 100) : 0 };
   }
@@ -139,6 +142,7 @@ R.valija = (function () {
         <button type="button" data-modo-valija="vuelta" class="${!ida ? 'activo' : ''}">🛬 Para volver</button>
       </div>
       ${prog.total ? `<div class="barra-progreso barra-valija"><span style="width:${prog.pct}%"></span></div>` : ''}
+      ${otrasValijasHTML(v, modo)}
 
       <div class="valija-grilla">
         <div>
@@ -233,6 +237,29 @@ R.valija = (function () {
     });
     const armar = cont.querySelector('[data-a="armar"]');
     if (armar) armar.onclick = () => armarPasoAPaso(v, modo);
+    cont.querySelectorAll('[data-ver-valija]').forEach(b => b.onclick = () => verValija(v, b.dataset.verValija, modo));
+  }
+
+  /** Cómo van las valijas del resto (solo para mirar). */
+  function otrasValijasHTML(v, modo) {
+    const yo = R.db.yoEn(v);
+    const otros = (v.participantes || []).filter(pid => pid !== yo && v.valijas && v.valijas[pid] && (v.valijas[pid].items || []).length);
+    if (!otros.length) return '';
+    return `<div class="otras-valijas"><small>Las valijas del resto:</small>${otros.map(pid => {
+      const p = R.db.persona(pid) || { nombre: 'Viajero' };
+      const pr = progreso(v, modo, pid);
+      return `<button class="chip-persona" data-ver-valija="${pid}">${U.avatar(p, 22)} ${esc(p.nombre)} <small>${pr.hechos}/${pr.total}</small></button>`;
+    }).join('')}</div>`;
+  }
+  function verValija(v, pid, modo) {
+    const p = R.db.persona(pid) || { nombre: 'Viajero' };
+    const items = itemsDe(v, modo, pid);
+    U.modal({
+      titulo: `La valija de ${p.nombre}`,
+      subtitulo: modo === 'vuelta' ? 'Para volver' : 'Para ir',
+      cuerpo: `<ul class="lista-valija checklist">${items.map(i => `<li class="${listo(i, modo) ? 'hecho' : ''}"><label><input type="checkbox" disabled ${listo(i, modo) ? 'checked' : ''}><span>${esc(i.texto)}</span></label></li>`).join('')}</ul>`,
+      acciones: [{ texto: 'Cerrar', clase: 'btn-primario' }]
+    });
   }
 
   function nombreLista(id) { const l = R.db.listasValija().find(x => x.id === id); return l ? l.nombre : 'Lista'; }
@@ -409,5 +436,5 @@ R.valija = (function () {
     });
   }
 
-  return { render, renderMisListas, sugerencias, progreso, CATEGORIAS };
+  return { render, renderMisListas, sugerencias, progreso, valijaDe, CATEGORIAS };
 })();

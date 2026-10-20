@@ -31,7 +31,7 @@ R.lugares = (function () {
       region: x.admin1 || '',
       pais: x.country || '',
       codigoPais: (x.country_code || '').toUpperCase(),
-      lat: x.latitude, lon: x.longitude
+      lat: x.latitude, lon: x.longitude, zona: x.timezone || ''
     }));
     cache[clave] = lista;
     return lista;

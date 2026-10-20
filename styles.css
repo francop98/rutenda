@@ -546,7 +546,8 @@ input, select, textarea { font: inherit; color: inherit; }
 .dia.fuera { border-style: dashed; }
 .dia-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
 .dia-cab strong { font-family: var(--fuente-titulo); font-size: 1.15rem; font-weight: 600; }
-.dia-cab small { display: block; color: var(--tinta-tenue); text-transform: capitalize; }
+.dia-cab small { display: block; color: var(--tinta-tenue); }
+.dia-cab small::first-letter { text-transform: uppercase; }
 .evento { display: flex; align-items: flex-start; gap: 12px; padding: 10px; border-radius: var(--radio-chico); cursor: pointer; }
 .evento:hover { background: var(--arena); }
 .ev-hora { flex: none; width: 48px; font-weight: 700; font-size: .88rem; color: var(--mar); padding-top: 3px; }
@@ -1157,3 +1158,161 @@ body.sin-scroll { position: fixed; left: 0; right: 0; width: 100%; overflow: hid
 .campo .division-fila input[type="checkbox"]:checked { background: var(--salvia); border-color: var(--salvia); }
 .campo .division-monto { width: 90px; flex: none; text-align: right; }
 .division-fila input[type="checkbox"]:checked::after, .lista-valija input[type="checkbox"]:checked::after { line-height: 1; }
+
+/* =========================================================
+   v7 — Cronograma, itinerario, nube, compartir y avisos
+   ========================================================= */
+
+/* ---------- Roles: lo que solo ve quien organiza ---------- */
+.pp-viajero { display: none; }
+.rol-viajero .solo-org,
+.rol-viajero [data-rapido], .rol-viajero [data-posponer], .rol-viajero [data-reactivar],
+.rol-viajero [data-completar], .rol-viajero [data-nohace], .rol-viajero [data-estado],
+.rol-viajero [data-a="cambio"], .rol-viajero [data-a="propia"], .rol-viajero [data-a="formulario"],
+.rol-viajero [data-a="editarViaje"], .rol-viajero [data-a="editarPropia"], .rol-viajero [data-a="borrarPropia"],
+.rol-viajero [data-a="presupuesto"], .rol-viajero [data-a="categorias"], .rol-viajero [data-agregar] { display: none !important; }
+.rol-viajero .pp-viajero { display: block; font-size: .88rem; color: var(--tinta-suave); margin: 0; }
+.rol-viajero .pp-estado { display: none; }
+
+/* ---------- Cronograma (editor) ---------- */
+.cr-mover { margin-top: 6px; }
+.cronograma { position: relative; display: grid; gap: 10px; margin: 14px 0 6px; padding-left: 22px; }
+.cronograma::before { content: ''; position: absolute; left: 10px; top: 14px; bottom: 14px; border-left: 2px dashed var(--linea); }
+.cronograma.sin-fechas .cr-horarios, .cronograma.sin-fechas .cr-noches { opacity: .45; pointer-events: none; }
+.cr-punto { position: absolute; left: -24px; top: 10px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--papel); border: 2px solid var(--linea); font-size: .85rem; }
+.cr-hito, .cr-parada, .cr-estadia, .cr-seg { position: relative; }
+.cr-hito { display: flex; gap: 10px; align-items: center; padding: 8px 4px; }
+.cr-hito .cr-punto { position: absolute; }
+.cr-hito > div { display: grid; gap: 2px; }
+.cr-hito small { color: var(--tinta-suave); }
+.cr-seg { background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio-chico); padding: 12px; display: grid; gap: 10px; box-shadow: var(--sombra); }
+.cr-seg::before { content: ''; position: absolute; left: -17px; top: 18px; width: 10px; height: 10px; border-radius: 50%; background: var(--mar); }
+.cr-seg-cab { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.cr-seg-cab strong { flex: 1 1 160px; min-width: 0; }
+.cr-estado { font-size: .74rem; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.cr-adefinir { background: var(--arena-2); color: var(--tinta-suave); }
+.cr-estimado { background: var(--sol-claro); color: #8a6417; }
+.cr-confirmado { background: var(--salvia-claro); color: #3e6b3b; }
+.cr-horarios { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.cr-hora { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 6px; align-items: end; }
+.cr-hora small { grid-column: 1 / -1; font-weight: 600; color: var(--tinta-suave); font-size: .78rem; }
+.cr-hora input { width: 100%; min-width: 0; padding: 9px 8px; border: 1px solid var(--linea); border-radius: 10px; background: var(--arena); color: var(--tinta); font: inherit; font-size: .92rem; }
+.cr-nota { margin: 0; font-size: .82rem; color: var(--tinta-suave); }
+.cr-nota:empty { display: none; }
+.cr-parada, .cr-estadia { display: block; padding: 10px 12px; border-radius: var(--radio-chico); }
+.cr-parada { background: var(--arena-2); }
+.cr-parada > div { display: grid; gap: 6px; }
+.cr-estadia { background: var(--mar-claro); }
+.cr-estadia .cr-punto { border-color: var(--mar); }
+.cr-estadia-cuerpo { display: grid; gap: 8px; }
+.cr-noche { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: .9rem; }
+.cr-noches { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.cr-contador { display: inline-flex; align-items: center; gap: 8px; background: var(--papel); border-radius: 999px; padding: 3px; border: 1px solid var(--linea); }
+.cr-contador strong { min-width: 1.6em; text-align: center; }
+.cr-contador .btn-icono { width: 34px; height: 34px; }
+.cr-escapada { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: .9rem; background: var(--papel); padding: 8px 10px; border-radius: 10px; }
+.cr-escapada select { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--linea); background: var(--arena); color: var(--tinta); font: inherit; }
+.cr-btn-parada { justify-self: start; margin-left: 4px; }
+.cr-agregar-parada { background: var(--papel); border: 1px dashed var(--mar); border-radius: var(--radio-chico); padding: 12px; display: grid; gap: 10px; }
+.cr-avisos { display: grid; gap: 6px; margin-top: 10px; }
+.cr-aviso { margin: 0; padding: 9px 12px; border-radius: 10px; font-size: .88rem; line-height: 1.4; }
+.cr-error { background: var(--alerta-claro); color: var(--alerta); }
+.cr-aviso.cr-aviso { background: var(--sol-claro); color: #7a5a14; }
+.cr-info { background: var(--mar-claro); color: var(--mar-oscuro); }
+.cr-avisos.bloque .cr-aviso.cr-error { background: var(--alerta-claro); color: var(--alerta); }
+.cr-avisos.bloque .cr-aviso.cr-info { background: var(--mar-claro); color: var(--mar-oscuro); }
+
+/* Cronograma (resumen) */
+.cronograma-resumen { list-style: none; margin: 8px 0 0; padding: 0 0 0 4px; display: grid; gap: 4px; }
+.cronograma-resumen li { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 10px; font-size: .92rem; }
+.cronograma-resumen li > span:not(.crr-medio):not(.cr-estado) { flex: 1; min-width: 0; }
+.crr-hito { color: var(--tinta-suave); }
+.crr-seg { background: var(--arena-2); }
+.crr-estadia { background: var(--mar-claro); }
+.crr-medio { width: 28px; text-align: center; font-size: 1.1rem; }
+
+/* ---------- Itinerario ---------- */
+.plegable > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+.plegable > summary::-webkit-details-marker { display: none; }
+.plegable > summary::after { content: '▾'; color: var(--tinta-tenue); transition: transform .2s; }
+.plegable[open] > summary::after { transform: rotate(180deg); }
+.plegable > summary .bloque-titulo { margin: 0; }
+.mapa-cont { margin-top: 12px; }
+.mapa-lienzo { height: 320px; border-radius: var(--radio-chico); overflow: hidden; background: var(--arena-2); z-index: 0; }
+.mapa-cargando { padding: 30px; text-align: center; color: var(--tinta-suave); }
+.dia-linea { margin: 6px 0; font-size: .9rem; color: var(--tinta-suave); }
+.dia-dormis { background: var(--mar-claro); color: var(--mar-oscuro); padding: 8px 12px; border-radius: 10px; margin-top: 10px; }
+.dia-dormis.falta { background: var(--sol-claro); color: #7a5a14; }
+.dia-dormis a { color: inherit; font-weight: 600; }
+.dia-clima { font-size: .85rem; color: var(--tinta-suave); white-space: nowrap; margin-left: auto; }
+.dia-clima small { color: var(--tinta-tenue); }
+.ev-docs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.evento.ev-traslado .ev-icono { background: var(--mar-claro); }
+.evento.ev-aloj .ev-icono { background: var(--salvia-claro); }
+.evento.ev-escapada .ev-icono { background: var(--sol-claro); }
+.itinerario-pie { text-align: center; margin-top: 16px; }
+.opciones-compartir { display: grid; gap: 8px; margin-bottom: 14px; }
+.vista-texto { white-space: pre-wrap; word-break: break-word; background: var(--arena-2); border-radius: var(--radio-chico); padding: 12px; font: .82rem/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; max-height: 260px; overflow: auto; margin: 0; }
+
+/* Modo viaje (hoy) */
+.modo-viaje { border: 2px solid var(--sol); background: linear-gradient(180deg, var(--sol-claro), var(--papel) 70%); display: grid; gap: 8px; }
+.mv-cab { display: flex; align-items: flex-start; gap: 12px; }
+.mv-cab h3 { margin: 2px 0; font-family: var(--fuente-titulo); font-size: 1.3rem; }
+.mv-cab small { color: var(--tinta-suave); }
+.mv-manana { margin: 4px 0; font-size: .9rem; color: var(--tinta-suave); }
+.modo-viaje > .btn { justify-self: start; }
+
+/* ---------- Avisos de hoy ---------- */
+.avisos-hoy { display: grid; gap: 8px; margin-bottom: 16px; }
+.aviso-hoy { display: flex; align-items: center; gap: 8px; background: var(--papel); border: 1px solid var(--linea); border-left: 4px solid var(--terracota); border-radius: var(--radio-chico); padding: 10px 8px 10px 14px; box-shadow: var(--sombra); }
+.aviso-hoy a { flex: 1; min-width: 0; color: var(--tinta); text-decoration: none; display: grid; gap: 2px; }
+.aviso-hoy small { color: var(--tinta-suave); }
+
+/* ---------- Formularios: escaneo ---------- */
+.btn-escanear { width: 100%; margin-bottom: 12px; border-style: dashed; }
+.aviso-leido { background: var(--sol-claro); color: #7a5a14; padding: 9px 12px; border-radius: 10px; font-size: .88rem; margin-bottom: 12px; }
+
+/* ---------- Gastos y valija ---------- */
+.antes-durante { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .82rem; color: var(--tinta-suave); margin-top: 4px; }
+.antes-durante strong { color: var(--tinta); font-size: inherit; }
+.bc-nombre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.otras-valijas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 14px; }
+.otras-valijas > small { color: var(--tinta-suave); width: 100%; }
+
+/* ---------- Compartir viaje y roles ---------- */
+.bloque-invitar { border: 1px dashed var(--mar); }
+.enlace-invitacion { background: var(--arena-2); border-radius: 10px; padding: 10px 12px; margin: 10px 0; overflow-x: auto; }
+.enlace-invitacion code { font-size: .85rem; white-space: nowrap; }
+.select-rol { margin-top: 4px; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--linea); background: var(--arena); color: var(--tinta); font: inherit; font-size: .85rem; max-width: 100%; }
+.sin-cuenta { color: var(--tinta-tenue); font-style: italic; }
+.unirse { max-width: 560px; margin: 0 auto; display: grid; gap: 16px; }
+.unirse-portada { border-radius: var(--radio); color: #fff; padding: 28px 22px; min-height: 180px; display: flex; align-items: flex-end; position: relative; overflow: hidden; }
+.unirse-portada h1 { font-family: var(--fuente-titulo); margin: 6px 0; font-size: 1.8rem; }
+.unirse-portada p { margin: 0; opacity: .9; }
+.lista-elegir-personas { display: grid; gap: 8px; margin: 10px 0 16px; }
+.persona-op { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--linea); border-radius: var(--radio-chico); cursor: pointer; }
+.persona-op:has(input:checked) { border-color: var(--mar); background: var(--mar-claro); }
+
+/* ---------- Cuenta y carga ---------- */
+.pantalla-carga { min-height: 60vh; display: grid; place-content: center; justify-items: center; gap: 14px; color: var(--tinta-suave); }
+.pantalla-carga .marca-logo { animation: latir 1.4s ease-in-out infinite; }
+@keyframes latir { 50% { transform: scale(1.08); opacity: .7; } }
+.bloque-interno { background: var(--arena-2); border-radius: var(--radio-chico); padding: 12px 14px; margin: 12px 0; display: grid; gap: 6px; justify-items: start; }
+.bloque-interno p { margin: 0; }
+.acceso-local { text-align: center; }
+
+/* ---------- Impresión del itinerario ---------- */
+.solo-impresion { display: none; }
+@media print {
+  body.imprimiendo > *:not(.solo-impresion) { display: none !important; }
+  body.imprimiendo .solo-impresion { display: block !important; color: #000; background: #fff; font: 11pt/1.45 Georgia, serif; }
+  body.imprimiendo { background: #fff !important; position: static !important; }
+}
+
+@media (max-width: 640px) {
+  .cr-horarios { grid-template-columns: minmax(0, 1fr); }
+  .cronograma { padding-left: 20px; }
+  .mapa-lienzo { height: 260px; }
+  .mv-cab { flex-wrap: wrap; }
+  .dia-clima { margin-left: 0; }
+}

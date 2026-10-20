@@ -61,11 +61,11 @@ R.guia = (function () {
       impacto: 4, anticipacion: 80, dependeDe: ['d_destino']
     },
     {
-      id: 'd_fechas', fase: 'definir', titulo: 'Cerrar fechas firmes',
-      desc: 'Pasá de fechas tentativas a fechas confirmadas: día de salida y de regreso.',
-      consejo: 'Revisá feriados, vacaciones laborales y temporada alta del destino: mover un día puede cambiar mucho el precio.',
+      id: 'd_fechas', fase: 'definir', titulo: 'Completar las fechas del cronograma',
+      desc: 'Cargá cuándo sale y cuándo llega cada traslado. Con eso se calculan las noches en cada lugar y para cuándo conviene tener listo cada paso.',
+      consejo: 'Revisá feriados, vacaciones y temporada alta del destino: mover un día puede cambiar mucho el precio.',
       porque: 'Destraba pasajes, alojamiento y casi todo lo demás.',
-      impacto: 5, anticipacion: 75, dependeDe: ['d_destino', 'd_participantes']
+      impacto: 5, anticipacion: 75, dependeDe: ['d_destino'], aplica: v => !R.recorrido.completo(v), abreCronograma: true
     },
 
     /* ---------- Documentación ---------- */
@@ -167,7 +167,7 @@ R.guia = (function () {
     /* ---------- Alojamiento ---------- */
     {
       id: 'a_reserva', fase: 'alojamiento', porDestino: true,
-      titulo: (v, c) => c.varios ? `Reservar alojamiento en ${c.destino.nombre}` : 'Reservar el alojamiento',
+      titulo: (v, c) => c.destino.parada ? `Dónde dormir en ${c.destino.nombre} (parada)` : c.varios ? `Reservar alojamiento en ${c.destino.nombre}` : 'Reservar el alojamiento',
       desc: 'Elegí dónde vas a dormir cada noche del viaje.',
       consejo: 'Priorizá tarifas con cancelación gratuita: te dan margen si algo cambia. Subí la reserva a Documentos.',
       porque: 'Importante, pero suele tener más disponibilidad y cancelación flexible que el transporte.',
@@ -382,7 +382,7 @@ R.guia = (function () {
 
   /** Motivos de cambio de planes y el paso raíz que afectan. */
   const motivosCambio = [
-    { id: 'fechas', nombre: 'Cambiaron las fechas', icono: '📅', afecta: ['d_fechas'] },
+    { id: 'fechas', nombre: 'Cambiaron las fechas', icono: '📅', afecta: ['d_fechas', 't_segmento', 'a_reserva'] },
     { id: 'destino', nombre: 'Cambió el destino', icono: '🧭', afecta: ['d_destino'] },
     { id: 'transporte', nombre: 'Se canceló o cambió el vuelo / transporte', icono: '✈️', afecta: ['t_segmento', 'pq_paquete'] },
     { id: 'alojamiento', nombre: 'Se cayó o cambió el alojamiento', icono: '🏡', afecta: ['a_reserva', 'pq_paquete'] },

@@ -1,0 +1,96 @@
+rules_version = '2';
+// =========================================================
+// Tripbox — reglas de Firestore
+// Organizador y coorganizadores editan todo el viaje.
+// Viajeros ven todo y cargan sus gastos, documentos y valija.
+// =========================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function logueado() { return request.auth != null; }
+    function yo() { return request.auth.uid; }
+
+    // ---------- Perfil de cada usuario ----------
+    match /usuarios/{uid} {
+      allow read, write: if logueado() && yo() == uid;
+      match /{sub=**} {
+        allow read, write: if logueado() && yo() == uid;
+      }
+    }
+
+    // ---------- Invitaciones ----------
+    match /invitaciones/{codigo} {
+      allow read: if logueado();
+      allow create: if logueado() && request.resource.data.creadoPor == yo()
+        && organiza(request.resource.data.viajeId);
+      allow update, delete: if logueado() && organiza(resource.data.viajeId);
+    }
+
+    function viaje(id) { return get(/databases/$(database)/documents/viajes/$(id)).data; }
+    function organiza(id) {
+      let v = viaje(id);
+      return yo() in v.miembros && v.roles[yo()] in ['organizador', 'coorganizador'];
+    }
+
+    // ---------- Viajes ----------
+    match /viajes/{viajeId} {
+      function miembro() { return logueado() && yo() in resource.data.miembros; }
+      function organizador() { return miembro() && resource.data.roles[yo()] in ['organizador', 'coorganizador']; }
+      function cambia() { return request.resource.data.diff(resource.data).affectedKeys(); }
+
+      // Unirse con una invitación activa: solo se agrega uno mismo, como viajero
+      function unirse() {
+        let inv = get(/databases/$(database)/documents/invitaciones/$(request.resource.data.codigoUnion)).data;
+        return logueado()
+          && !(yo() in resource.data.miembros)
+          && inv.activa == true && inv.viajeId == viajeId
+          && request.resource.data.miembros.toSet() == resource.data.miembros.toSet().union([yo()].toSet())
+          && request.resource.data.roles.diff(resource.data.roles).affectedKeys().hasOnly([yo()])
+          && request.resource.data.roles[yo()] == 'viajero'
+          && request.resource.data.owner == resource.data.owner
+          && cambia().hasOnly(['miembros', 'roles', 'personas', 'participantes', 'codigoUnion']);
+      }
+      // Salir del viaje (el dueño no puede)
+      function salir() {
+        return miembro() && resource.data.owner != yo()
+          && !(yo() in request.resource.data.miembros)
+          && request.resource.data.miembros.toSet() == resource.data.miembros.toSet().difference([yo()].toSet())
+          && !(yo() in request.resource.data.roles)
+          && cambia().hasOnly(['miembros', 'roles']);
+      }
+
+      allow read: if miembro();
+      allow create: if logueado()
+        && request.resource.data.owner == yo()
+        && request.resource.data.miembros == [yo()]
+        && request.resource.data.roles[yo()] == 'organizador';
+      allow update: if (organizador()
+          && request.resource.data.owner == resource.data.owner
+          && resource.data.owner in request.resource.data.miembros
+          && request.resource.data.roles[resource.data.owner] == 'organizador')
+        || unirse() || salir();
+      allow delete: if logueado() && resource.data.owner == yo();
+
+      function esMiembro() { return logueado() && yo() in viaje(viajeId).miembros; }
+      function esOrganizador() { return esMiembro() && viaje(viajeId).roles[yo()] in ['organizador', 'coorganizador']; }
+
+      // Gastos y documentos: cada uno carga los suyos; organizadores, todo
+      match /{col}/{docId} {
+        allow read: if (col == 'movimientos' || col == 'documentos') && esMiembro();
+        allow create: if (col == 'movimientos' || col == 'documentos') && esMiembro()
+          && (esOrganizador() || request.resource.data.creadoPor == yo());
+        allow update: if (col == 'movimientos' || col == 'documentos') && esMiembro()
+          && (esOrganizador() || (resource.data.creadoPor == yo() && request.resource.data.creadoPor == yo()));
+        allow delete: if (col == 'movimientos' || col == 'documentos') && esMiembro()
+          && (esOrganizador() || resource.data.creadoPor == yo());
+      }
+
+      // Valija de cada persona: la tilda esa persona (o un organizador)
+      match /valijas/{personaId} {
+        allow read: if esMiembro();
+        allow write: if esMiembro()
+          && (esOrganizador() || viaje(viajeId).personas[personaId].uid == yo());
+      }
+    }
+  }
+}
