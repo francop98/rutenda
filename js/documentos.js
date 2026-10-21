@@ -39,11 +39,11 @@ R.documentos = (function () {
       <div class="bloque-cab cab-seccion">
         <div>
           <h2 class="titulo-seccion">Documentos del viaje</h2>
-          <p class="texto-suave">Todo a mano, en un solo lugar. ${R.db.modo() === 'nube' ? 'Se guardan en tu cuenta y quedan disponibles sin conexión una vez abiertos.' : 'Se guardan en este dispositivo.'}</p>
+          <p class="texto-suave">Pasajes, reservas y papeles, todo a mano.</p>
         </div>
         <div class="acciones-fila">
           ${R.escaneo && R.escaneo.disponible() ? '<button class="btn btn-suave" data-a="escanear" title="Leo la reserva y completo el paso de la guía">📷 Escanear reserva</button>' : ''}
-          <button class="btn btn-primario" data-a="subir">+ Subir documento</button>
+          ${grupos.length ? '<button class="btn btn-primario" data-a="subir">+ Subir</button>' : ''}
         </div>
       </div>
       ${grupos.length ? grupos.map(g => `

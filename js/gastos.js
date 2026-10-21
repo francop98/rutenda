@@ -250,7 +250,7 @@ R.gastos = (function () {
   }
 
   function cuentasHTML(v, s, tr) {
-    if (v.participantes.length < 2) return '<div class="bloque"><p class="texto-suave">Viajás solo/a: no hay cuentas para dividir. Si se suma alguien, agregalo en la pestaña Viajeros.</p></div>';
+    if (v.participantes.length < 2) return '<div class="bloque"><p class="texto-suave">Viajás solo/a: no hay cuentas para dividir.</p></div>';
     const pagado = {};
     v.participantes.forEach(p => { pagado[p] = 0; });
     v.movimientos.forEach(m => { if (m.tipo === 'gasto') pagado[m.persona] = (pagado[m.persona] || 0) + montoBase(v, m); });

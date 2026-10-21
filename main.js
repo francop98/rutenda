@@ -265,11 +265,11 @@
         </div>
       </section>
       ${viajes.length ? `
-      <div class="chips-filtro filtro-viajes">
+      ${viajes.length >= 4 ? `<div class="chips-filtro filtro-viajes">
         <button class="${filtroViajes === 'todos' ? 'activo' : ''}" data-filtro-viajes="todos">Todos</button>
         ${grupos.filter(g => g.lista.length).map(g => `<button class="${filtroViajes === g.id ? 'activo' : ''}" data-filtro-viajes="${g.id}">${g.titulo} <span>${g.lista.length}</span></button>`).join('')}
-      </div>
-      ${visibles.map(g => `
+      </div>` : ''}
+      ${(viajes.length >= 4 ? visibles : grupos.filter(g => g.lista.length)).map(g => `
         <section class="seccion-viajes">
           <h2 class="titulo-seccion">${g.icono} ${esc(g.titulo)} <span class="contador">${g.lista.length}</span></h2>
           <div class="grilla-viajes">${g.lista.map(R.viajes.tarjeta).join('')}</div>

@@ -45,84 +45,68 @@ R.vistaGuia = (function () {
     const faltanDatos = info.filter(t => t.faltanDatos);
     const pendientes = R.motor.pendientes(v);
 
+    const ahora = proximos.slice(0, 3);
+    const rec = R.motor.recomendaciones(v);
+    const reqHTML = R.requisitos.tarjeta(v);
+    const est = R.viajes.estadoViaje(v);
+    const plegable = (id, titulo, cuenta, cuerpo, abierto) => `
+      <details class="plegable" data-plegable="${id}" ${abierto || plegado[id] ? 'open' : ''}>
+        <summary><span>${titulo}</span>${cuenta != null ? `<span class="contador">${cuenta}</span>` : ''}</summary>
+        <div class="plegable-cuerpo">${cuerpo}</div>
+      </details>`;
+
     cont.innerHTML = `
+      <div class="guia-simple">
       ${aRevisar.length ? `
         <div class="aviso-cambio">
-          <div><strong>🔄 Estás reorganizando el viaje</strong><p>${U.plural(aRevisar.length, 'paso quedó', 'pasos quedaron')} para revisar después del último cambio de planes.</p></div>
-          <button class="btn btn-primario btn-chico" data-a="verPlan">Ver plan ordenado</button>
+          <div><strong>🔄 Reorganizando el viaje</strong><p>${U.plural(aRevisar.length, 'paso para revisar', 'pasos para revisar')}.</p></div>
+          <button class="btn btn-primario btn-chico" data-a="verPlan">Ver en orden</button>
         </div>` : ''}
 
-      <div class="guia-grilla">
-        <div class="col-principal">
-          ${top ? tarjetaProximo(v, top) : tarjetaSinProximo(v, prog, pendientes.length)}
-          ${pendientes.length ? `
-            <div class="bloque bloque-marcha" id="pendientes">
-              <h3 class="bloque-titulo">Pendientes <span class="contador">${pendientes.length}</span></h3>
-              <p class="texto-suave rec-intro">Lo que dejaste para más tarde y lo que todavía no se puede hacer.</p>
-              <div class="lista-siguientes">${pendientes.map(t => `
-                <div class="fila-siguiente fila-pendiente">
-                  <span class="num">${t.esperaVentana ? '⏳' : R.guia.fase(t.fase).icono}</span>
-                  <span class="fs-texto" data-tarea="${t.id}"><strong>${esc(t.titulo)}</strong><small>${t.esperaVentana ? `Se habilita el ${U.fmtFecha(t.habilitaEl, 'largo')}` : esPaqueteSinDatos(v, t) ? '📦 Incluido en el paquete · faltan los datos' : esc(R.guia.fase(t.fase).nombre)}${t.diasRestantes != null && t.diasRestantes < 0 && !t.esperaVentana ? ' · atrasado' : ''}</small></span>
-                  <span class="fp-acciones">
-                    ${t.esperaVentana ? '<span class="chip chip-gris">Todavía no</span>'
-                      : esPaqueteSinDatos(v, t) ? `<button class="btn btn-primario btn-chico" data-completar="${t.id}">Completar datos</button>`
-                      : `<button class="btn btn-primario btn-chico" data-rapido="hecha" data-id="${t.id}">✓ Listo</button>
-                         <button class="btn btn-texto btn-chico" data-reactivar="${t.id}">A la guía</button>`}
-                  </span>
-                </div>`).join('')}</div>
-            </div>` : ''}
-          ${proximos.length > 1 ? `
-            <div class="bloque">
-              <h3 class="bloque-titulo">Lo que sigue</h3>
-              <div class="lista-siguientes">${proximos.slice(1).map((t, i) => `
-                <button class="fila-siguiente" data-tarea="${t.id}">
-                  <span class="num">${i + 2}</span>
-                  <span class="fs-texto"><strong>${esc(t.titulo)}</strong><small>${esc(R.guia.fase(t.fase).nombre)}${t.razones[0] ? ' · ' + esc(t.razones.find(r => r.tipo === 'urgente') ? t.razones.find(r => r.tipo === 'urgente').texto : t.razones[0].texto) : ''}</small></span>
-                  ${chipFecha(t)}
-                </button>`).join('')}</div>
-            </div>` : ''}
+      <h3 class="guia-seccion">Ahora</h3>
+      ${top ? tarjetaProximo(v, top) : tarjetaSinProximo(v, prog, pendientes.length)}
+      ${ahora.length > 1 ? `<div class="lista-siguientes lista-ahora">${ahora.slice(1).map(t => filaPaso(v, t)).join('')}</div>` : ''}
 
-          ${faltanDatos.length ? `
-            <div class="bloque bloque-datos">
-              <h3 class="bloque-titulo">Completá los datos <span class="contador">${faltanDatos.length}</span></h3>
-              <p class="texto-suave">Ya están resueltos, pero falta guardar horarios, códigos, costos o archivos.</p>
-              <div class="lista-siguientes">${faltanDatos.map(t => `
-                <div class="fila-siguiente fila-datos">
-                  <span class="num">${R.guia.fase(t.fase).icono}</span>
-                  <span class="fs-texto"><strong>${esc(t.titulo)}</strong><small>${(v.tareas[t.id] || {}).incluidoEnPaquete ? 'Incluido en el paquete · ' : ''}Sin datos cargados</small></span>
-                  <button class="btn btn-primario btn-chico" data-completar="${t.id}">Completar</button>
-                  <button class="btn btn-texto btn-chico" data-nohace="${t.id}" title="No hace falta cargar datos">No hace falta</button>
-                </div>`).join('')}</div>
-            </div>` : ''}
+      ${faltanDatos.length ? `
+        <div class="bloque bloque-datos">
+          <h3 class="bloque-titulo">Completá los datos <span class="contador">${faltanDatos.length}</span></h3>
+          <div class="lista-siguientes">${faltanDatos.map(t => `
+            <div class="fila-siguiente fila-datos">
+              <span class="num">${R.guia.fase(t.fase).icono}</span>
+              <span class="fs-texto" data-tarea="${t.id}"><strong>${esc(t.titulo)}</strong><small>${(v.tareas[t.id] || {}).incluidoEnPaquete ? 'Del paquete · ' : ''}Faltan horarios, códigos o costos</small></span>
+              <button class="btn btn-primario btn-chico" data-completar="${t.id}">Completar</button>
+              <button class="btn btn-texto btn-chico" data-nohace="${t.id}">No hace falta</button>
+            </div>`).join('')}</div>
+        </div>` : ''}
 
-          ${consejosHTML(v)}
-        </div>
+      ${pendientes.length ? plegable('despues', 'Más adelante', pendientes.length, `
+        <div class="lista-siguientes">${pendientes.map(t => `
+          <div class="fila-siguiente fila-pendiente">
+            <span class="num">${t.esperaVentana ? '⏳' : R.guia.fase(t.fase).icono}</span>
+            <span class="fs-texto" data-tarea="${t.id}"><strong>${esc(t.titulo)}</strong><small>${t.esperaVentana ? `Se habilita el ${U.fmtFecha(t.habilitaEl, 'largo')}` : esPaqueteSinDatos(v, t) ? '📦 Del paquete · faltan los datos' : 'Lo dejaste para después'}</small></span>
+            <span class="fp-acciones">
+              ${t.esperaVentana ? ''
+                : esPaqueteSinDatos(v, t) ? `<button class="btn btn-primario btn-chico" data-completar="${t.id}">Completar</button>`
+                : `<button class="btn btn-primario btn-chico" data-rapido="hecha" data-id="${t.id}">✓ Listo</button>
+                   <button class="btn btn-texto btn-chico" data-reactivar="${t.id}">Retomar</button>`}
+            </span>
+          </div>`).join('')}</div>`) : ''}
 
-        <aside class="col-lateral">
-          <div class="bloque tarjeta-progreso">
-            ${U.anillo(prog.pct, 84)}
-            <div>
-              <strong>${prog.hechas} de ${prog.total} pasos</strong>
-              <p class="texto-suave">${mensajeProgreso(prog.pct)}</p>
-            </div>
-          </div>
-          ${R.requisitos.tarjeta(v)}
-          <div class="bloque tarjeta-cambio">
-            <h4>¿Cambiaron los planes?</h4>
-            <p class="texto-suave">Contame qué cambió y te digo en qué orden reorganizar todo.</p>
-            <button class="btn btn-terracota" data-a="cambio">Tuve un cambio de planes</button>
-          </div>
-        </aside>
-      </div>
+      ${rec.pendientes.length ? plegable('rec', 'Recomendaciones', rec.pendientes.length, recomendacionesHTML(v, rec)) : ''}
 
-      <div class="bloque">
-        <div class="bloque-cab">
-          <h3 class="bloque-titulo">Todo el recorrido</h3>
-          <button class="btn btn-suave btn-chico" data-a="propia">+ Agregar un paso propio</button>
-        </div>
+      ${reqHTML ? plegable('req', v.perfil.internacional ? 'Documentos y salud para este destino' : 'Salud en este destino', null, reqHTML) : ''}
+
+      ${est !== 'planificando' ? plegable('notas', 'Notas y recuerdos del viaje', null, `<textarea id="notasViaje" rows="3" placeholder="Lo que te gustó, lo que harías distinto…">${esc(v.notasViaje || '')}</textarea>`) : ''}
+
+      ${plegable('todos', 'Todos los pasos', `${prog.hechas}/${prog.total}`, `
         <div class="fases">${fases.map(f => faseHTML(v, f)).join('')}</div>
+        <div class="acciones-fila guia-pie">
+          <button class="btn btn-suave btn-chico" data-a="propia">+ Paso propio</button>
+          <button class="btn btn-suave btn-chico" data-a="cambio">🔄 Cambiaron los planes</button>
+        </div>`)}
       </div>`;
 
+    cont.querySelectorAll('details[data-plegable]').forEach(d => d.addEventListener('toggle', () => { plegado[d.dataset.plegable] = d.open; }));
     cont.querySelectorAll('[data-tarea]').forEach(x => x.addEventListener('click', e => {
       // Los botones de adentro (Listo, Más tarde, etc.) no abren el detalle
       const boton = e.target.closest('button');
@@ -137,19 +121,19 @@ R.vistaGuia = (function () {
     if (btnCambio) btnCambio.onclick = () => cambioDePlanes(v);
     const btnPlan = cont.querySelector('[data-a="verPlan"]');
     if (btnPlan) btnPlan.onclick = () => mostrarPlan(v, R.motor.ordenarPlan(v, R.motor.pasosARevisar(v)));
-    cont.querySelector('[data-a="propia"]').onclick = () => editarPropia(v);
+    cont.querySelectorAll('[data-a="propia"]').forEach(b => b.onclick = () => editarPropia(v));
     cont.querySelectorAll('[data-posponer]').forEach(b => b.onclick = () => {
       R.motor.posponer(v, b.dataset.posponer, true);
       guardar(v);
       R.app.refrescar();
-      U.toast('Pasó a Pendientes. Seguimos con lo siguiente.');
+      U.toast('Quedó en "Más adelante".');
     });
     cont.querySelectorAll('[data-reactivar]').forEach(b => b.onclick = () => {
       R.motor.posponer(v, b.dataset.reactivar, false);
       if (R.motor.estado(v, b.dataset.reactivar) === 'en_curso') R.motor.setEstado(v, b.dataset.reactivar, 'pendiente');
       guardar(v);
       R.app.refrescar();
-      U.toast('Volvió a la guía.');
+      U.toast('Listo, volvió a "Ahora".');
     });
     const bValija = cont.querySelector('[data-a="abrirValija"]');
     if (bValija) bValija.onclick = () => { location.hash = `#viaje/${v.id}/valija`; };
@@ -166,49 +150,24 @@ R.vistaGuia = (function () {
     });
   }
 
-  /**
-   * Recomendaciones: cosas útiles que no son pasos obligatorios de la organización.
-   * Ordenadas de la más necesaria a la menos (urgencia + importancia). No cuentan en el progreso.
-   */
-  let verTodasRec = false;
-  function consejosHTML(v) {
-    const est = R.viajes.estadoViaje(v);
-    const rec = R.motor.recomendaciones(v);
-    const mostrar = verTodasRec ? rec.pendientes : rec.pendientes.slice(0, 5);
+  /** Recomendaciones: útiles pero no obligatorias, de la más necesaria a la menos. No cuentan en el progreso. */
+  function recomendacionesHTML(v, rec) {
     const motivo = t => {
       if (t.bloqueada) return `Cuando tengas: ${t.bloqueadaPor.map(id => R.motor.nombre(v, id)).join(', ')}`;
-      const urg = t.razones.find(r => r.tipo === 'urgente');
-      return urg ? urg.texto : (t.porque || t.desc || '');
+      return t.porque || '';
     };
-    const items = mostrar.map(t => `
-      <li class="${t.bloqueada ? 'rec-espera' : ''} ${t.diasRestantes != null && t.diasRestantes <= 7 && !t.bloqueada ? 'rec-urgente' : ''}">
-        <span>${R.guia.fase(t.fase).icono}</span>
-        <div data-tarea="${t.id}" class="rec-texto"><strong>${esc(t.titulo)}</strong><small>${esc(motivo(t))}</small></div>
-        <div class="rec-acciones">
-          ${t.base === 's_valija' ? '<button class="btn btn-suave btn-chico" data-ir="valija">🧳 Armar</button>' : ''}
-          <button class="btn-icono rec-ok" data-rapido="hecha" data-id="${t.id}" title="Hecho">✓</button>
-          <button class="btn-icono" data-rapido="no_aplica" data-id="${t.id}" title="No me sirve">×</button>
-        </div>
-      </li>`);
-    const fijos = [];
-    fijos.push(`<li><span>💸</span><div><strong>Registrá los gastos a medida que ocurren</strong><small>Con quién pagó y entre quiénes se divide: al final las cuentas salen solas.</small></div><button class="btn btn-suave btn-chico" data-ir="gastos">Gastos</button></li>`);
-    if (v.participantes.length > 1) {
-      const pendientes = R.gastos.transferencias(R.gastos.saldos(v)).length;
-      fijos.push(`<li><span>🤝</span><div><strong>Dividí las cuentas al volver</strong><small>${v.movimientos.length ? (pendientes ? `Hoy harían falta ${U.plural(pendientes, 'transferencia', 'transferencias')} para quedar a mano.` : 'Por ahora todos están a mano.') : 'Cuando haya gastos, te digo quién le debe a quién.'}</small></div><button class="btn btn-suave btn-chico" data-ir="gastos">Saldos</button></li>`);
-    }
-    if (est !== 'planificando') {
-      fijos.push(`<li class="consejo-notas"><span>📸</span><div><strong>Guardá recuerdos y notas del viaje</strong><small>Lo que te gustó, lo que no y lo que harías distinto.</small>
-        <textarea id="notasViaje" rows="3" placeholder="Escribí lo que quieras recordar…">${esc(v.notasViaje || '')}</textarea></div></li>`);
-    }
     return `
-      <div class="bloque bloque-consejos">
-        <div class="bloque-cab"><h3 class="bloque-titulo">Recomendaciones</h3>${rec.total ? `<span class="chip">${rec.hechas}/${rec.total} hechas</span>` : ''}</div>
-        <p class="texto-suave rec-intro">No son obligatorias: ordenadas de la más necesaria a la menos.</p>
-        ${items.length ? `<ul class="lista-consejos lista-rec">${items.join('')}</ul>` : '<p class="texto-suave">¡Todas las recomendaciones resueltas! 🙌</p>'}
-        ${rec.pendientes.length > 5 ? `<button class="btn btn-texto btn-chico" data-a="verTodasRec">${verTodasRec ? 'Ver menos' : `Ver todas (${rec.pendientes.length})`}</button>` : ''}
-        <h4 class="subtitulo">Durante el viaje</h4>
-        <ul class="lista-consejos">${fijos.join('')}</ul>
-      </div>`;
+      <ul class="lista-consejos lista-rec">${rec.pendientes.map(t => `
+        <li class="${t.bloqueada ? 'rec-espera' : ''} ${t.diasRestantes != null && t.diasRestantes <= 7 && !t.bloqueada ? 'rec-urgente' : ''}">
+          <span>${R.guia.fase(t.fase).icono}</span>
+          <div data-tarea="${t.id}" class="rec-texto"><strong>${esc(t.titulo)}</strong><small>${esc(motivo(t))}</small></div>
+          <div class="rec-acciones">
+            ${t.base === 's_valija' ? '<button class="btn btn-suave btn-chico" data-ir="valija">🧳 Armar</button>' : ''}
+            <button class="btn-icono rec-ok" data-rapido="hecha" data-id="${t.id}" title="Hecho">✓</button>
+            <button class="btn-icono" data-rapido="no_aplica" data-id="${t.id}" title="No me sirve">×</button>
+          </div>
+        </li>`).join('')}</ul>
+      <p class="ayuda">✓ si ya lo hiciste · × si no te sirve.</p>`;
   }
 
   function mensajeProgreso(pct) {
@@ -219,35 +178,36 @@ R.vistaGuia = (function () {
     return 'Empecemos por el primer paso.';
   }
 
+  const plegado = {};
+  /** Fila de un paso: título, para cuándo y un botón. */
+  function filaPaso(v, t) {
+    return `
+      <div class="fila-siguiente fila-ahora">
+        <span class="num">${R.guia.fase(t.fase).icono}</span>
+        <span class="fs-texto" data-tarea="${t.id}"><strong>${esc(t.titulo)}</strong>${t.fechaLimite ? `<small>${t.diasRestantes < 0 ? 'Atrasado' : 'Ideal antes del ' + U.fmtFecha(t.fechaLimite, 'corto')}</small>` : ''}</span>
+        <button class="btn btn-suave btn-chico" data-rapido="hecha" data-id="${t.id}">${t.abreCronograma ? 'Cargar' : t.tieneFormulario ? 'Cargar' : '✓'}</button>
+      </div>`;
+  }
+
   function tarjetaProximo(v, t) {
     const f = R.guia.fase(t.fase);
     return `
       <article class="proximo-paso" data-tarea="${t.id}">
-        <div class="pp-cab">
-          <span class="etiqueta">Tu próximo paso</span>
-          ${chipEstado(t)} ${chipFecha(t)}
-        </div>
         <div class="pp-cuerpo">
           <span class="pp-icono">${f.icono}</span>
           <div>
-            <small class="texto-suave">${esc(f.nombre)}</small>
             <h2>${esc(t.titulo)}</h2>
             <p>${esc(t.desc)}</p>
+            <div class="pp-chips">${chipEstado(t)} ${chipFecha(t)}</div>
           </div>
         </div>
-        ${t.razones.length ? `
-          <div class="pp-porque">
-            <strong>¿Por qué ahora?</strong>
-            <ul>${t.razones.slice(0, 3).map(r => `<li><span>${ICONO_RAZON[r.tipo] || '•'}</span>${esc(r.texto)}</li>`).join('')}</ul>
-          </div>` : ''}
         <div class="pp-acciones">
           <button class="btn btn-primario" data-rapido="hecha" data-id="${t.id}">${t.abreCronograma ? '📅 Cargar las fechas' : t.tieneFormulario ? '✓ Listo, cargar datos' : '✓ Listo'}</button>
-          ${t.base === 's_valija' ? '<button class="btn btn-suave" data-a="abrirValija">🧳 Abrir el armador</button>' : ''}
-          <button class="btn btn-suave" data-posponer="${t.id}" title="Pasa a Pendientes y seguís con lo siguiente">⏭ Más tarde</button>
+          ${t.base === 's_valija' ? '<button class="btn btn-suave" data-a="abrirValija">🧳 Armar valija</button>' : ''}
+          <button class="btn btn-texto" data-posponer="${t.id}">Más tarde</button>
           <button class="btn btn-texto" data-rapido="no_aplica" data-id="${t.id}">No aplica</button>
         </div>
-        <p class="pp-viajero">Lo resuelve quien organiza el viaje. Vos podés cargar tus gastos, documentos y tu valija.</p>
-        <p class="pp-estado">${t.estado === 'revisar' ? 'Quedó a revisar por un cambio de planes.' : '"Más tarde" lo pasa a tus Pendientes y seguís con lo siguiente.'}</p>
+        <p class="pp-viajero">Esto lo resuelve quien organiza. Vos podés cargar gastos, documentos y tu valija.</p>
       </article>`;
   }
 
@@ -255,7 +215,7 @@ R.vistaGuia = (function () {
     if (enEspera && prog.pct < 100) {
       return `<article class="proximo-paso">
         <div class="pp-cuerpo"><span class="pp-icono">📋</span>
-        <div><h2>Solo quedan tus pendientes</h2><p>Todo lo demás está resuelto. Revisá la lista de pendientes cuando puedas.</p></div></div>
+        <div><h2>Solo queda lo de más adelante</h2><p>Todo lo demás está resuelto.</p></div></div>
       </article>`;
     }
     if (prog.pct >= 100) {
@@ -266,7 +226,7 @@ R.vistaGuia = (function () {
     }
     return `<article class="proximo-paso">
       <div class="pp-cuerpo"><span class="pp-icono">⏳</span>
-      <div><h2>Todo lo disponible está hecho</h2><p>Los pasos que quedan esperan a que se resuelvan otros. Revisá el recorrido completo más abajo.</p></div></div>
+      <div><h2>Por ahora, nada más</h2><p>Lo que queda depende de otros pasos.</p></div></div>
     </article>`;
   }
 
@@ -367,23 +327,24 @@ R.vistaGuia = (function () {
         ${t.tieneFormulario && !t.esperaVentana ? `
           <div class="detalle-datos">
             <div class="bloque-cab"><h4>Datos cargados</h4><button type="button" class="btn ${datos.datos ? 'btn-suave' : 'btn-primario'} btn-chico" data-a="formulario">${datos.datos ? 'Editar datos' : (t.estado === 'hecha' ? 'Cargar datos' : 'Listo, cargar datos')}</button></div>
-            ${datos.datos ? `<ul class="lista-resumen">${R.formularios.resumen(v, t).map(l => `<li>${esc(l)}</li>`).join('') || '<li>Sin detalles.</li>'}</ul>` : '<p class="texto-suave">Cuando lo resuelvas, cargá los datos (horarios, códigos, costo, archivos) y se suman solos al itinerario, a los gastos y a documentos.</p>'}
+            ${datos.datos ? `<ul class="lista-resumen">${R.formularios.resumen(v, t).map(l => `<li>${esc(l)}</li>`).join('') || '<li>Sin detalles.</li>'}</ul>` : '<p class="texto-suave">Lo que cargues se suma solo al itinerario, a los gastos y a documentos.</p>'}
           </div>` : ''}
         ${['d_destino', 'd_fechas', 'd_participantes'].includes(t.id) ? '<button type="button" class="btn btn-suave btn-chico boton-editar-viaje" data-a="editarViaje">✎ Editar destinos, fechas y viajeros</button>' : ''}
         ${t.base === 's_valija' ? '<button type="button" class="btn btn-primario btn-chico boton-editar-viaje" data-a="abrirValija">🧳 Abrir el armador de valija</button>' : ''}
         ${['doc_pasaporte', 'doc_visa', 'doc_requisitos', 'p_vacunas'].includes(t.base) ? R.requisitos.tarjeta(v) : ''}
         ${t.consejo ? `<div class="consejo"><strong>💡 Consejo</strong><p>${esc(t.consejo)}</p></div>` : ''}
-        ${t.razones.length ? `<div class="detalle-bloque"><h4>¿Por qué tiene esta prioridad?</h4><ul class="lista-razones">${t.razones.map(r => `<li><span>${ICONO_RAZON[r.tipo] || '•'}</span>${esc(r.texto)}</li>`).join('')}</ul></div>` : ''}
+        <label class="campo"><span>Notas</span><textarea id="tNota" rows="2" placeholder="Ej: a quién llamar, opciones que viste…">${esc(datos.nota || '')}</textarea></label>
+        <div class="detalle-bloque">
+          <div class="bloque-cab"><h4>Archivos</h4><button type="button" class="btn btn-suave btn-chico" data-a="adjuntar">+ Adjuntar</button></div>
+          ${docs.length ? `<div class="docs-mini">${docs.map(d => `<button type="button" class="doc-mini" data-doc="${d.id}">${R.documentos.iconoDoc(d)} ${esc(d.nombre)}</button>`).join('')}</div>` : ''}
+        </div>
+        <details class="plegable plegable-chico"><summary><span>¿Por qué y para cuándo?</span></summary><div class="plegable-cuerpo">
+        ${t.razones.length ? `<ul class="lista-razones">${t.razones.map(r => `<li><span>${ICONO_RAZON[r.tipo] || '•'}</span>${esc(r.texto)}</li>`).join('')}</ul>` : ''}
         <div class="detalle-grilla">
           ${t.fechaLimite ? `<div><small>Fecha recomendada</small><strong>${U.fmtFecha(t.fechaLimite, 'largo')}</strong></div>` : ''}
           ${t.dependeDe.length ? `<div><small>Necesita antes</small>${t.dependeDe.map(d => `<span class="dep ${R.motor.resuelta(v, d) ? 'ok' : ''}">${R.motor.resuelta(v, d) ? '✓' : '○'} ${esc(R.motor.nombre(v, d))}</span>`).join('')}</div>` : ''}
           ${t.destraba.length ? `<div><small>Destraba</small>${t.destraba.map(d => `<span class="dep">🔓 ${esc(R.motor.nombre(v, d))}</span>`).join('')}</div>` : ''}
-        </div>
-        <label class="campo"><span>Notas</span><textarea id="tNota" rows="3" placeholder="Ej: número de reserva, a quién llamar, opciones que viste…">${esc(datos.nota || '')}</textarea></label>
-        <div class="detalle-bloque">
-          <div class="bloque-cab"><h4>Documentos de este paso</h4><button type="button" class="btn btn-suave btn-chico" data-a="adjuntar">+ Adjuntar</button></div>
-          ${docs.length ? `<div class="docs-mini">${docs.map(d => `<button type="button" class="doc-mini" data-doc="${d.id}">${R.documentos.iconoDoc(d)} ${esc(d.nombre)}</button>`).join('')}</div>` : '<p class="texto-suave">Todavía no adjuntaste nada.</p>'}
-        </div>
+        </div></div></details>
         ${t.propia ? `<div class="detalle-pie-propia"><button type="button" class="btn btn-texto" data-a="editarPropia">Editar paso</button><button type="button" class="btn btn-texto peligro" data-a="borrarPropia">Eliminar paso</button></div>` : ''}`
     });
 

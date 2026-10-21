@@ -119,12 +119,10 @@ R.itinerario = (function () {
       <div class="bloque-cab cab-seccion">
         <div>
           <h2 class="titulo-seccion">Itinerario</h2>
-          <p class="texto-suave">${dias.length ? `${U.plural(dias.length, 'día', 'días')} de viaje, armados desde tu cronograma.` : 'Cuando cargues las fechas del cronograma, te armo los días automáticamente.'}</p>
+          <p class="texto-suave">${dias.length ? U.plural(dias.length, 'día', 'días') + ' de viaje' : 'Cargá las fechas y te armo los días.'}</p>
         </div>
         <div class="acciones-fila">
-          <button class="btn btn-suave btn-chico solo-org" data-a="cronograma">📅 Cronograma</button>
-          <button class="btn btn-suave btn-chico" data-a="pdf">📄 PDF</button>
-          <button class="btn btn-suave btn-chico" data-a="compartir">↗ Compartir</button>
+          <button class="btn btn-suave btn-chico solo-org" data-a="cronograma">📅 Fechas y traslados</button>
           <button class="btn btn-primario btn-chico solo-org" data-a="nuevo">+ Actividad</button>
         </div>
       </div>
@@ -133,7 +131,7 @@ R.itinerario = (function () {
         <button class="btn btn-texto btn-chico solo-org" data-a="cronograma2">Corregir en el cronograma →</button></div>` : ''}
 
       <details class="bloque plegable" ${dias.length ? '' : 'open'}>
-        <summary><h3 class="bloque-titulo">🧭 Cronograma del viaje</h3></summary>
+        <summary><h3 class="bloque-titulo">🧭 Resumen de traslados</h3></summary>
         ${R.cronogramaEditor.resumenHTML(v)}
       </details>
 
@@ -142,15 +140,19 @@ R.itinerario = (function () {
         <div class="mapa-cont"></div>
       </details>
 
-      ${dias.length ? `<div class="linea-tiempo">${dias.map(f => diaHTML(v, diaDe(v, f), f === hoy)).join('')}</div>` : ''}
+      ${dias.length ? `<div class="linea-tiempo">${agruparDias(v, dias, hoy)}</div>` : ''}
       ${fuera.length ? `<section class="dia fuera"><header class="dia-cab"><div><strong>Sin fecha o fuera del viaje</strong></div></header>${fuera.map(e => itemHTML({ hora: e.hora, icono: tipo(e.tipo).icono, titulo: e.titulo, sub: [e.fecha ? U.fmtFecha(e.fecha, 'corto') : '', e.lugar].filter(Boolean).join(' · '), evento: e.id, docs: [] })).join('')}</section>` : ''}
       ${!dias.length && !fuera.length ? `
         <div class="vacio vacio-chico">
           <div class="vacio-icono">🗓️</div>
-          <p>Completá el cronograma (cuándo sale y llega cada traslado) y acá vas a ver cada día del viaje.</p>
-          <button class="btn btn-primario solo-org" data-a="cronograma3">Completar el cronograma</button>
+          <p>Cargá cuándo salís y cuántas noches te quedás en cada lugar, y acá aparece cada día.</p>
+          <button class="btn btn-primario solo-org" data-a="cronograma3">Cargar las fechas</button>
         </div>` : ''}
-      <p class="ayuda itinerario-pie"><button class="btn btn-texto btn-chico" data-a="ics">📆 Agregar al calendario del celular</button></p>`;
+      <div class="itinerario-pie acciones-fila">
+        <button class="btn btn-suave btn-chico" data-a="compartir">↗ Compartir</button>
+        <button class="btn btn-suave btn-chico" data-a="pdf">📄 PDF</button>
+        <button class="btn btn-suave btn-chico" data-a="ics">📆 Al calendario</button>
+      </div>`;
 
     cont.querySelectorAll('[data-a^="cronograma"]').forEach(b => b.onclick = () => editarCronograma(v));
     cont.querySelector('[data-a="nuevo"]').onclick = () => editar(v);
@@ -178,7 +180,54 @@ R.itinerario = (function () {
       </article>`;
   }
 
-  function diaHTML(v, d, esHoy) {
+  /**
+   * Días seguidos sin nada en el mismo lugar se muestran juntos ("Días 2 a 4 · Iguazú").
+   * El alojamiento aparece una vez por lugar, no todos los días.
+   */
+  function agruparDias(v, dias, hoy) {
+    const ds = dias.map(f => diaDe(v, f));
+    const libre = d => !d.items.length && d.fecha !== hoy && d.lugarNombre && (!d.amaneces || d.amaneces === 'Amanecés en ' + d.lugarNombre);
+    const html = [];
+    let ultimoDormis = '';
+    for (let i = 0; i < ds.length; i++) {
+      const d = ds[i];
+      const dormisTxt = d.dormis ? d.dormis.texto : '';
+      const mostrarDormis = dormisTxt && dormisTxt !== ultimoDormis;
+      if (libre(d)) {
+        let j = i;
+        while (j + 1 < ds.length && libre(ds[j + 1]) && ds[j + 1].lugarNombre === d.lugarNombre && (ds[j + 1].dormis || {}).texto === dormisTxt) j++;
+        if (j > i) {
+          html.push(grupoHTML(d, ds[j], mostrarDormis ? d.dormis : null));
+          ultimoDormis = dormisTxt;
+          i = j;
+          continue;
+        }
+      }
+      html.push(diaHTML(v, d, d.fecha === hoy, mostrarDormis));
+      ultimoDormis = dormisTxt || ultimoDormis;
+    }
+    return html.join('');
+  }
+
+  function dormisHTML(dm) {
+    return dm ? `<p class="dia-linea dia-dormis ${dm.falta ? 'falta' : ''}">${dm.icono} ${esc(dm.texto)}${dm.direccion ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dm.direccion)}" target="_blank" rel="noopener">${esc(dm.direccion)}</a>` : ''}</p>` : '';
+  }
+
+  function grupoHTML(a, b, dormis) {
+    return `
+      <section class="dia dia-grupo" id="dia-${a.fecha}">
+        <header class="dia-cab">
+          <div>
+            <strong>Días ${a.numero} a ${b.numero} · ${esc(a.lugarNombre)}</strong>
+            <small>${U.fmtRango(a.fecha, b.fecha)} · días libres ☀️</small>
+          </div>
+          <button class="btn-icono solo-org" data-agregar="${a.fecha}" title="Agregar una actividad">+</button>
+        </header>
+        ${dormisHTML(dormis)}
+      </section>`;
+  }
+
+  function diaHTML(v, d, esHoy, mostrarDormis) {
     return `
       <section class="dia ${esHoy ? 'hoy' : ''}" id="dia-${d.fecha}">
         <header class="dia-cab">
@@ -189,9 +238,9 @@ R.itinerario = (function () {
           <span class="dia-clima" data-clima-dia="${d.fecha}"></span>
           <button class="btn-icono solo-org" data-agregar="${d.fecha}" title="Agregar a este día">+</button>
         </header>
-        ${d.amaneces ? `<p class="dia-linea">🌅 ${esc(d.amaneces)}</p>` : ''}
+        ${d.amaneces && d.amaneces !== 'Amanecés en ' + d.lugarNombre ? `<p class="dia-linea">🌅 ${esc(d.amaneces)}</p>` : ''}
         ${d.items.length ? d.items.map(itemHTML).join('') : '<p class="dia-libre">Día libre ☀️</p>'}
-        ${d.dormis ? `<p class="dia-linea dia-dormis ${d.dormis.falta ? 'falta' : ''}">${d.dormis.icono} ${esc(d.dormis.texto)}${d.dormis.direccion ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.dormis.direccion)}" target="_blank" rel="noopener">${esc(d.dormis.direccion)}</a>` : ''}</p>` : ''}
+        ${mostrarDormis === false ? '' : dormisHTML(d.dormis)}
       </section>`;
   }
 

@@ -45,13 +45,14 @@ R.viajes = (function () {
   ];
   const extraActivo = (b, id) => id === 'trabajo' ? b.tipo === 'trabajo' : !!b.perfil[id];
 
+  // Cinco pestañas; Viajeros se abre desde las caritas de la portada
   const PESTANAS = [
     { id: 'guia', nombre: 'Guía', icono: '🧭' },
     { id: 'itinerario', nombre: 'Itinerario', icono: '🗓️' },
-    { id: 'documentos', nombre: 'Documentos', icono: '📁' },
+    { id: 'gastos', nombre: 'Gastos', icono: '💸' },
     { id: 'valija', nombre: 'Valija', icono: '🧳' },
-    { id: 'viajeros', nombre: 'Viajeros', icono: '👥' },
-    { id: 'gastos', nombre: 'Gastos', icono: '💸' }
+    { id: 'documentos', nombre: 'Docs', icono: '📁' },
+    { id: 'viajeros', nombre: 'Viajeros', icono: '👥', oculta: true }
   ];
 
   /* ---------- Ayudas de destinos ---------- */
@@ -158,16 +159,18 @@ R.viajes = (function () {
       ? existente.participantes.filter(id => id !== R.db.yoEn(existente)).map(id => R.db.persona(id)).filter(Boolean).map(p => ({ id: p.id, nombre: p.nombre }))
       : [];
 
+    // Tres pasos: a dónde (y con quién), cuándo, y qué ya tenés
     const PASOS = editando
-      ? ['Destinos', 'Cronograma', 'Detalles', 'Viajeros']
-      : ['Destinos', 'Cronograma', 'Detalles', 'Lo resuelto', 'Viajeros'];
+      ? ['Destinos', 'Cronograma', 'Detalles']
+      : ['Destinos', 'Cronograma', 'Lo resuelto'];
+    const ETIQUETA_PASO = { Destinos: '¿A dónde?', Cronograma: '¿Cuándo?', 'Lo resuelto': '¿Ya tenés algo?', Detalles: 'Detalles' };
     let editorCronograma = null;
     let paso = 0;
     let camposLugar = { origen: null, destinos: [] };
 
     const { el } = U.modal({
       titulo: editando ? 'Editar viaje' : 'Nuevo viaje',
-      subtitulo: editando ? 'Ajustá lo que haga falta.' : 'Unas preguntas y tu viaje empieza a tomar forma.',
+      subtitulo: '',
       cuerpo: '<div class="asistente-paisaje" id="asPaisaje"></div><div id="asistente"></div>',
       ancho: true
     });
@@ -194,8 +197,8 @@ R.viajes = (function () {
       const ultimo = paso === PASOS.length - 1;
       cont.innerHTML = `
         <div class="pasos-asistente">${PASOS.map((p, i) =>
-          `<span class="paso-a ${i === paso ? 'actual' : ''} ${i < paso ? 'listo' : ''}"><i>${i < paso ? '✓' : i + 1}</i>${p}</span>`).join('')}</div>
-        <div class="paso-movil"><span>Paso ${paso + 1} de ${PASOS.length}</span><strong>${PASOS[paso]}</strong>
+          `<span class="paso-a ${i === paso ? 'actual' : ''} ${i < paso ? 'listo' : ''}"><i>${i < paso ? '✓' : i + 1}</i>${ETIQUETA_PASO[p] || p}</span>`).join('')}</div>
+        <div class="paso-movil"><span>Paso ${paso + 1} de ${PASOS.length}</span><strong>${ETIQUETA_PASO[PASOS[paso]] || PASOS[paso]}</strong>
           <span class="pm-puntos">${PASOS.map((p, i) => `<i class="${i < paso ? 'listo' : i === paso ? 'actual' : ''}"></i>`).join('')}</span></div>
         <div class="asistente-cuerpo">${contenidoPaso()}</div>
         <div class="asistente-pie">
@@ -216,18 +219,30 @@ R.viajes = (function () {
 
     function contenidoPaso() {
       const n = nombrePaso();
-      if (n === 'Destinos') return `
+      if (n === 'Destinos') return htmlDestinos() + htmlViajeros();
+      if (n === 'Cronograma') return htmlCronograma();
+      if (n === 'Detalles') return htmlDetalles();
+      if (n === 'Lo resuelto') return htmlResuelto() + `
+        <details class="plegable plegable-chico" ${EXTRAS.some(x => extraActivo(b, x.id)) || b.extrasManuales.length ? 'open' : ''}>
+          <summary><span>¿Algo especial? Auto, mascotas, menores…</span></summary>
+          <div class="plegable-cuerpo">${htmlDetalles()}</div>
+        </details>`;
+      return '';
+    }
+
+    function htmlDestinos() {
+      return `
         <h4 class="titulo-paso">¿Desde dónde salís?</h4>
         ${b.origen && b.origen.nombre && b.origen.codigoPais && !b.cambiarOrigen ? `
           <div class="origen-fijo">
             <span>${R.lugares.bandera(b.origen.codigoPais) || '📍'} <strong>${esc(b.origen.nombre)}</strong><small>${esc([b.origen.region, b.origen.pais].filter(Boolean).join(', '))}</small></span>
             <button type="button" class="btn btn-texto btn-chico" data-a="cambiarOrigen">Cambiar</button>
           </div>
-          <p class="ayuda">La ida y la vuelta se arman solas desde acá.</p>` : `
-        <p class="ayuda">Tu ciudad. La guardo para los próximos viajes y la ida y la vuelta se arman solas desde acá.</p>
+          ` : `
+        <p class="ayuda">Tu ciudad. Queda guardada para los próximos viajes.</p>
         <div id="lugarOrigen"></div>`}
         <h4 class="titulo-paso">¿A dónde vas?</h4>
-        <p class="ayuda">Si es un viaje combinado, agregá cada destino en orden.</p>
+        <p class="ayuda">Si son varios, en orden.</p>
         <div class="lista-destinos">${b.destinos.map((d, i) => `
           <div class="fila-destino ${d.soloDia ? 'escapada' : ''}">
             <span class="fd-num">${d.soloDia ? '☀️' : b.destinos.filter((x, j) => !x.soloDia && j <= i).length}</span>
@@ -238,39 +253,37 @@ R.viajes = (function () {
             ${b.destinos.length > 1 ? `<button type="button" class="btn-icono" data-quitar-destino="${i}" title="Quitar">×</button>` : ''}
           </div>`).join('')}</div>
         <div class="acciones-fila">
-          <button type="button" class="btn btn-suave btn-chico" data-a="masDestino">+ Agregar otro destino</button>
-          <button type="button" class="btn btn-suave btn-chico" data-a="masEscapada">+ Escapada de un día</button>
+          <button type="button" class="btn btn-suave btn-chico" data-a="masDestino">+ Otro destino</button>
+          <button type="button" class="btn btn-suave btn-chico" data-a="masEscapada">+ Escapada (ida y vuelta en el día)</button>
         </div>
-        <p class="ayuda">Una escapada de un día es un lugar que visitás y del que volvés en el día, sin dormir ahí (aunque sea en otro país).</p>
         <div id="avisoInter"></div>
-        <label class="campo"><span>Nombre del viaje (opcional)</span><input id="aNombre" value="${esc(b.nombre)}" placeholder="Ej: Vacaciones de invierno"></label>`;
+        <label class="campo"><span>Nombre del viaje <small>(opcional)</small></span><input id="aNombre" value="${esc(b.nombre)}" placeholder="Ej: Vacaciones de invierno"></label>`;
+    }
 
-      if (n === 'Cronograma') {
+    function htmlCronograma() {
+      {
         b.recorrido = R.recorrido.construir(b.origen, b.destinos, b.recorrido, 'avion');
         const nueva = b.conexion && b.conexion.lugar && b.conexion.lugar.nombre ? b.conexion.lugar.nombre : '';
         if (b.conexionAplicada && normal(b.conexionAplicada) !== normal(nueva)) R.recorrido.quitarConexion(b.recorrido, { nombre: b.conexionAplicada });
         if (nueva) R.recorrido.aplicarConexion(b.recorrido, b.conexion);
         b.conexionAplicada = nueva;
         return `
-        <h4 class="titulo-paso">¿Cómo y cuándo viajás?</h4>
-        <p class="ayuda">Para cada traslado indicá si es <strong>directo</strong> o <strong>con conexión</strong>, en qué viajás y cuándo salís. Las noches se calculan solas con las fechas (o escribilas y ajusto la salida). Si la ida tiene una conexión, la vuelta la repite.</p>
+        <h4 class="titulo-paso">¿Cuándo salís y cuántas noches?</h4>
+        <p class="ayuda">En qué viajás, cuándo salís y cuántas noches. El resto se calcula solo.</p>
         <div id="editorCronograma"></div>`;
       }
+    }
 
-      if (n === 'Detalles') {
+    function htmlDetalles() {
+      {
         const det = deteccionInternacional(b.origen, b.destinos.filter(d => d.nombre));
         const inter = internacional();
         return `
-        <h4 class="titulo-paso">¿Salís del país en algún momento del viaje?</h4>
-        ${det.estado === 'si' ? `<p class="aviso-suave">🌎 Detectamos que salís del país: ${det.paises.map(p => `${R.lugares.bandera(p.codigoPais)} ${esc(p.pais)}`).join(', ')}.</p>`
-          : det.estado === 'no' ? '<p class="aviso-suave">📍 Por los destinos que cargaste, no salís del país.</p>' : ''}
-        <div class="segmentado">
-          <button type="button" data-inter="no" class="${!inter ? 'activo' : ''}">No salgo del país</button>
-          <button type="button" data-inter="si" class="${inter ? 'activo' : ''}">Sí, en algún momento salgo</button>
+        <div class="inter-linea">
+          <span>${inter ? '🌎 Salís del país' : '📍 No salís del país'}${det.estado === 'si' ? ': ' + det.paises.map(p => `${R.lugares.bandera(p.codigoPais)} ${esc(p.pais)}`).join(', ') : ''}</span>
+          <button type="button" class="btn-texto-mini" data-inter="${inter ? 'no' : 'si'}">${inter ? 'No salgo' : 'Sí salgo'}</button>
         </div>
-        <p class="ayuda">Aunque sea por un día, cuenta: cambia la documentación y el seguro.</p>
-        <h4 class="titulo-paso">¿Hay algo más a tener en cuenta?</h4>
-        <p class="ayuda">Cada opción que marques suma pasos a tu guía.</p>
+        <p class="ayuda">Marcá lo que corresponda: cada opción suma sus pasos a la guía.</p>
         <div class="extras-lista">${EXTRAS.map(x =>
           `<label class="extra-op ${extraActivo(b, x.id) ? 'activo' : ''}"><input type="checkbox" data-extra="${x.id}" ${extraActivo(b, x.id) ? 'checked' : ''}>
             <span class="eo-icono">${x.icono}</span><span><strong>${esc(x.texto)}</strong><small>Suma: ${esc(x.suma)}</small></span></label>`).join('')}</div>
@@ -278,15 +291,16 @@ R.viajes = (function () {
           <input id="aExtraManual" placeholder="Otra cosa que tengas que hacer">
           <button type="button" class="btn btn-suave" data-a="agregarExtra">Agregar</button>
         </div>
-        ${b.extrasManuales.length ? `<div class="chips-personas">${b.extrasManuales.map((x, i) => `<span class="chip-persona chip-texto">📝 ${esc(x)} <button type="button" data-quitar-extra="${i}" aria-label="Quitar">×</button></span>`).join('')}</div>` : ''}
-        <p class="ayuda">Cada cosa que agregues se suma a tu guía como un paso más.</p>`;
+        ${b.extrasManuales.length ? `<div class="chips-personas">${b.extrasManuales.map((x, i) => `<span class="chip-persona chip-texto">📝 ${esc(x)} <button type="button" data-quitar-extra="${i}" aria-label="Quitar">×</button></span>`).join('')}</div>` : ''}`;
       }
+    }
 
-      if (n === 'Lo resuelto') {
+    function htmlResuelto() {
+      {
         const opciones = pasosResolubles();
         return `
-        <h4 class="titulo-paso">¿Ya tenés algo resuelto?</h4>
-        <p class="texto-suave">Así la guía se organiza en base a lo que falta. Después te pido los datos (horarios, códigos, costos y archivos) para que quede todo guardado.</p>
+        <h4 class="titulo-paso">¿Ya tenés algo comprado o reservado?</h4>
+        <p class="ayuda">Marcalo y la guía arranca por lo que falta. Si no, seguí de largo.</p>
         <label class="opcion-paquete ${b.resuelto.paquete ? 'activo' : ''}">
           <input type="checkbox" data-resuelto="paquete" ${b.resuelto.paquete ? 'checked' : ''}>
           <span class="op-icono">📦</span>
@@ -297,19 +311,21 @@ R.viajes = (function () {
             <div class="checks-grilla">${[['vuelos', 'Vuelos'], ['alojamiento', 'Alojamiento'], ['traslados', 'Traslados'], ['excursiones', 'Excursiones'], ['seguro', 'Seguro'], ['auto', 'Auto']].map(([k, t]) =>
               `<label class="chip-check ${b.paqueteIncluye.includes(k) ? 'activo' : ''}"><input type="checkbox" data-incluye="${k}" ${b.paqueteIncluye.includes(k) ? 'checked' : ''}> ${t}</label>`).join('')}</div>
           </div>` : ''}
-        <div class="campo"><span>${b.resuelto.paquete ? 'Fuera del paquete, ¿resolviste algo más?' : '¿Qué resolviste por tu cuenta?'}</span>
+        <details class="plegable plegable-chico" ${b.resueltoIds.length ? 'open' : ''}><summary><span>${b.resuelto.paquete ? 'Fuera del paquete, ¿tenés algo más?' : 'Ya compré o reservé otras cosas'}</span>${b.resueltoIds.length ? `<span class="contador">${b.resueltoIds.length}</span>` : ''}</summary><div class="plegable-cuerpo">
           ${opciones.length ? R.guia.fases.filter(f => opciones.some(o => o.fase === f.id)).map(f => `
             <small class="grupo-resuelto">${f.icono} ${esc(f.nombre)}</small>
             <div class="checks-grilla">${opciones.filter(o => o.fase === f.id).map(o =>
               `<label class="chip-check ${b.resueltoIds.includes(o.id) ? 'activo' : ''}"><input type="checkbox" data-resuelto-id="${o.id}" ${b.resueltoIds.includes(o.id) ? 'checked' : ''}> ${esc(o.titulo)}</label>`).join('')}</div>`).join('')
-          : '<p class="texto-suave">Con el paquete ya está cubierto todo lo que suele resolverse antes.</p>'}
-        </div>`;
+          : '<p class="texto-suave">El paquete ya cubre lo principal.</p>'}
+        </div></details>`;
       }
+    }
 
-      if (n === 'Viajeros') {
+    function htmlViajeros() {
+      {
         const conocidos = R.db.personas().filter(p => !p.esYo && !b.viajeros.some(x => normal(x.nombre) === normal(p.nombre)));
         return `
-        <h4 class="titulo-paso">¿Quiénes viajan?</h4>
+        <h4 class="titulo-paso">¿Viaja alguien con vos?</h4>
         <div class="lista-viajeros-asistente">
           <span class="chip-persona fijo">${U.avatar(yo, 26)} ${esc(yo.nombre)} <small>(vos)</small></span>
           ${b.viajeros.map((p, i) => `<span class="chip-persona">${U.avatar({ id: p.id || p.nombre, nombre: p.nombre }, 26)} ${esc(p.nombre)} <button type="button" data-quitar-viajero="${i}" aria-label="Quitar">×</button></span>`).join('')}
@@ -319,10 +335,8 @@ R.viajes = (function () {
           <datalist id="aConocidos">${conocidos.map(p => `<option value="${esc(p.nombre)}">`).join('')}</datalist>
           <button type="button" class="btn btn-suave" data-a="agregarPersona">Agregar</button>
         </div>
-        <p class="ayuda">${b.viajeros.length ? '' : 'Si viajás solo/a, seguí de largo. '}Si alguien ya viajó con vos, al escribir su nombre te lo sugerimos para que quede en su historial.</p>`;
+        <p class="ayuda">Si viajás solo/a, seguí de largo.</p>`;
       }
-
-      return '';
     }
 
     function leerPaso() {
@@ -334,7 +348,7 @@ R.viajes = (function () {
         camposLugar.destinos.forEach((c, i) => { if (c && b.destinos[i]) Object.assign(b.destinos[i], c.obtener()); });
         b.nombre = v('aNombre');
       }
-      if (n === 'Detalles') {
+      if (n === 'Detalles' || n === 'Lo resuelto') {
         cont.querySelectorAll('[data-extra]').forEach(x => {
           if (x.dataset.extra === 'trabajo') { if (x.checked) b.tipo = 'trabajo'; else if (b.tipo === 'trabajo') b.tipo = 'vacaciones'; }
           else b.perfil[x.dataset.extra] = x.checked;
@@ -404,7 +418,7 @@ R.viajes = (function () {
         editorCronograma = R.cronogramaEditor.montar(cont.querySelector('#editorCronograma'), b, { permitirSinFechas: true });
       }
 
-      if (n === 'Detalles') {
+      if (n === 'Detalles' || n === 'Lo resuelto') {
         cont.querySelectorAll('[data-inter]').forEach(x => x.onclick = () => { leerPaso(); b.perfil.internacionalManual = x.dataset.inter === 'si'; pintar(); });
         cont.querySelectorAll('[data-extra]').forEach(x => x.onchange = () => x.closest('.extra-op').classList.toggle('activo', x.checked));
         const input = cont.querySelector('#aExtraManual');
@@ -419,13 +433,14 @@ R.viajes = (function () {
         cont.querySelectorAll('[data-resuelto-id]').forEach(x => x.onchange = () => x.closest('.chip-check').classList.toggle('activo', x.checked));
       }
 
-      if (n === 'Viajeros') {
+      if (n === 'Destinos') {
         const input = cont.querySelector('#aNuevaPersona');
         const agregar = () => {
           const nombre = input.value.trim();
           if (!nombre) return;
           if (normal(nombre) === normal(yo.nombre)) { U.toast('Vos ya estás en el viaje 🙂'); return; }
           if (b.viajeros.some(p => normal(p.nombre) === normal(nombre))) { U.toast('Ya está en la lista.'); return; }
+          leerPaso();
           const conocido = R.db.personas().find(p => !p.esYo && normal(p.nombre) === normal(nombre));
           b.viajeros.push(conocido ? { id: conocido.id, nombre: conocido.nombre } : { nombre });
           pintar();
@@ -433,7 +448,7 @@ R.viajes = (function () {
         };
         cont.querySelector('[data-a="agregarPersona"]').onclick = agregar;
         input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); agregar(); } };
-        cont.querySelectorAll('[data-quitar-viajero]').forEach(x => x.onclick = () => { b.viajeros.splice(Number(x.dataset.quitarViajero), 1); pintar(); });
+        cont.querySelectorAll('[data-quitar-viajero]').forEach(x => x.onclick = () => { leerPaso(); b.viajeros.splice(Number(x.dataset.quitarViajero), 1); pintar(); });
       }
     }
 
@@ -618,53 +633,64 @@ R.viajes = (function () {
     });
   }
 
+  /** Menú ⋯ del viaje: lo que se usa poco, fuera de la vista. */
+  function menuViaje(v) {
+    const ops = [];
+    if (R.db.puedeOrganizar(v)) ops.push(['editar', '✏️', 'Editar destinos, fechas y opciones']);
+    ops.push(['viajeros', '👥', 'Viajeros']);
+    if (R.db.puedeOrganizar(v)) ops.push(['portada', '🎨', 'Estilo de la portada']);
+    ops.push(['pdf', '📄', 'Descargar itinerario en PDF']);
+    if (R.db.esDueno(v)) ops.push(['eliminar', '🗑', 'Eliminar viaje']);
+    const { el } = U.modal({
+      titulo: v.nombre || conAlojamiento(v).map(d => d.nombre).join(' → ') || 'Viaje',
+      cuerpo: `<div class="menu-acciones">${ops.map(([id, ic, t]) => `<button type="button" class="menu-op ${id === 'eliminar' ? 'peligro' : ''}" data-op="${id}"><span>${ic}</span>${t}</button>`).join('')}</div>`
+    });
+    el.querySelectorAll('[data-op]').forEach(b => b.onclick = async () => {
+      const op = b.dataset.op;
+      U.cerrarModal();
+      if (op === 'editar') abrirAsistente(v);
+      else if (op === 'viajeros') location.hash = `#viaje/${v.id}/viajeros`;
+      else if (op === 'portada') elegirPortada(v);
+      else if (op === 'pdf') R.itinerarioPdf.descargar(v);
+      else if (op === 'eliminar') {
+        const ok = await U.confirmar(`Se borra "${v.nombre || v.destino}" con sus pasos, documentos y gastos. No se puede deshacer.`, { titulo: 'Eliminar viaje', textoSi: 'Eliminar', peligro: true });
+        if (!ok) return;
+        await R.db.eliminarViaje(v.id);
+        location.hash = '#inicio';
+        U.toast('Viaje eliminado.');
+      }
+    });
+  }
+
   function renderViaje(app, v, pestana) {
     const prog = R.motor.progreso(v);
     const tipo = tipoDe(v);
     const personas = v.participantes.map(id => R.db.persona(id)).filter(Boolean);
     if (!PESTANAS.some(p => p.id === pestana)) pestana = 'guia';
 
+    const grande = pestana === 'guia';
+    const titulo = v.nombre || conAlojamiento(v).map(d => d.nombre).join(' → ') || v.destino;
     app.innerHTML = `
-      <section class="portada-viaje" style="background:${R.paisaje.fondo(v)}">
+      <section class="portada-viaje ${grande ? '' : 'portada-compacta'}" style="background:${R.paisaje.fondo(v)}">
         ${U.paisaje(v)}
+        <button class="btn-menu-viaje" data-a="menu" aria-label="Opciones del viaje">⋯</button>
         <div class="portada-contenido">
-          <div class="portada-fila">
-            <div>
-              <span class="etiqueta-clara">${esc([v.tipo === 'trabajo' || v.tipo === 'otro' ? tipo.icono + ' ' + tipo.nombre : R.paisaje.TEMAS[R.paisaje.tema(v)].icono + ' ' + R.paisaje.TEMAS[R.paisaje.tema(v)].nombre, etiquetaTransporte(v), v.perfil.internacional ? '🌎 Internacional' : '', v.perfil.paquete ? '📦 Paquete' : ''].filter(Boolean).join(' · '))}</span>
-              <h1>${esc(v.nombre || conAlojamiento(v).map(d => d.nombre).join(' → ') || v.destino)}</h1>
-              <p class="portada-meta">${esc(destinoCompleto(v))} · ${esc(U.fmtRango(v.fechaInicio, v.fechaFin))}</p>
-              <p class="portada-cuenta">${esc(cuentaRegresiva(v))}</p>
-              <div class="portada-avatares">${personas.map(p => U.avatar(p, 30)).join('')}</div>
-            </div>
-            <div class="portada-lado">
-              ${U.anillo(prog.pct, 92, 'listo')}
-              <div class="portada-acciones">
-                ${R.db.puedeOrganizar(v) ? '<button class="btn btn-vidrio btn-chico" data-a="portada" title="Elegir el estilo de la portada">🎨 Portada</button><button class="btn btn-vidrio btn-chico" data-a="editar">Editar</button>' : ''}
-                ${R.db.esDueno(v) ? '<button class="btn btn-vidrio btn-chico" data-a="eliminar" title="Eliminar viaje">Eliminar</button>' : ''}
-              </div>
-            </div>
-          </div>
+          <h1>${esc(titulo)}</h1>
+          <p class="portada-meta">${esc(U.fmtRango(v.fechaInicio, v.fechaFin))} · <strong>${esc(cuentaRegresiva(v))}</strong></p>
+          ${grande ? `
+          <div class="portada-pie">
+            <a class="portada-avatares" href="#viaje/${v.id}/viajeros" title="Viajeros">${personas.map(p => U.avatar(p, 30)).join('')}<span class="pa-mas">${personas.length > 1 ? personas.length + ' viajeros' : '+ Viajeros'}</span></a>
+            <div class="portada-avance"><span><strong>${prog.pct}%</strong> organizado</span><span class="barra-progreso"><span style="width:${prog.pct}%"></span></span></div>
+          </div>` : ''}
         </div>
       </section>
       <nav class="pestanas" role="tablist">
-        ${PESTANAS.map(p => `<a role="tab" href="#viaje/${v.id}/${p.id}" class="pestana ${p.id === pestana ? 'activa' : ''}"><span>${p.icono}</span>${p.nombre}</a>`).join('')}
+        ${PESTANAS.filter(p => !p.oculta).map(p => `<a role="tab" href="#viaje/${v.id}/${p.id}" class="pestana ${p.id === pestana ? 'activa' : ''}"><span>${p.icono}</span>${p.nombre}</a>`).join('')}
       </nav>
       <section class="contenido-pestana" id="contPestana"></section>`;
 
+    app.querySelector('[data-a="menu"]').onclick = () => menuViaje(v);
     app.classList.toggle('rol-viajero', !R.db.puedeOrganizar(v));
-    const bEditar = app.querySelector('[data-a="editar"]');
-    if (bEditar) bEditar.onclick = () => abrirAsistente(v);
-    const bPortada = app.querySelector('[data-a="portada"]');
-    if (bPortada) bPortada.onclick = () => elegirPortada(v);
-    const bEliminar = app.querySelector('[data-a="eliminar"]');
-    if (bEliminar) bEliminar.onclick = async () => {
-      const ok = await U.confirmar(`Se va a borrar "${v.nombre || v.destino}" con sus pasos, documentos y gastos. No se puede deshacer.`, { titulo: 'Eliminar viaje', textoSi: 'Eliminar', peligro: true });
-      if (!ok) return;
-      await R.db.eliminarViaje(v.id);
-      location.hash = '#inicio';
-      U.toast('Viaje eliminado.');
-    };
-
     // En el celular, la pestaña activa queda siempre a la vista
     const barraPestanas = app.querySelector('.pestanas');
     const activa = app.querySelector('.pestana.activa');

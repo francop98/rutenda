@@ -122,7 +122,7 @@ R.valija = (function () {
         <div>
           <h2 class="titulo-seccion">Armador de valija</h2>
           <p class="texto-suave">${ida
-            ? (prog.total ? `${prog.hechos} de ${prog.total} cosas guardadas para salir.` : 'Armá tu lista como quieras: libre, con tus listas personalizadas o con sugerencias para este viaje.')
+            ? (prog.total ? `${prog.hechos} de ${prog.total} cosas guardadas para salir.` : 'Sumá lo sugerido para este viaje o escribí lo que quieras.')
             : (prog.total ? `${prog.hechos} de ${prog.total} cosas listas para volver.` : 'Cuando armes la valija de ida, acá vas a poder chequear que vuelvas con todo.')}</p>
         </div>
         ${prog.total ? `<button class="btn btn-primario" data-a="armar">${ida ? '🧳 Armar paso a paso' : '🏠 Chequear la vuelta'}</button>` : ''}
@@ -143,7 +143,7 @@ R.valija = (function () {
               <select id="vjCat">${opcionesCategoria('otros')}</select>
               <button class="btn btn-primario" data-a="agregar">Agregar</button>
             </div>
-            <p class="ayuda">${ida ? 'Lo que agregues acá queda solo en este viaje: no cambia tus listas personalizadas.' : 'Tocá cada cosa cuando la guardes. Si algo no vuelve (se terminó o lo regalaste), marcá "No vuelve".'}</p>
+            <p class="ayuda">${ida ? 'Queda solo en este viaje.' : 'Tocá cada cosa cuando la guardes. Si algo no vuelve (se terminó o lo regalaste), marcá "No vuelve".'}</p>
           </div>
 
           ${grupos.length ? grupos.map(g => `
@@ -159,14 +159,14 @@ R.valija = (function () {
             <div class="vacio">
               <div class="vacio-icono">${ida ? '🧳' : '🏠'}</div>
               <h3>${ida ? 'Tu valija está vacía' : 'Todavía no hay nada para chequear'}</h3>
-              <p>${ida ? 'Elegí cómo arrancar: una de tus listas, las sugerencias para este viaje o escribí lo que quieras arriba (lista libre).' : 'Primero tildá lo que guardás para ir: eso es lo que después tenés que traer de vuelta.'}</p>
+              <p>${ida ? 'Arrancá con las sugerencias o escribí lo que quieras.' : 'Primero tildá lo que guardás para ir: eso es lo que después tenés que traer de vuelta.'}</p>
             </div>`}
         </div>
 
         ${ida ? `<aside class="col-lateral">
           <div class="bloque">
-            <h4>Mis listas personalizadas</h4>
-            <p class="texto-suave">Se copian a este viaje; después podés sumar o quitar cosas sin tocar la lista original.</p>
+            <h4>Mis listas</h4>
+            <p class="texto-suave">Se copian a este viaje sin cambiar la original.</p>
             ${listas.length ? `<div class="listas-elegir">${listas.map(l => `
               <button class="lista-op ${val.listas.includes(l.id) ? 'usada' : ''}" data-lista="${l.id}">
                 <span><strong>${esc(l.nombre)}</strong><small>${U.plural(l.items.length, 'cosa', 'cosas')}${val.listas.includes(l.id) ? ' · ya agregada' : ''}</small></span>
@@ -177,7 +177,7 @@ R.valija = (function () {
           ${sug.length ? `
             <div class="bloque">
               <h4>Sugeridos para este viaje</h4>
-              <p class="texto-suave">Según destino, fechas, transporte y viajeros.</p>
+              <p class="texto-suave">Según destino, fechas y transporte.</p>
               <ul class="lista-sugerencias">${sug.map((x, i) => `<li><span>${categoria(x[0]).icono} ${esc(x[1])}</span><button class="btn-icono" data-sug="${i}" title="Agregar">+</button></li>`).join('')}</ul>
               <button class="btn btn-suave btn-chico" data-a="todasSug">Agregar todas</button>
             </div>` : ''}
@@ -354,7 +354,7 @@ R.valija = (function () {
     app.innerHTML = `
       <section class="encabezado-simple">
         <h1>Mis listas de valija</h1>
-        <p class="texto-suave">Armá listas con lo que llevás siempre. En cada viaje las agregás y después sumás lo particular de ese viaje.</p>
+        <p class="texto-suave">Lo que llevás siempre. En cada viaje la sumás con un toque.</p>
       </section>
       <div class="acciones-fila">
         <button class="btn btn-primario" data-a="nueva">+ Nueva lista</button>

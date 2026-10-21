@@ -56,7 +56,7 @@ R.participantes = (function () {
       ${nube && organiza ? `
         <div class="bloque bloque-invitar">
           <h3 class="bloque-titulo">🔗 Compartir el viaje</h3>
-          <p class="texto-suave">Mandá el enlace a quienes viajan con vos. Al entrar con su cuenta eligen quiénes son y quedan vinculados.
+          <p class="texto-suave">Mandales el enlace: entran con su cuenta y ya ven el viaje.
             Los <strong>viajeros</strong> ven todo, cargan sus gastos y documentos y tildan su valija; los <strong>coorganizadores</strong> además editan la organización.</p>
           ${invitacion ? `
             <div class="enlace-invitacion"><code>${esc(enlace(invitacion.codigo))}</code></div>
@@ -66,7 +66,7 @@ R.participantes = (function () {
               <button class="btn btn-texto peligro" data-a="desactivar">Desactivar enlace</button>
             </div>` : `<button class="btn btn-primario" data-a="invitar">Crear enlace para invitar</button>`}
         </div>` : ''}
-      ${!nube ? '<p class="ayuda">Para compartir el viaje con tus compañeros, Rutenda tiene que estar conectado a tu cuenta en la nube.</p>' : ''}
+      ${!nube ? '<p class="ayuda">Para compartir el viaje, entrá con tu cuenta en la nube.</p>' : ''}
 
       ${organiza ? `
         <div class="bloque">
