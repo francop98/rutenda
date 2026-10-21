@@ -565,7 +565,7 @@ R.formularios = (function () {
         <span>${esc(c.etiqueta)}</span>
         <input type="hidden" data-campo="${c.id}" data-lista="${clave.lista}" data-item="${clave.i}" value="${esc(val)}">
         <div class="aero-chips">${sug.map(chip).join('')}${elegido ? chip(elegido) : ''}</div>
-        <input type="text" class="aero-manual" maxlength="3" placeholder="${sug.length ? 'Otro: código de 3 letras' : 'Código del aeropuerto (3 letras, ej. MAD)'}" data-aero-manual="${clave.lista}|${clave.i}|${c.id}">
+        <input type="text" class="aero-manual" maxlength="3" placeholder="${sug.length ? 'Otro (código)' : 'Código, ej. MAD'}" data-aero-manual="${clave.lista}|${clave.i}|${c.id}">
       </div>`;
     }
 
@@ -654,10 +654,11 @@ R.formularios = (function () {
         leer();
         const error = validar(p);
         if (error) { U.toast(error); return; }
-        if (paso < pasos().length - 1) { paso++; pintar(); cont.scrollIntoView({ block: 'start' }); } else guardar();
+        if (paso < pasos().length - 1) { paso++; pintar(); arriba(); } else guardar();
       };
       const atras = cont.querySelector('[data-a="atras"]');
-      if (atras) atras.onclick = () => { leer(); paso--; pintar(); };
+      if (atras) atras.onclick = () => { leer(); paso--; pintar(); arriba(); };
+      function arriba() { const c = cont.closest('.modal-cuerpo'); if (c) c.scrollTop = 0; const m = cont.closest('.modal'); if (m) m.scrollTop = 0; }
       cont.querySelector('[data-a="sinDatos"]').onclick = () => {
         if (previo.datos) { U.cerrarModal(); return; }
         R.motor.setEstado(v, tareaId, 'hecha');
@@ -708,6 +709,18 @@ R.formularios = (function () {
         pintar();
       });
       cont.querySelectorAll('[data-rerender]').forEach(x => x.onchange = () => { leer(); pintar(); });
+      // Fechas vacías: el calendario arranca en la fecha anterior del formulario (la llegada en la salida, etc.)
+      const fechas = Array.from(cont.querySelectorAll('input[type="date"][data-campo]'));
+      fechas.forEach((el, i) => {
+        const poner = () => {
+          if (el.value) return;
+          const prev = fechas.slice(0, i).reverse().find(x => x.value);
+          const f = prev ? prev.value : (ctx.fecha || (ctx.seg && ctx.seg.sale && ctx.seg.sale.fecha) || v.fechaInicio || '');
+          if (f) el.value = f;
+        };
+        el.addEventListener('pointerdown', poner);
+        el.addEventListener('focus', poner);
+      });
       const archivo = cont.querySelector('#fpArchivos');
       if (archivo) archivo.onchange = () => { archivosNuevos = archivosNuevos.concat(Array.from(archivo.files)); pintar(); };
       const esc2 = cont.querySelector('[data-a="escanear"]');

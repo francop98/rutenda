@@ -1475,3 +1475,140 @@ body.sin-scroll { position: fixed; left: 0; right: 0; width: 100%; overflow: hid
 .portada-opcion.activa { border-color: var(--oro, #D4AF6A); }
 .portada-muestra { position: relative; display: block; height: 78px; border-radius: 12px; overflow: hidden; }
 .portada-muestra .paisaje { height: 100%; }
+
+/* ---------- v12 · Campos que no se pisan ---------- */
+.campo input, .campo select, .campo textarea { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.form-grilla { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.form-grilla > * { min-width: 0; }
+/* En iPhone los campos de fecha y hora tienen un ancho mínimo propio que los hacía pisar al de al lado */
+.campo input[type="date"], .campo input[type="time"], .cr-seg input[type="date"], .cr-seg input[type="time"] {
+  -webkit-appearance: none; appearance: none; display: block; width: 100%; min-width: 0; text-align: left;
+}
+input[type="date"]::-webkit-date-and-time-value, input[type="time"]::-webkit-date-and-time-value { text-align: left; margin: 0; }
+.chip-aero { max-width: 100%; min-width: 0; }
+.chip-aero small { max-width: 100%; }
+.aero-chips { min-width: 0; }
+.aero-chips .chip-aero { flex: 1 1 auto; }
+@media (max-width: 760px) {
+  .form-grilla { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  /* Los aeropuertos van a lo ancho: las etiquetas largas y los chips no entran en media columna */
+  .form-grilla > .campo-aero { grid-column: 1 / -1; }
+  .form-grilla > .campo.medio > span { min-height: 1.3em; }
+}
+
+/* ---------- v12 · Botón Volver ---------- */
+.btn-atras {
+  display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px 6px 4px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--tinta); font: inherit; font-weight: 600; font-size: .95rem; cursor: pointer;
+}
+.btn-atras[hidden] { display: none; }
+.btn-atras svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.btn-atras:hover { background: var(--arena-2); }
+body.sin-sesion .btn-atras { display: none; }
+@media (max-width: 760px) {
+  .barra { position: sticky; }
+  .btn-atras { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); margin-top: calc(env(safe-area-inset-top) / 2); }
+  .btn-atras span { display: none; }
+  .btn-atras { padding: 8px; }
+}
+
+/* ---------- v12 · Inicio con viajes ---------- */
+body.fondo-inicio {
+  background:
+    radial-gradient(900px 420px at 100% -80px, color-mix(in srgb, var(--oro, #D4AF6A) 22%, transparent), transparent 70%),
+    radial-gradient(700px 380px at -10% 30%, color-mix(in srgb, var(--mar, #1F3A36) 10%, transparent), transparent 70%),
+    var(--arena);
+  background-attachment: fixed;
+}
+.saludo-inicio {
+  position: relative; overflow: hidden; isolation: isolate;
+  padding: 22px 22px 20px; border-radius: 24px; margin: 20px 0 16px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--papel) 92%, transparent), color-mix(in srgb, var(--arena-2) 80%, transparent));
+  border: 1px solid var(--linea); box-shadow: var(--sombra);
+}
+.saludo-inicio > div { position: relative; z-index: 1; }
+.saludo-inicio > .btn { position: relative; z-index: 1; }
+.inicio-deco { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+.id-curva { fill: none; stroke: color-mix(in srgb, var(--oro, #D4AF6A) 30%, transparent); stroke-width: 1.2; }
+.id-curva-2 { stroke: color-mix(in srgb, var(--mar, #1F3A36) 12%, transparent); }
+.id-ruta { fill: none; stroke: var(--oro, #D4AF6A); stroke-width: 2.4; stroke-linecap: round; stroke-dasharray: 0.1 9; opacity: .8; }
+.id-punto { fill: var(--mar, #1F3A36); opacity: .55; }
+.id-meta { fill: var(--oro, #D4AF6A); opacity: .9; }
+.id-meta-c { fill: var(--papel); }
+.fecha-hoy { margin: 0 0 2px; font-size: .78rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--oro-oscuro, #B08A43); }
+.fecha-hoy::first-letter { text-transform: uppercase; }
+
+.destacado { display: block; }
+.destacado-portada { position: relative; display: flex; flex-direction: column; min-height: 300px; padding: 22px; }
+.dp-enlace { position: absolute; inset: 0; z-index: 2 !important; border-radius: inherit; }
+.dp-arriba { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dp-arriba .destacado-cuenta { margin: 0; font-size: .95rem; padding: 4px 12px; border-radius: 999px; background: rgba(255, 255, 255, .2); backdrop-filter: blur(6px); }
+.destacado-portada h2 { margin: 14px 0 4px; }
+.dp-meta { margin: 0 0 18px; opacity: .92; }
+.dp-pie {
+  margin-top: auto; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 14px; border-radius: 18px; color: var(--tinta);
+  background: color-mix(in srgb, var(--papel) 90%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+}
+.dp-avance { display: flex; align-items: center; gap: 10px; }
+.dp-avance small, .dp-siguiente small { display: block; color: var(--tinta-suave); font-size: .74rem; }
+.dp-avance strong { font-size: .95rem; }
+.dp-siguiente { flex: 1 1 160px; min-width: 0; padding-left: 14px; border-left: 1px solid var(--linea); }
+.dp-siguiente small { text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+.dp-siguiente strong { display: block; font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dp-boton { position: relative; z-index: 3; min-height: 38px; }
+.destacado-portada .anillo-centro { background: var(--papel); }
+@media (max-width: 760px) {
+  .destacado-portada { min-height: 340px; padding: 18px; }
+  .dp-siguiente { flex-basis: 100%; padding-left: 0; border-left: 0; border-top: 1px solid var(--linea); padding-top: 10px; }
+  .dp-boton { flex: 1; }
+  .saludo-inicio { padding: 18px; }
+}
+@media (min-width: 761px) { .inicio-deco { left: auto; right: 0; width: min(62%, 620px); } }
+
+/* ---------- v12 · Gastos e ingresos ---------- */
+.grilla-monto > *, .grilla-2 > * { min-width: 0; }
+.gr-botones { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.gr-botones .btn-grande { width: 100%; padding: 15px 10px; font-size: 1rem; }
+.gr-signo { font-size: 1.3rem; line-height: 1; font-weight: 700; margin-right: 2px; }
+.gr-ingreso { background: color-mix(in srgb, var(--salvia) 16%, var(--papel)); color: var(--tinta); border: 1px solid color-mix(in srgb, var(--salvia) 45%, transparent); }
+.gr-ingreso .gr-signo { color: var(--salvia); }
+.gr-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.gr-cab small { color: var(--tinta-suave); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
+.gr-chips { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.gr-chip-nueva { border-style: dashed; color: var(--tinta-suave); }
+.gr-chip-nueva span { color: var(--oro); }
+@media (max-width: 760px) {
+  .gr-chips { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grilla-2.grilla-fh { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+}
+
+/* ---------- v12 · Sitios oficiales ---------- */
+.detalle-enlaces { display: grid; gap: 8px; margin: 12px 0; }
+.detalle-enlaces h4 { margin: 0; }
+.enlace-oficial {
+  display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center;
+  padding: 10px 12px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--papel);
+  color: var(--tinta); font-weight: 600; text-decoration: none;
+}
+.enlace-oficial span { grid-row: span 2; font-size: 1.1rem; }
+.enlace-oficial small { color: var(--tinta-tenue); font-weight: 500; font-size: .78rem; }
+.enlace-oficial:hover { border-color: var(--mar); }
+
+/* ---------- v12 · Ciudades guardadas y opciones que suman pasos ---------- */
+.origen-fijo { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--papel); }
+.origen-fijo > span { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.origen-fijo small { color: var(--tinta-tenue); }
+.lugar-sugeridos { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.lugar-sugeridos:empty { display: none; }
+.lugar-sugeridos small { color: var(--tinta-tenue); font-size: .78rem; margin-right: 2px; }
+.chip-lugar { padding: 5px 10px; border-radius: 999px; border: 1px solid var(--linea); background: var(--papel); color: var(--tinta); font: inherit; font-size: .84rem; cursor: pointer; }
+.chip-lugar:hover { border-color: var(--mar); }
+.extras-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.extra-op { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--papel); cursor: pointer; }
+.extra-op input { width: 18px; height: 18px; accent-color: var(--mar); }
+.extra-op .eo-icono { font-size: 1.2rem; }
+.extra-op strong { display: block; font-size: .92rem; }
+.extra-op small { color: var(--tinta-tenue); font-size: .78rem; }
+.extra-op.activo { border-color: var(--mar); background: var(--mar-claro); }

@@ -95,6 +95,12 @@ R.cronogramaEditor = (function () {
       const est = C().ESTADOS[s.estado] || C().ESTADOS.a_definir;
       const dur = C().duracion(s);
       const nocturno = s.sale.fecha && s.llega.fecha && s.llega.fecha > s.sale.fecha;
+      // Última fecha conocida antes de este traslado: el calendario arranca desde ahí
+      let previa = '';
+      for (const x of C().todosLosSegmentos(b.recorrido)) {
+        if (x.seg === s) break;
+        previa = C().fechaLlega(x.seg) || x.seg.sale.fecha || previa;
+      }
       return `
         <div class="cr-seg" data-seg="${s.id}">
           <div class="cr-seg-cab">
@@ -106,8 +112,8 @@ R.cronogramaEditor = (function () {
           ${s.medio === 'otro' ? `<input class="campo-otro" data-cr-otro="${clave}" value="${esc(s.medioOtro || '')}" placeholder="¿Cuál? Ej: combi, motorhome, bici">` : ''}
           ${b.sinFechas ? '' : `
           <div class="cr-horarios">
-            <div class="cr-hora"><small>Sale</small><input type="date" data-cr-f="${clave}|sale|fecha" value="${esc(s.sale.fecha)}"><input type="time" data-cr-f="${clave}|sale|hora" value="${esc(s.sale.hora)}"></div>
-            <div class="cr-hora"><small>Llega</small><input type="date" data-cr-f="${clave}|llega|fecha" value="${esc(s.llega.fecha)}" min="${esc(s.sale.fecha)}"><input type="time" data-cr-f="${clave}|llega|hora" value="${esc(s.llega.hora)}"></div>
+            <div class="cr-hora"><small>Sale</small><input type="date" data-cr-f="${clave}|sale|fecha" value="${esc(s.sale.fecha)}" ${previa ? `min="${previa}" data-sugerir="${previa}"` : ''}><input type="time" data-cr-f="${clave}|sale|hora" value="${esc(s.sale.hora)}"></div>
+            <div class="cr-hora"><small>Llega</small><input type="date" data-cr-f="${clave}|llega|fecha" value="${esc(s.llega.fecha)}" ${s.sale.fecha || previa ? `min="${s.sale.fecha || previa}" data-sugerir="${s.sale.fecha || previa}"` : ''}><input type="time" data-cr-f="${clave}|llega|hora" value="${esc(s.llega.hora)}"></div>
           </div>
           <p class="cr-nota">${[
             dur != null && dur >= 0 ? `⏱ ${C().fmtDuracion(dur)} de viaje` : '',
@@ -207,6 +213,7 @@ R.cronogramaEditor = (function () {
       });
       q('[data-cr-otro]').forEach(x => x.oninput = () => { seg(x.dataset.crOtro).medioOtro = x.value.trim(); });
 
+      U.sugerirFechas(cont);
       // Fechas y horas: se aplican al salir del campo (no se pierde el foco mientras escribís)
       q('[data-cr-f]').forEach(x => x.onblur = () => {
         const [ti, si, cual, campo] = x.dataset.crF.split('|');
@@ -251,7 +258,7 @@ R.cronogramaEditor = (function () {
       });
       q('[data-cr-parada]').forEach(x => x.onclick = () => { paradaAbierta = Number(x.dataset.crParada); pintar(); });
       const cp = cont.querySelector('#crLugarParada');
-      if (cp) { campoParada = R.lugares.campo(cp, { placeholder: 'Escribí la ciudad' }); campoParada.input.focus(); }
+      if (cp) { campoParada = R.lugares.campo(cp, { placeholder: 'Escribí la ciudad', sugeridos: R.lugares.recientes([b.origen].concat(b.destinos || [])) }); campoParada.input.focus(); }
       const conf = cont.querySelector('[data-cr="confirmarParada"]');
       if (conf) conf.onclick = () => {
         const l = campoParada.obtener();

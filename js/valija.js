@@ -28,16 +28,6 @@ R.valija = (function () {
   const categoria = id => CATEGORIAS.find(c => c.id === id) || CATEGORIAS[CATEGORIAS.length - 1];
   const opcionesCategoria = sel => CATEGORIAS.map(c => `<option value="${c.id}" ${c.id === sel ? 'selected' : ''}>${c.icono} ${c.nombre}</option>`).join('');
 
-  const BASICO = [
-    ['documentos', 'DNI / pasaporte'], ['documentos', 'Tarjetas y efectivo'], ['documentos', 'Reservas y pasajes en el celular'],
-    ['ropa', 'Ropa interior'], ['ropa', 'Medias'], ['ropa', 'Remeras'], ['ropa', 'Pantalones'], ['ropa', 'Abrigo'], ['ropa', 'Pijama'],
-    ['calzado', 'Zapatillas cómodas'], ['calzado', 'Ojotas'],
-    ['higiene', 'Cepillo y pasta de dientes'], ['higiene', 'Desodorante'], ['higiene', 'Shampoo y acondicionador'], ['higiene', 'Protector solar'],
-    ['salud', 'Medicación habitual'], ['salud', 'Analgésicos'], ['salud', 'Curitas'],
-    ['electronica', 'Celular y cargador'], ['electronica', 'Auriculares'], ['electronica', 'Batería externa'],
-    ['otros', 'Lentes de sol'], ['otros', 'Botella reutilizable']
-  ];
-
   /* ---------- Datos del viaje ---------- */
   /** La valija de una persona del viaje (por defecto, la tuya). Cada viajero arma la suya. */
   function valijaDe(v, personaId) {
@@ -149,7 +139,7 @@ R.valija = (function () {
           <div class="bloque">
             <h3 class="bloque-titulo">${ida ? 'Agregar a esta valija' : 'Algo nuevo que traés'}</h3>
             <div class="fila-agregar fila-valija">
-              <input id="vjTexto" placeholder="${ida ? 'Escribí lo que necesites (ej: cámara de fotos)' : 'Ej: regalos, artesanías, compras'}">
+              <input id="vjTexto" placeholder="${ida ? 'Agregá algo más' : 'Ej: regalos, artesanías, compras'}">
               <select id="vjCat">${opcionesCategoria('otros')}</select>
               <button class="btn btn-primario" data-a="agregar">Agregar</button>
             </div>
@@ -368,7 +358,6 @@ R.valija = (function () {
       </section>
       <div class="acciones-fila">
         <button class="btn btn-primario" data-a="nueva">+ Nueva lista</button>
-        ${!listas.some(l => l.nombre === 'Básico para cualquier viaje') ? '<button class="btn btn-suave" data-a="basica">Crear "Básico para cualquier viaje"</button>' : ''}
       </div>
       ${listas.length ? `<div class="grilla-listas">${listas.map(l => `
         <article class="bloque lista-personal" data-id="${l.id}">
@@ -389,7 +378,7 @@ R.valija = (function () {
         <div class="vacio">
           <div class="vacio-icono">📝</div>
           <h3>Todavía no tenés listas</h3>
-          <p>Por ejemplo: "Básico", "Playa", "Nieve", "Viaje con los chicos". Después las sumás a cualquier viaje con un toque.</p>
+          <p>Por ejemplo: "Playa", "Nieve", "Viaje de trabajo". Después las sumás a cualquier viaje con un toque.</p>
         </div>`}`;
 
     const guardar = l => { R.db.guardarListaValija(l); R.app.refrescar(); };
@@ -399,8 +388,6 @@ R.valija = (function () {
       R.app.refrescar();
       setTimeout(() => { const i = document.querySelector(`[data-renombrar="${l.id}"]`); if (i) { i.focus(); i.select(); } }, 30);
     };
-    const basica = app.querySelector('[data-a="basica"]');
-    if (basica) basica.onclick = () => guardar({ id: U.id('lst'), nombre: 'Básico para cualquier viaje', items: BASICO.map(([categoria, texto]) => ({ id: U.id('it'), texto, categoria })) });
     app.querySelectorAll('[data-renombrar]').forEach(x => x.onchange = () => {
       const l = R.db.listasValija().find(y => y.id === x.dataset.renombrar);
       l.nombre = x.value.trim() || 'Lista sin nombre';

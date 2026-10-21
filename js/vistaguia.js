@@ -363,6 +363,7 @@ R.vistaGuia = (function () {
         ${t.esperaVentana ? `<p class="aviso-suave">⏳ Se habilita el ${U.fmtFecha(t.habilitaEl, 'largo')}. Hasta entonces queda en tus pendientes.</p>`
           : t.postergado ? '<p class="aviso-suave">📋 Está en tus pendientes. <button type="button" class="btn-texto-mini" data-a="reactivar">Volver a la guía</button></p>' : ''}
         ${t.desc ? `<p class="detalle-desc">${esc(t.desc)}</p>` : ''}
+        ${t.enlaces && t.enlaces.length ? `<div class="detalle-enlaces"><h4>Dónde hacerlo</h4>${t.enlaces.map(e => `<a class="enlace-oficial" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer"><span>🔗</span>${esc(e.texto)}<small>${esc(new URL(e.url).hostname.replace(/^www\./, ''))}</small></a>`).join('')}</div>` : ''}
         ${t.tieneFormulario && !t.esperaVentana ? `
           <div class="detalle-datos">
             <div class="bloque-cab"><h4>Datos cargados</h4><button type="button" class="btn ${datos.datos ? 'btn-suave' : 'btn-primario'} btn-chico" data-a="formulario">${datos.datos ? 'Editar datos' : (t.estado === 'hecha' ? 'Cargar datos' : 'Listo, cargar datos')}</button></div>

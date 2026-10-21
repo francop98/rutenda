@@ -33,6 +33,7 @@ R.motor = (function () {
       desc: typeof t.desc === 'function' ? t.desc(v, ctx || {}) : t.desc,
       consejo: typeof t.consejo === 'function' ? t.consejo(v, ctx || {}) : t.consejo,
       porque: typeof t.porque === 'function' ? t.porque(v, ctx || {}) : t.porque,
+      enlaces: typeof t.enlaces === 'function' ? t.enlaces(v, ctx || {}) : (t.enlaces || []),
       impacto: typeof t.impacto === 'function' ? t.impacto(v, ctx || {}) : t.impacto,
       anticipacion: typeof t.anticipacion === 'function' ? t.anticipacion(v, ctx || {}) : t.anticipacion,
       dependeDe: (t.dependeDe || []).slice(),

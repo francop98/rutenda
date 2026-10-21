@@ -5,7 +5,7 @@
 window.R = window.R || {};
 
 /** Versión de la app (cambios chicos: 10.1, 10.2…; cambios grandes: 11, 12…). Igual que VERSION en sw.js. */
-window.R.VERSION = '11';
+window.R.VERSION = '12';
 
 R.util = (function () {
   const pad = n => String(n).padStart(2, '0');
@@ -251,6 +251,18 @@ R.util = (function () {
     return MONEDAS.map(m => `<option value="${m}" ${m === seleccionada ? 'selected' : ''}>${m}</option>`).join('');
   }
 
+  /**
+   * Fechas vacías con data-sugerir: al abrir el calendario arranca en esa fecha
+   * (por ejemplo, la vuelta arranca en la fecha de ida) en vez de en hoy.
+   */
+  function sugerirFechas(cont) {
+    cont.querySelectorAll('input[type="date"][data-sugerir]').forEach(el => {
+      const poner = () => { if (!el.value && el.dataset.sugerir) el.value = el.dataset.sugerir; };
+      el.addEventListener('pointerdown', poner);
+      el.addEventListener('focus', poner);
+    });
+  }
+
   /** Campo de contraseña con botón para mostrarla u ocultarla. */
   function campoClave(id, etiqueta, autocomplete) {
     return `<label class="campo campo-clave"><span>${esc(etiqueta)}</span>
@@ -272,7 +284,7 @@ R.util = (function () {
   }
 
   return {
-    campoClave, enlazarClaves,
+    campoClave, enlazarClaves, sugerirFechas,
     MONEDAS, fondoBloqueado, id, esc, aISO, hoyISO, aFecha, sumarDias, diasEntre, fmtFecha, fmtRango, plural,
     redondear, fmtMoneda, fmtTamano, numero, hash, portada, colorPersona, iniciales, avatar,
     anillo, saludo, frase, paisaje, modal, cerrarModal, confirmar, toast, opcionesMoneda

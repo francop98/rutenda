@@ -24,6 +24,7 @@
     }
     document.body.classList.remove('sin-sesion');
     app.classList.remove('rol-viajero');
+    document.body.classList.remove('fondo-inicio');
     const hash = location.hash.replace(/^#/, '') || 'inicio';
     const [vista, id, pestana] = hash.split('/');
     document.querySelectorAll('[data-nav]').forEach(a => {
@@ -149,10 +150,18 @@
     const otrosProximos = planificando.filter(v => v !== destacado).slice(0, 3);
     const hayViajes = viajes.length > 0;
 
+    document.body.classList.toggle('fondo-inicio', hayViajes);
     app.innerHTML = `
       ${hayViajes ? `
       <section class="saludo-inicio">
+        <svg class="inicio-deco" viewBox="0 0 600 160" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
+          <path class="id-curva" d="M-20 130 C 90 60, 180 150, 280 90 S 470 30, 620 70"/>
+          <path class="id-curva id-curva-2" d="M-20 150 C 110 100, 220 170, 330 120 S 500 70, 620 100"/>
+          <path class="id-ruta" d="M60 118 C 160 70, 240 130, 330 92 S 470 46, 548 58"/>
+          <circle class="id-punto" cx="60" cy="118" r="5"/><circle class="id-meta" cx="548" cy="58" r="9"/><circle class="id-meta-c" cx="548" cy="58" r="3.5"/>
+        </svg>
         <div>
+          <p class="fecha-hoy">${esc(new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
           <p class="hero-saludo">${U.saludo()}${esc(nombre)} ☀️</p>
           <h1>${enCurso.length ? '¡Buen viaje!' : destacado ? '¿Seguimos organizando?' : '¿A dónde vamos?'}</h1>
         </div>
@@ -212,7 +221,7 @@
     const est = R.viajes.estadoViaje(v);
     return `
       <a class="fila-viaje" href="#viaje/${v.id}/guia">
-        <span class="fv-portada" style="background:${U.portada(v.destino)}">${R.viajes.tipoDe(v).icono}</span>
+        <span class="fv-portada" style="background:${R.paisaje.fondo(v)}">${R.paisaje.TEMAS[R.paisaje.tema(v)].icono}</span>
         <span class="fv-texto">
           <strong>${esc(v.nombre || (v.destinos || []).filter(d => !d.soloDia).map(d => d.nombre).join(' → ') || v.destino)}</strong>
           <small>${esc(U.fmtRango(v.fechaInicio, v.fechaFin))} · ${esc(R.viajes.cuentaRegresiva(v))}</small>
@@ -291,28 +300,33 @@
   function destacadoHTML(v) {
     const prog = R.motor.progreso(v);
     const prox = R.motor.proximos(v, 1)[0];
+    const viajando = R.viajes.estadoViaje(v) === 'en_curso';
+    // Todo dentro de la tarjeta: portada, cuenta regresiva, avance y lo que sigue
     return `
       <section class="destacado">
-        <a class="destacado-portada" href="#viaje/${v.id}/guia" style="background:${R.paisaje.fondo(v)}">
+        <article class="destacado-portada" style="background:${R.paisaje.fondo(v)}">
           ${U.paisaje(v)}
-          <span class="etiqueta-clara">${R.viajes.estadoViaje(v) === 'en_curso' ? 'Viajando ahora' : 'Tu próximo viaje'}</span>
-          <h2>${esc(v.nombre || (v.destinos || []).filter(d => !d.soloDia).map(d => d.nombre).join(' → ') || v.destino)}</h2>
-          <p>${esc(R.viajes.destinoCompleto(v))} · ${esc(U.fmtRango(v.fechaInicio, v.fechaFin))}</p>
-          <strong class="destacado-cuenta">${esc(R.viajes.cuentaRegresiva(v))}</strong>
-        </a>
-        <div class="destacado-lado">
-          <div class="destacado-progreso">
-            ${U.anillo(prog.pct, 76)}
-            <div><strong>${prog.hechas} de ${prog.total} pasos</strong><small class="texto-suave">organizados</small></div>
+          <a class="dp-enlace" href="#viaje/${v.id}/guia" aria-label="Abrir ${esc(v.nombre || v.destino || 'el viaje')}"></a>
+          <div class="dp-arriba">
+            <span class="etiqueta-clara">${viajando ? 'Viajando ahora' : 'Tu próximo viaje'}</span>
+            <strong class="destacado-cuenta">${esc(R.viajes.cuentaRegresiva(v))}</strong>
           </div>
-          ${prox ? `
-            <div class="destacado-siguiente">
-              <small>Siguiente paso</small>
-              <strong>${R.guia.fase(prox.fase).icono} ${esc(prox.titulo)}</strong>
-              <a href="#" class="btn btn-primario btn-chico" data-siguiente="${prox.id}" data-viaje="${v.id}">Resolverlo</a>
-            </div>` : `<p class="texto-suave">¡Nada pendiente por ahora! 🌴</p>`}
-          <a href="#viaje/${v.id}/guia" class="btn btn-suave btn-chico">Ver el viaje completo →</a>
-        </div>
+          <h2>${esc(v.nombre || (v.destinos || []).filter(d => !d.soloDia).map(d => d.nombre).join(' → ') || v.destino)}</h2>
+          <p class="dp-meta">${esc(R.viajes.destinoCompleto(v))} · ${esc(U.fmtRango(v.fechaInicio, v.fechaFin))}</p>
+          <div class="dp-pie">
+            <div class="dp-avance">
+              ${U.anillo(prog.pct, 54)}
+              <div><strong>${prog.hechas} de ${prog.total} pasos</strong><small>organizados</small></div>
+            </div>
+            ${prox ? `
+              <div class="dp-siguiente">
+                <small>Lo que sigue</small>
+                <strong>${R.guia.fase(prox.fase).icono} ${esc(prox.titulo)}</strong>
+              </div>
+              <a href="#" class="btn btn-primario btn-chico dp-boton" data-siguiente="${prox.id}" data-viaje="${v.id}">Resolverlo →</a>`
+            : `<div class="dp-siguiente"><strong>¡Nada pendiente por ahora! 🌴</strong></div>`}
+          </div>
+        </article>
       </section>`;
   }
 
@@ -368,6 +382,29 @@
   document.getElementById('btnUsuario').onclick = () => R.auth.abrirMiCuenta();
   document.getElementById('btnNuevoViajeNav').onclick = () => R.viajes.abrirAsistente();
   document.getElementById('btnCuentaNav').onclick = () => R.auth.abrirMiCuenta();
+  /* ---------- Botón "Volver" en todas las pantallas (menos el inicio) ---------- */
+  const pila = [];
+  const clavePila = h => { const p = (h || '#inicio').replace(/^#/, '').split('/'); return p[0] === 'viaje' ? 'viaje/' + p[1] : p[0] || 'inicio'; };
+  function padre(h) {
+    const p = (h || '').replace(/^#/, '').split('/');
+    if (p[0] === 'viaje') return '#viajes';
+    return '#inicio';
+  }
+  function anotarRuta() {
+    const h = location.hash || '#inicio';
+    const k = clavePila(h);
+    if (pila.length > 1 && clavePila(pila[pila.length - 2]) === k) pila.pop();
+    if (pila.length && clavePila(pila[pila.length - 1]) === k) pila[pila.length - 1] = h;
+    else pila.push(h);
+    if (pila.length > 30) pila.shift();
+    const b = document.getElementById('btnAtras');
+    if (b) b.hidden = k === 'inicio' || !R.auth.usuarioActual();
+  }
+  document.getElementById('btnAtras').onclick = () => {
+    const destino = pila.length > 1 ? pila[pila.length - 2] : padre(location.hash);
+    location.hash = destino;
+  };
+  window.addEventListener('hashchange', anotarRuta);
   window.addEventListener('hashchange', () => {
     const ruta = location.hash.split('/').slice(0, 2).join('/');
     const cambioDeVista = ruta !== rutaAnterior;
@@ -392,6 +429,7 @@
   app.innerHTML = '<div class="pantalla-carga"><span class="marca-logo grande"></span><p>Abriendo Rutenda…</p></div>';
   R.auth.iniciar().then(async u => {
     listo = true;
+    setTimeout(anotarRuta, 0);
     if (u) await arrancarSesion(u); else render();
   });
 })();

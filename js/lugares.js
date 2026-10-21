@@ -38,6 +38,31 @@ R.lugares = (function () {
     return lista;
   }
 
+  const clave = l => String((l && l.nombre) || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+  /** Ciudades de tus viajes anteriores (las más recientes primero), sin repetir. */
+  function recientes(excluir) {
+    const fuera = new Set((excluir || []).map(clave));
+    const vistos = new Set();
+    const r = [];
+    const sumar = l => {
+      if (!l || !l.nombre) return;
+      const k = clave(l);
+      if (!k || vistos.has(k) || fuera.has(k)) return;
+      vistos.add(k);
+      r.push({ nombre: l.nombre, region: l.region || '', pais: l.pais || '', codigoPais: l.codigoPais || '', lat: l.lat, lon: l.lon, zona: l.zona || '', elevacion: l.elevacion, poblacion: l.poblacion, tipoLugar: l.tipoLugar });
+    };
+    const viajes = (R.db && R.db.viajes ? R.db.viajes() : []).slice().sort((a, b) => String(b.creado || '').localeCompare(String(a.creado || '')));
+    const pref = R.db && R.db.prefs ? R.db.prefs().ciudadOrigen : null;
+    sumar(pref);
+    viajes.forEach(v => {
+      sumar(v.origen);
+      (v.destinos || []).forEach(sumar);
+      (v.recorrido || []).forEach(t => (t.segmentos || []).forEach(s => { sumar(s.desde); sumar(s.hasta); }));
+    });
+    return r;
+  }
+
   function etiqueta(l) {
     if (!l || !l.nombre) return '';
     return [l.nombre, l.region, l.pais].filter(Boolean).filter((x, i, a) => a.indexOf(x) === i).join(', ');
@@ -62,12 +87,26 @@ R.lugares = (function () {
         <input type="text" class="lugar-input" autocomplete="off" placeholder="${esc(op.placeholder || 'Ciudad o lugar')}" value="${esc(lugar.nombre)}">
         <ul class="lugar-lista oculto" role="listbox"></ul>
       </div>
-      <div class="lugar-info"></div>`;
+      <div class="lugar-info"></div>
+      <div class="lugar-sugeridos"></div>`;
     const input = cont.querySelector('.lugar-input');
+    const sugeridos = cont.querySelector('.lugar-sugeridos');
+    /** Ciudades que ya usaste: un toque y listo, sin volver a escribirlas. */
+    function pintarSugeridos() {
+      const lista = (op.sugeridos || []).filter(s => s && s.nombre && clave(s) !== clave(lugar)).slice(0, 6);
+      if (!lista.length || (lugar.nombre && lugar.codigoPais)) { sugeridos.innerHTML = ''; return; }
+      sugeridos.innerHTML = `<small>Usadas antes:</small>${lista.map((s, i) => `<button type="button" class="chip-lugar" data-sug="${i}">${bandera(s.codigoPais) || '📍'} ${esc(s.nombre)}</button>`).join('')}`;
+      sugeridos.querySelectorAll('[data-sug]').forEach(bt => bt.addEventListener('click', () => {
+        lugar = Object.assign({}, lista[Number(bt.dataset.sug)]);
+        input.value = lugar.nombre;
+        cerrar(); pintarInfo(); avisar();
+      }));
+    }
     const lista = cont.querySelector('.lugar-lista');
     const info = cont.querySelector('.lugar-info');
 
     function pintarInfo() {
+      pintarSugeridos();
       if (!lugar.nombre) { info.innerHTML = ''; return; }
       if (lugar.pais && lugar.codigoPais) {
         info.innerHTML = `<span class="lugar-detectado">${bandera(lugar.codigoPais)} ${esc([lugar.region, lugar.pais].filter(Boolean).join(', '))}</span>`;
@@ -133,5 +172,5 @@ R.lugares = (function () {
     return { obtener, input };
   }
 
-  return { buscar, campo, bandera, etiqueta };
+  return { buscar, campo, bandera, etiqueta, recientes };
 })();

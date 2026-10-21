@@ -32,15 +32,18 @@ R.viajes = (function () {
     return `${(M[medios[0]] || M.otro).icono} ${(M[medios[0]] || M.otro).nombre}`;
   }
 
+  // Cada opción suma pasos concretos a la guía (no es solo informativo)
   const EXTRAS = [
-    { id: 'alquilaAuto', icono: '🚗', texto: 'Voy a alquilar auto' },
-    { id: 'menores', icono: '🧒', texto: 'Viajan menores de edad' },
-    { id: 'viajaConMascota', icono: '🐕', texto: 'Viajo con mi mascota' },
-    { id: 'mascotas', icono: '🏠', texto: 'Dejo mascotas en casa' },
-    { id: 'accesibilidad', icono: '♿', texto: 'Alguien necesita asistencia o accesibilidad' },
-    { id: 'equipamiento', icono: '🎿', texto: 'Deportes o actividades con equipo (ski, buceo, bici…)' },
-    { id: 'eventoEspecial', icono: '🎉', texto: 'Hay un evento especial (cumpleaños, aniversario…)' }
+    { id: 'alquilaAuto', icono: '🚗', texto: 'Voy a alquilar auto', suma: 'Alquilar el auto y, si salís del país, revisar la licencia' },
+    { id: 'menores', icono: '🧒', texto: 'Viajan menores de edad', suma: 'Autorización de viaje para menores' },
+    { id: 'viajaConMascota', icono: '🐕', texto: 'Viajo con mi mascota', suma: 'Requisitos para viajar con tu mascota' },
+    { id: 'mascotas', icono: '🏠', texto: 'Dejo mascotas en casa', suma: 'Organizar quién las cuida' },
+    { id: 'accesibilidad', icono: '♿', texto: 'Alguien necesita asistencia o accesibilidad', suma: 'Pedir asistencia en el transporte y el alojamiento' },
+    { id: 'equipamiento', icono: '🎿', texto: 'Deportes o actividades con equipo (ski, buceo, bici…)', suma: 'Reservar equipo y clases' },
+    { id: 'eventoEspecial', icono: '🎉', texto: 'Hay un evento especial (cumpleaños, aniversario…)', suma: 'Organizar el momento especial' },
+    { id: 'trabajo', icono: '💼', texto: 'Es un viaje de trabajo', suma: 'Rendir los gastos al volver' }
   ];
+  const extraActivo = (b, id) => id === 'trabajo' ? b.tipo === 'trabajo' : !!b.perfil[id];
 
   const PESTANAS = [
     { id: 'guia', nombre: 'Guía', icono: '🧭' },
@@ -116,6 +119,14 @@ R.viajes = (function () {
   /* ---------------------------------------------------------
      Asistente paso a paso (crear o editar)
      --------------------------------------------------------- */
+  /** La ciudad desde donde salís siempre: la última que usaste (se puede cambiar). */
+  function ciudadDeSiempre() {
+    const pref = R.db.prefs().ciudadOrigen;
+    if (pref && pref.nombre) return Object.assign({}, pref);
+    const ultimo = R.db.viajes().slice().sort((a, b) => String(b.creado || '').localeCompare(String(a.creado || '')))[0];
+    return ultimo && ultimo.origen && ultimo.origen.nombre ? Object.assign({}, ultimo.origen) : { nombre: '' };
+  }
+
   function abrirAsistente(existente) {
     const editando = !!existente;
     const yo = R.db.yo();
@@ -127,7 +138,7 @@ R.viajes = (function () {
       recorrido: existente.recorrido || [], tipoOtro: existente.tipoOtro || ''
     })) : {
       recorrido: [], tipoOtro: '',
-      nombre: '', origen: { nombre: '' }, destinos: [nuevoDestino(false)],
+      nombre: '', origen: ciudadDeSiempre(), destinos: [nuevoDestino(false)],
       fechaInicio: '', fechaFin: '', tipo: 'vacaciones',
       perfil: { internacionalManual: null, transporte: 'avion' },
       presupuesto: '', monedaBase: R.db.prefs().monedaBase || 'ARS'
@@ -148,8 +159,8 @@ R.viajes = (function () {
       : [];
 
     const PASOS = editando
-      ? ['Destinos', 'Cronograma', 'Estilo', 'Viajeros']
-      : ['Destinos', 'Cronograma', 'Estilo', 'Lo resuelto', 'Viajeros'];
+      ? ['Destinos', 'Cronograma', 'Detalles', 'Viajeros']
+      : ['Destinos', 'Cronograma', 'Detalles', 'Lo resuelto', 'Viajeros'];
     let editorCronograma = null;
     let paso = 0;
     let camposLugar = { origen: null, destinos: [] };
@@ -192,14 +203,29 @@ R.viajes = (function () {
           <button type="button" class="btn btn-primario" data-a="seguir">${ultimo ? (editando ? 'Guardar cambios' : 'Empezar a organizar ✨') : 'Siguiente →'}</button>
         </div>`;
       enlazarPaso();
+      // Al pasar de paso, arrancar desde arriba
+      if (paso !== pasoPintado) {
+        pasoPintado = paso;
+        const caja = cont.closest('.modal-cuerpo');
+        if (caja) caja.scrollTop = 0;
+        const modal = cont.closest('.modal');
+        if (modal) modal.scrollTop = 0;
+      }
     }
+    let pasoPintado = -1;
 
     function contenidoPaso() {
       const n = nombrePaso();
       if (n === 'Destinos') return `
         <h4 class="titulo-paso">¿Desde dónde salís?</h4>
-        <p class="ayuda">Tu ciudad. La ida y la vuelta se arman solas desde acá.</p>
-        <div id="lugarOrigen"></div>
+        ${b.origen && b.origen.nombre && b.origen.codigoPais && !b.cambiarOrigen ? `
+          <div class="origen-fijo">
+            <span>${R.lugares.bandera(b.origen.codigoPais) || '📍'} <strong>${esc(b.origen.nombre)}</strong><small>${esc([b.origen.region, b.origen.pais].filter(Boolean).join(', '))}</small></span>
+            <button type="button" class="btn btn-texto btn-chico" data-a="cambiarOrigen">Cambiar</button>
+          </div>
+          <p class="ayuda">La ida y la vuelta se arman solas desde acá.</p>` : `
+        <p class="ayuda">Tu ciudad. La guardo para los próximos viajes y la ida y la vuelta se arman solas desde acá.</p>
+        <div id="lugarOrigen"></div>`}
         <h4 class="titulo-paso">¿A dónde vas?</h4>
         <p class="ayuda">Si es un viaje combinado, agregá cada destino en orden.</p>
         <div class="lista-destinos">${b.destinos.map((d, i) => `
@@ -231,14 +257,10 @@ R.viajes = (function () {
         <div id="editorCronograma"></div>`;
       }
 
-      if (n === 'Estilo') {
+      if (n === 'Detalles') {
         const det = deteccionInternacional(b.origen, b.destinos.filter(d => d.nombre));
         const inter = internacional();
         return `
-        <h4 class="titulo-paso">¿Qué tipo de viaje es?</h4>
-        <div class="chips-elegir">${TIPOS.map(t =>
-          `<button type="button" class="chip-op ${b.tipo === t.id ? 'activo' : ''}" data-tipo="${t.id}">${t.icono} ${t.nombre}</button>`).join('')}</div>
-        ${b.tipo === 'otro' ? `<label class="campo"><span>¿Qué tipo de viaje?</span><input id="aTipoOtro" value="${esc(b.tipoOtro)}" placeholder="Ej: luna de miel, estudio, recital, deportivo"></label>` : ''}
         <h4 class="titulo-paso">¿Salís del país en algún momento del viaje?</h4>
         ${det.estado === 'si' ? `<p class="aviso-suave">🌎 Detectamos que salís del país: ${det.paises.map(p => `${R.lugares.bandera(p.codigoPais)} ${esc(p.pais)}`).join(', ')}.</p>`
           : det.estado === 'no' ? '<p class="aviso-suave">📍 Por los destinos que cargaste, no salís del país.</p>' : ''}
@@ -248,10 +270,12 @@ R.viajes = (function () {
         </div>
         <p class="ayuda">Aunque sea por un día, cuenta: cambia la documentación y el seguro.</p>
         <h4 class="titulo-paso">¿Hay algo más a tener en cuenta?</h4>
-        <div class="checks-grilla">${EXTRAS.map(x =>
-          `<label class="chip-check ${b.perfil[x.id] ? 'activo' : ''}"><input type="checkbox" data-extra="${x.id}" ${b.perfil[x.id] ? 'checked' : ''}> ${x.icono} ${esc(x.texto)}</label>`).join('')}</div>
+        <p class="ayuda">Cada opción que marques suma pasos a tu guía.</p>
+        <div class="extras-lista">${EXTRAS.map(x =>
+          `<label class="extra-op ${extraActivo(b, x.id) ? 'activo' : ''}"><input type="checkbox" data-extra="${x.id}" ${extraActivo(b, x.id) ? 'checked' : ''}>
+            <span class="eo-icono">${x.icono}</span><span><strong>${esc(x.texto)}</strong><small>Suma: ${esc(x.suma)}</small></span></label>`).join('')}</div>
         <div class="fila-agregar">
-          <input id="aExtraManual" placeholder="Otra cosa (ej: llevar la bici, comprar ropa de nieve)">
+          <input id="aExtraManual" placeholder="Otra cosa que tengas que hacer">
           <button type="button" class="btn btn-suave" data-a="agregarExtra">Agregar</button>
         </div>
         ${b.extrasManuales.length ? `<div class="chips-personas">${b.extrasManuales.map((x, i) => `<span class="chip-persona chip-texto">📝 ${esc(x)} <button type="button" data-quitar-extra="${i}" aria-label="Quitar">×</button></span>`).join('')}</div>` : ''}
@@ -310,9 +334,11 @@ R.viajes = (function () {
         camposLugar.destinos.forEach((c, i) => { if (c && b.destinos[i]) Object.assign(b.destinos[i], c.obtener()); });
         b.nombre = v('aNombre');
       }
-      if (n === 'Estilo') {
-        cont.querySelectorAll('[data-extra]').forEach(x => { b.perfil[x.dataset.extra] = x.checked; });
-        if (cont.querySelector('#aTipoOtro')) b.tipoOtro = v('aTipoOtro');
+      if (n === 'Detalles') {
+        cont.querySelectorAll('[data-extra]').forEach(x => {
+          if (x.dataset.extra === 'trabajo') { if (x.checked) b.tipo = 'trabajo'; else if (b.tipo === 'trabajo') b.tipo = 'vacaciones'; }
+          else b.perfil[x.dataset.extra] = x.checked;
+        });
       }
       if (n === 'Lo resuelto') {
         cont.querySelectorAll('[data-resuelto]').forEach(x => { b.resuelto[x.dataset.resuelto] = x.checked; });
@@ -359,9 +385,13 @@ R.viajes = (function () {
           caja.innerHTML = det.estado === 'si'
             ? `<p class="aviso-suave">🌎 Salís del país: ${det.paises.map(p => `${R.lugares.bandera(p.codigoPais)} ${esc(p.pais)}`).join(', ')}. Vamos a sumar documentación y seguro a la guía.</p>` : '';
         };
-        camposLugar.origen = R.lugares.campo(cont.querySelector('#lugarOrigen'), { valor: b.origen, placeholder: 'Tu ciudad de salida', alCambiar: avisar });
+        const usadas = R.lugares.recientes();
+        camposLugar.origen = cont.querySelector('#lugarOrigen') ? R.lugares.campo(cont.querySelector('#lugarOrigen'), { valor: b.origen, placeholder: 'Tu ciudad de salida', alCambiar: avisar, sugeridos: usadas }) : null;
+        const bOrigen = cont.querySelector('[data-a="cambiarOrigen"]');
+        if (bOrigen) bOrigen.onclick = () => { leerPaso(); b.cambiarOrigen = true; pintar(); const i = cont.querySelector('#lugarOrigen .lugar-input'); if (i) { i.focus(); i.select(); } };
         camposLugar.destinos = b.destinos.map((d, i) => R.lugares.campo(cont.querySelector(`[data-lugar-destino="${i}"]`), {
           valor: d, placeholder: d.soloDia ? 'Lugar que visitás en el día' : 'Ej: Roma, Cusco, Nueva York',
+          sugeridos: usadas.filter(u => normal(u.nombre) !== normal(b.origen && b.origen.nombre)),
           alCambiar: () => { avisar(); }
         }));
         avisar();
@@ -374,10 +404,9 @@ R.viajes = (function () {
         editorCronograma = R.cronogramaEditor.montar(cont.querySelector('#editorCronograma'), b, { permitirSinFechas: true });
       }
 
-      if (n === 'Estilo') {
-        cont.querySelectorAll('[data-tipo]').forEach(x => x.onclick = () => { leerPaso(); b.tipo = x.dataset.tipo; pintar(); });
+      if (n === 'Detalles') {
         cont.querySelectorAll('[data-inter]').forEach(x => x.onclick = () => { leerPaso(); b.perfil.internacionalManual = x.dataset.inter === 'si'; pintar(); });
-        cont.querySelectorAll('[data-extra]').forEach(x => x.onchange = () => x.closest('.chip-check').classList.toggle('activo', x.checked));
+        cont.querySelectorAll('[data-extra]').forEach(x => x.onchange = () => x.closest('.extra-op').classList.toggle('activo', x.checked));
         const input = cont.querySelector('#aExtraManual');
         const agregar = () => { const t = input.value.trim(); if (!t) return; leerPaso(); b.extrasManuales.push(t); pintar(); cont.querySelector('#aExtraManual').focus(); };
         cont.querySelector('[data-a="agregarExtra"]').onclick = agregar;
@@ -504,6 +533,7 @@ R.viajes = (function () {
         creado: new Date().toISOString()
       }, datos, { participantes: resolverViajeros() });
       R.db.guardarViaje(v); // normaliza
+      if (b.origen && b.origen.nombre) R.db.guardarPrefs({ ciudadOrigen: Object.assign({}, b.origen) });
       recalcularTramos(v);
       agregarExtrasManuales(v);
 
@@ -598,10 +628,9 @@ R.viajes = (function () {
       <section class="portada-viaje" style="background:${R.paisaje.fondo(v)}">
         ${U.paisaje(v)}
         <div class="portada-contenido">
-          <a href="#viajes" class="volver">← Mis viajes</a>
           <div class="portada-fila">
             <div>
-              <span class="etiqueta-clara">${tipo.icono} ${esc(tipo.nombre)}${etiquetaTransporte(v) ? ' · ' + esc(etiquetaTransporte(v)) : ''}${v.perfil.internacional ? ' · 🌎 Internacional' : ''}${v.perfil.paquete ? ' · 📦 Paquete' : ''}</span>
+              <span class="etiqueta-clara">${esc([v.tipo === 'trabajo' || v.tipo === 'otro' ? tipo.icono + ' ' + tipo.nombre : R.paisaje.TEMAS[R.paisaje.tema(v)].icono + ' ' + R.paisaje.TEMAS[R.paisaje.tema(v)].nombre, etiquetaTransporte(v), v.perfil.internacional ? '🌎 Internacional' : '', v.perfil.paquete ? '📦 Paquete' : ''].filter(Boolean).join(' · '))}</span>
               <h1>${esc(v.nombre || conAlojamiento(v).map(d => d.nombre).join(' → ') || v.destino)}</h1>
               <p class="portada-meta">${esc(destinoCompleto(v))} · ${esc(U.fmtRango(v.fechaInicio, v.fechaFin))}</p>
               <p class="portada-cuenta">${esc(cuentaRegresiva(v))}</p>

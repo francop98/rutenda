@@ -44,6 +44,25 @@ R.guia = (function () {
   const paisesCon = (v, niveles) => req(v).porPais.filter(p => niveles.includes(p.nivel)).map(p => p.pais).join(', ');
   const usa = medio => v => R.recorrido.usaMedio(v, medio);
 
+  /* Sitios oficiales para hacer cada trámite */
+  const SITIOS = {
+    pasaporte: { texto: 'Tramitar el pasaporte (Argentina.gob.ar)', url: 'https://www.argentina.gob.ar/interior/pasaporte' },
+    renaper: { texto: 'DNI y pasaporte: turnos y pagos (RENAPER)', url: 'https://www.argentina.gob.ar/interior/renaper' },
+    documentacion: { texto: 'Documentación para viajar al exterior (Cancillería)', url: 'https://www.cancilleria.gob.ar/es/servicios/viajar-al-exterior/documentacion' },
+    menores: { texto: 'Autorización de viaje para menores (Migraciones)', url: 'https://www.argentina.gob.ar/servicio/autorizacion-de-viaje-para-menores-de-edad' },
+    fiebreAmarilla: { texto: 'Fiebre amarilla y vacunas por destino (Cancillería)', url: 'https://cancilleria.gob.ar/es/servicios/alertas/fiebre-amarilla' }
+  };
+  const SITIOS_PAIS = {
+    US: { texto: 'Visa de Estados Unidos (Embajada en Argentina)', url: 'https://ar.usembassy.gov/es/visas-es/' },
+    PR: { texto: 'Visa de Estados Unidos (Embajada en Argentina)', url: 'https://ar.usembassy.gov/es/visas-es/' },
+    GB: { texto: 'ETA de Reino Unido (GOV.UK)', url: 'https://www.gov.uk/guidance/apply-for-an-electronic-travel-authorisation-eta' },
+    CA: { texto: 'eTA de Canadá (Canada.ca)', url: 'https://www.canada.ca/en/immigration-refugees-citizenship/services/visit-canada/eta.html' }
+  };
+  const sitiosDeTramites = v => {
+    const vistos = new Set();
+    return req(v).tramites.map(p => SITIOS_PAIS[p.codigo]).filter(x => x && !vistos.has(x.url) && vistos.add(x.url)).concat([SITIOS.documentacion]);
+  };
+
   const tareas = [
     /* ---------- Definir ---------- */
     {
@@ -80,14 +99,16 @@ R.guia = (function () {
         : 'El DNI tiene que ser la tarjeta vigente; la constancia de trámite en general no sirve para cruzar.',
       porque: v => req(v).necesitaPasaporte ? 'Si hay que renovarlo, es lo que más tarda y frena todo.' : 'Es rápido, pero sin documento vigente no se cruza.',
       impacto: v => req(v).necesitaPasaporte ? 5 : 3, anticipacion: v => req(v).necesitaPasaporte ? 90 : 7,
-      dependeDe: [], aplica: v => req(v).necesitaPasaporte, docCategoria: 'identidad'
+      dependeDe: [], aplica: v => req(v).necesitaPasaporte, docCategoria: 'identidad',
+      enlaces: [SITIOS.pasaporte, SITIOS.renaper]
     },
     {
       id: 'doc_dni', rec: true, fase: 'documentos', titulo: 'Revisar que el DNI de todos esté vigente',
       desc: v => req(v).internacional ? `Para ${paisesCon(v, ['dni'])} alcanza con el DNI argentino vigente (la tarjeta). No hace falta pasaporte.` : 'Lo vas a necesitar para viajar y para registrarte en el alojamiento.',
       consejo: 'La constancia de DNI en trámite en general no sirve para cruzar fronteras. Revisá también el de los menores.',
       porque: 'Sin documento vigente no se viaja.',
-      impacto: 3, anticipacion: 10, dependeDe: [], aplica: v => !req(v).necesitaPasaporte, docCategoria: 'identidad'
+      impacto: 3, anticipacion: 10, dependeDe: [], aplica: v => !req(v).necesitaPasaporte, docCategoria: 'identidad',
+      enlaces: [SITIOS.renaper]
     },
     {
       id: 'doc_requisitos', fase: 'documentos',
@@ -95,7 +116,8 @@ R.guia = (function () {
       desc: 'Rutenda no tiene los requisitos confirmados para este destino: revisalos en la fuente oficial.',
       consejo: 'Consultá siempre la Cancillería o el consulado del destino.',
       porque: 'Un requisito no cumplido puede dejarte sin embarcar.',
-      impacto: 5, anticipacion: 75, dependeDe: ['d_destino'], aplica: v => req(v).aVerificar.length > 0
+      impacto: 5, anticipacion: 75, dependeDe: ['d_destino'], aplica: v => req(v).aVerificar.length > 0,
+      enlaces: [SITIOS.documentacion]
     },
     {
       id: 'doc_visa', fase: 'documentos',
@@ -104,14 +126,16 @@ R.guia = (function () {
       consejo: 'Hacelo apenas tengas el pasaporte al día. Guardá el comprobante en Documentos.',
       porque: v => req(v).tramites.some(p => p.nivel === 'visa') ? 'Los turnos y aprobaciones no dependen de vos: hay que empezar temprano.' : 'Es un trámite online, pero sin la autorización no te dejan embarcar.',
       impacto: 5, anticipacion: v => req(v).tramites.some(p => p.nivel === 'visa') ? 75 : 21,
-      dependeDe: ['doc_pasaporte'], aplica: v => req(v).tramites.length > 0, docCategoria: 'identidad'
+      dependeDe: ['doc_pasaporte'], aplica: v => req(v).tramites.length > 0, docCategoria: 'identidad',
+      enlaces: sitiosDeTramites
     },
     {
       id: 'doc_menores', fase: 'documentos', titulo: 'Autorización de viaje para menores',
       desc: 'Si viajan menores sin alguno de sus padres o tutores, puede hacer falta una autorización formal.',
       consejo: 'Averiguá qué formato se acepta para el destino y tramitalo con tiempo.',
       porque: 'Sin la autorización correcta, el menor puede no poder salir del país.',
-      impacto: 5, anticipacion: 30, dependeDe: ['d_participantes'], aplica: v => !!v.perfil.menores, docCategoria: 'identidad'
+      impacto: 5, anticipacion: 30, dependeDe: ['d_participantes'], aplica: v => !!v.perfil.menores, docCategoria: 'identidad',
+      enlaces: [SITIOS.menores]
     },
     {
       id: 'doc_licencia', fase: 'documentos', titulo: 'Licencia de conducir válida en destino',
@@ -196,7 +220,8 @@ R.guia = (function () {
       desc: v => req(v).fiebreAmarilla.map(x => x.nota).join(' ') + ' Consultá en un vacunatorio o centro de medicina del viajero.',
       consejo: 'Tiene que aplicarse al menos 10 días antes de llegar. Si ya la tenés, buscá el certificado y subilo a Documentos.',
       porque: 'Necesita tiempo para hacer efecto antes del viaje.',
-      impacto: 4, anticipacion: 30, dependeDe: ['d_destino'], aplica: v => req(v).fiebreAmarilla.length > 0, docCategoria: 'salud'
+      impacto: 4, anticipacion: 30, dependeDe: ['d_destino'], aplica: v => req(v).fiebreAmarilla.length > 0, docCategoria: 'salud',
+      enlaces: [SITIOS.fiebreAmarilla]
     },
     {
       id: 'p_botiquin', rec: true, fase: 'proteccion', titulo: 'Botiquín y medicación personal',
@@ -215,11 +240,11 @@ R.guia = (function () {
       impacto: 3, anticipacion: 14, dependeDe: []
     },
     {
-      id: 'm_aviso', rec: true, fase: 'dinero', titulo: 'Habilitar tarjetas para usar en el exterior',
-      desc: 'Revisá que tus tarjetas funcionen en el destino y avisá al banco si hace falta.',
-      consejo: 'Anotá el teléfono del banco para emergencias fuera del país.',
-      porque: 'Una tarjeta bloqueada en destino es un dolor de cabeza evitable.',
-      impacto: 3, anticipacion: 7, dependeDe: ['m_medios'], aplica: esInter
+      id: 'm_aviso', rec: true, fase: 'dinero', titulo: 'Hacer el "aviso de viaje" en el banco',
+      desc: 'Desde la app o el home banking de cada banco y billetera, cargá el aviso de viaje con los países y las fechas. Revisá también que las tarjetas estén habilitadas para el exterior y el límite de compra.',
+      consejo: 'Hacelo con cada tarjeta que lleves (crédito y débito). Anotá el teléfono del banco para emergencias fuera del país.',
+      porque: 'Sin el aviso, el banco puede bloquear una compra en el exterior por seguridad.',
+      impacto: 3, anticipacion: 7, dependeDe: [], aplica: esInter
     },
     {
       id: 'm_efectivo', rec: true, fase: 'dinero', titulo: 'Conseguir efectivo para los primeros días',
@@ -287,9 +312,9 @@ R.guia = (function () {
 
     /* ---------- Conectividad ---------- */
     {
-      id: 'c_datos', rec: true, fase: 'conectividad', titulo: 'Resolver internet en destino',
-      desc: 'Elegí entre roaming, eSIM o chip local para tener datos desde que llegás.',
-      consejo: 'Verificá que tu teléfono sea compatible con eSIM antes de comprar una.',
+      id: 'c_datos', rec: true, fase: 'conectividad', titulo: 'Comprar un pack de roaming, una eSIM o un chip',
+      desc: 'Para tener datos desde que llegás: un pack de roaming de tu compañía (se compra por días desde su app), una eSIM de viaje o un chip local en destino.',
+      consejo: 'Compará precios por día y por GB. Si comprás una eSIM, primero verificá que tu teléfono sea compatible. Si no contratás nada, apagá los datos en roaming para no tener cargos.',
       porque: 'Al llegar vas a necesitar mapas y comunicarte.',
       impacto: 2, anticipacion: 7, dependeDe: ['d_fechas'], aplica: esInter
     },
@@ -368,6 +393,13 @@ R.guia = (function () {
       consejo: 'En el equipaje de mano: documentos, medicación, cargador y una muda de ropa.',
       porque: 'Se hace sobre la fecha, con el pronóstico a mano.',
       impacto: 2, anticipacion: 1, dependeDe: []
+    },
+    {
+      id: 's_compartir', rec: true, fase: 'salida', titulo: 'Compartir el itinerario con alguien de confianza',
+      desc: 'Pasale a alguien que se queda las fechas, dónde vas a dormir y cómo contactarte. Desde el itinerario podés descargar el PDF.',
+      consejo: 'Sumá el teléfono del alojamiento y del seguro de viaje.',
+      porque: 'Ante cualquier imprevisto, alguien sabe dónde estás.',
+      impacto: 2, anticipacion: 2, dependeDe: []
     },
     {
       id: 's_repaso', rec: true, fase: 'salida', titulo: 'Repasar documentos y horarios del primer día',

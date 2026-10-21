@@ -175,8 +175,9 @@ R.gastos = (function () {
       <section class="gastos-hero">
         <div class="gh-fila">
           <div>
-            <small>Gastado en el viaje</small>
+            <small>${t.ingresado ? 'Costo neto del viaje' : 'Gastado en el viaje'}</small>
             <strong class="gh-total">${U.fmtMoneda(t.neto, v.monedaBase)}</strong>
+            ${t.ingresado ? `<span class="gh-sub">↓ ${U.fmtMoneda(t.gastado, v.monedaBase)} en gastos · ↑ ${U.fmtMoneda(t.ingresado, v.monedaBase)} en ingresos y reintegros</span>` : ''}
             ${t.antes && t.durante ? `<span class="gh-sub">${U.fmtMoneda(t.antes, v.monedaBase)} antes · ${U.fmtMoneda(t.durante, v.monedaBase)} durante</span>` : ''}
           </div>
           ${enCurso ? `<div class="gh-hoy"><small>Hoy</small><strong>${U.fmtMoneda(hoyTotal, v.monedaBase)}</strong>${promedioDia ? `<span>Promedio ${U.fmtMoneda(promedioDia, v.monedaBase)}/día</span>` : ''}</div>` : ''}
@@ -191,8 +192,13 @@ R.gastos = (function () {
       </section>
 
       <section class="gastos-rapido">
-        <button class="btn btn-primario btn-grande" data-a="gasto">+ Cargar gasto</button>
-        <div class="gr-chips">${RAPIDAS.map(id => { const c = categoria(id); return `<button class="gr-chip" data-rapido-cat="${id}"><span>${c.icono}</span>${esc(c.nombre)}</button>`; }).join('')}</div>
+        <div class="gr-botones">
+          <button class="btn btn-primario btn-grande gr-gasto" data-a="gasto"><span class="gr-signo">−</span> Gasto</button>
+          <button class="btn btn-grande gr-ingreso" data-a="ingreso"><span class="gr-signo">+</span> Ingreso / reintegro</button>
+        </div>
+        <div class="gr-cab"><small>Gasto rápido por categoría</small><button class="btn-texto-mini" data-a="categorias">🏷️ Crear o editar categorías</button></div>
+        <div class="gr-chips">${RAPIDAS.map(id => { const c = categoria(id); return `<button class="gr-chip" data-rapido-cat="${id}"><span>${c.icono}</span>${esc(c.nombre)}</button>`; }).join('')}
+          <button class="gr-chip gr-chip-nueva" data-a="categorias"><span>＋</span>Categoría</button></div>
       </section>
 
       <div class="segmentado segmentado-gastos" role="tablist">
@@ -212,10 +218,8 @@ R.gastos = (function () {
       render(v, cont);
     });
     cont.querySelectorAll('[data-filtro-persona]').forEach(b => b.onclick = () => { filtroPersona = b.dataset.filtroPersona; render(v, cont); });
-    const bCat = cont.querySelector('[data-a="categorias"]');
-    if (bCat) bCat.onclick = () => administrarCategorias();
-    const bIng = cont.querySelector('[data-a="ingreso"]');
-    if (bIng) bIng.onclick = () => editar(v, null, 'ingreso');
+    cont.querySelectorAll('[data-a="categorias"]').forEach(b => b.onclick = () => administrarCategorias());
+    cont.querySelectorAll('[data-a="ingreso"]').forEach(b => b.onclick = () => editar(v, null, 'ingreso'));
     cont.querySelectorAll('[data-mov]').forEach(b => b.onclick = () => editar(v, b.dataset.mov));
     cont.querySelectorAll('[data-saldar]').forEach(b => b.onclick = () => registrarPago(v, tr[Number(b.dataset.saldar)]));
   }
@@ -233,7 +237,6 @@ R.gastos = (function () {
           <button class="${filtroPersona === 'yo' ? 'activo' : ''}" data-filtro-persona="yo">Pagué yo</button>
           ${v.participantes.filter(p => p !== yo).map(p => `<button class="${filtroPersona === p ? 'activo' : ''}" data-filtro-persona="${p}">${esc(nombre(p))}</button>`).join('')}
         </div>` : '<span></span>'}
-        <button class="btn btn-texto btn-chico" data-a="ingreso">+ Reintegro</button>
       </div>
       ${grupos.length ? grupos.map(g => `
         <section class="bloque dia-gastos">
@@ -242,7 +245,7 @@ R.gastos = (function () {
         </section>`).join('') : `
         <div class="bloque vacio vacio-chico">
           <div class="vacio-icono">💸</div>
-          <p>${filtroPersona === 'todos' ? 'Cargá cada gasto con quién lo pagó y entre quiénes se divide. Rutenda hace las cuentas.' : 'No hay movimientos con este filtro.'}</p>
+          <p>${filtroPersona === 'todos' ? 'Cargá cada gasto (lo que sale) y cada ingreso o reintegro (lo que vuelve), con quién lo pagó o lo recibió y entre quiénes se divide. Rutenda hace las cuentas.' : 'No hay movimientos con este filtro.'}</p>
         </div>`}`;
   }
 
@@ -371,7 +374,7 @@ R.gastos = (function () {
     if (m.tipo === 'pago') {
       return `<button class="mov mov-pago" data-mov="${m.id}">
         <span class="mov-icono">🤝</span>
-        <span class="mov-texto"><strong>${esc(nombre(m.persona))} le pagó a ${esc(nombre(m.para))}</strong><small>${U.fmtFecha(m.fecha, 'corto')}</small></span>
+        <span class="mov-texto"><strong>${esc(nombre(m.persona))} le pagó a ${esc(nombre(m.para))}</strong><small>${esc(detallePago(m))}</small></span>
         <span class="mov-monto">${U.fmtMoneda(m.monto, m.moneda)}</span>
       </button>`;
     }
@@ -385,21 +388,53 @@ R.gastos = (function () {
         <strong>${esc(m.concepto)}</strong>
         <small>${m.origenTarea ? '🧭 ' : ''}${esIngreso ? 'Lo recibió' : 'Pagó'} ${esc(nombre(m.persona))}${v.participantes.length > 1 ? ' · ' + esc(divTxt) : ''} · ${U.fmtFecha(m.fecha, 'corto')}</small>
       </span>
-      <span class="mov-monto">${esIngreso ? '−' : ''}${U.fmtMoneda(m.monto, m.moneda)}${m.moneda !== v.monedaBase ? `<small>${U.fmtMoneda(montoBase(v, m), v.monedaBase)}</small>` : ''}</span>
+      <span class="mov-monto ${esIngreso ? 'positivo' : ''}">${esIngreso ? '+' : '−'}${U.fmtMoneda(m.monto, m.moneda)}${m.moneda !== v.monedaBase ? `<small>${U.fmtMoneda(montoBase(v, m), v.monedaBase)}</small>` : ''}</span>
     </button>`;
   }
 
-  function registrarPago(v, x) {
-    U.confirmar(`¿${nombre(x.de)} ya le pagó ${U.fmtMoneda(x.monto, v.monedaBase)} a ${nombre(x.para)}?`, { titulo: 'Registrar pago', textoSi: 'Sí, registrar' }).then(ok => {
-      if (!ok) return;
-      v.movimientos.push({
-        id: U.id('mov'), tipo: 'pago', persona: x.de, para: x.para,
-        monto: x.monto, moneda: v.monedaBase, cotizacion: 1,
-        fecha: U.hoyISO(), creado: new Date().toISOString(), concepto: 'Pago entre viajeros'
-      });
-      R.db.guardarViaje(v);
-      R.app.refrescar();
-      U.toast('Pago registrado.');
+  const FORMAS_PAGO = ['Efectivo', 'Transferencia', 'Mercado Pago', 'Tarjeta', 'Otra'];
+  /** "Transferencia · mié 21 oct, 18:40 · nota" */
+  function detallePago(m) {
+    return [m.formaPago, U.fmtFecha(m.fecha, 'corto') + (m.hora ? ', ' + m.hora : ''), m.nota].filter(Boolean).join(' · ');
+  }
+  const horaAhora = () => { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+
+  /** Registrar (o editar) un pago entre viajeros, con fecha, hora y forma de pago. */
+  function registrarPago(v, x, existente) {
+    const m = existente || { persona: x.de, para: x.para, monto: x.monto, moneda: v.monedaBase, fecha: U.hoyISO(), hora: horaAhora(), formaPago: 'Transferencia', nota: '' };
+    const acciones = [{ texto: 'Cancelar' }];
+    if (existente) acciones.unshift({ texto: 'Eliminar pago', clase: 'btn-texto peligro', onClick: () => { eliminar(v, existente.id); return false; } });
+    acciones.push({
+      texto: existente ? 'Guardar' : 'Registrar pago', clase: 'btn-primario', onClick: el => {
+        const val = sel => el.querySelector(sel).value;
+        const monto = U.numero(val('#pMonto'));
+        if (!(monto > 0)) { U.toast('El monto tiene que ser mayor a cero.'); return false; }
+        const datos = { monto, fecha: val('#pFecha') || U.hoyISO(), hora: val('#pHora'), formaPago: val('#pForma'), nota: val('#pNota').trim() };
+        if (existente) Object.assign(existente, datos);
+        else v.movimientos.push(Object.assign({
+          id: U.id('mov'), tipo: 'pago', persona: m.persona, para: m.para, moneda: v.monedaBase, cotizacion: 1,
+          creado: new Date().toISOString(), concepto: 'Pago entre viajeros'
+        }, datos));
+        R.db.guardarViaje(v);
+        R.app.refrescar();
+        U.toast(existente ? 'Pago actualizado.' : 'Pago registrado.');
+      }
+    });
+    U.modal({
+      titulo: existente ? 'Pago entre viajeros' : 'Registrar pago',
+      subtitulo: `${nombre(m.persona)} le paga a ${nombre(m.para)}`,
+      cuerpo: `
+        <div class="grilla-monto">
+          <label class="campo campo-monto"><span>Monto (${esc(m.moneda || v.monedaBase)})</span><input id="pMonto" inputmode="decimal" value="${esc(m.monto)}"></label>
+          <label class="campo"><span>Forma de pago</span><select id="pForma">${FORMAS_PAGO.map(f => `<option ${m.formaPago === f ? 'selected' : ''}>${f}</option>`).join('')}</select></label>
+        </div>
+        <div class="grilla-2 grilla-fh">
+          <label class="campo"><span>Fecha</span><input type="date" id="pFecha" value="${esc(m.fecha || U.hoyISO())}"></label>
+          <label class="campo"><span>Hora</span><input type="time" id="pHora" value="${esc(m.hora || '')}"></label>
+        </div>
+        <label class="campo"><span>Detalle <small>(opcional)</small></span><input id="pNota" value="${esc(m.nota || '')}" placeholder="Ej: alias, comprobante"></label>
+        ${existente ? '' : '<p class="ayuda">Si pagó una parte, cambiá el monto: el resto sigue pendiente.</p>'}`,
+      acciones
     });
   }
 
@@ -597,16 +632,7 @@ R.gastos = (function () {
     U.toast(existente ? 'Movimiento actualizado.' : (m.tipo === 'gasto' ? 'Gasto cargado.' : 'Ingreso cargado.'));
   }
 
-  function editarPago(v, m) {
-    U.modal({
-      titulo: 'Pago entre viajeros',
-      cuerpo: `<p><strong>${esc(nombre(m.persona))}</strong> le pagó <strong>${U.fmtMoneda(m.monto, m.moneda)}</strong> a <strong>${esc(nombre(m.para))}</strong> el ${U.fmtFecha(m.fecha, 'largo')}.</p>`,
-      acciones: [
-        { texto: 'Eliminar pago', clase: 'btn-texto peligro', onClick: () => { eliminar(v, m.id); return false; } },
-        { texto: 'Cerrar', clase: 'btn-primario' }
-      ]
-    });
-  }
+  function editarPago(v, m) { registrarPago(v, null, m); }
 
   async function eliminar(v, id) {
     const ok = await U.confirmar('Se va a eliminar este movimiento y se recalculan las cuentas.', { titulo: 'Eliminar movimiento', textoSi: 'Eliminar', peligro: true });
