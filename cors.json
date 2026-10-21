@@ -1,6 +1,6 @@
 [
   {
-    "origin": ["https://rutenda.vercel.app", "https://tripbox-jet.vercel.app", "http://localhost:3000"],
+    "origin": ["https://rutenda.vercel.app", "http://localhost:3000"],
     "method": ["GET"],
     "maxAgeSeconds": 3600
   }

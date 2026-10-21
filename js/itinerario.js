@@ -330,7 +330,7 @@ R.itinerario = (function () {
     const ev = [];
     const agregar = (fecha, hora, horaFin, fechaFin, zona, titulo, desc, lugar) => {
       if (!fecha) return;
-      const uid = `${U.id('ics')}@tripbox`;
+      const uid = `${U.id('ics')}@rutenda`;
       const lineas = ['BEGIN:VEVENT', `UID:${uid}`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}Z`];
       if (hora) {
         const tz = zona ? `;TZID=${zona}` : '';
@@ -367,7 +367,7 @@ R.itinerario = (function () {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tripbox-${(v.nombre || v.destino || 'viaje').toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.ics`;
+    a.download = `rutenda-${(v.nombre || v.destino || 'viaje').toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.ics`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
     U.toast('Abrí el archivo para sumarlo a tu calendario.');

@@ -75,7 +75,7 @@ R.recordatorios = (function () {
   /* ---------------------------------------------------------
      En la app: avisos de hoy
      --------------------------------------------------------- */
-  function descartados() { try { return JSON.parse(localStorage.getItem('tripbox_avisos_vistos') || '{}'); } catch (e) { return {}; } }
+  function descartados() { try { return JSON.parse(localStorage.getItem('rutenda_avisos_vistos') || '{}'); } catch (e) { return {}; } }
   function avisosHTML() {
     const hoy = U.hoyISO();
     const vistos = descartados();
@@ -92,7 +92,7 @@ R.recordatorios = (function () {
       const vistos = descartados();
       Object.keys(vistos).forEach(k => { if (!k.includes(U.hoyISO())) delete vistos[k]; });
       vistos[b.dataset.avisoVisto] = 1;
-      try { localStorage.setItem('tripbox_avisos_vistos', JSON.stringify(vistos)); } catch (e) { /* nada */ }
+      try { localStorage.setItem('rutenda_avisos_vistos', JSON.stringify(vistos)); } catch (e) { /* nada */ }
       b.closest('.aviso-hoy').remove();
     });
   }
@@ -121,7 +121,7 @@ R.recordatorios = (function () {
      Notificaciones push
      --------------------------------------------------------- */
   function soportado() { return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
-  function claveLocal() { return 'tripbox_push_' + (R.db.uid() || ''); }
+  function claveLocal() { return 'rutenda_push_' + (R.db.uid() || ''); }
 
   /** 'no' | 'bloqueado' | 'activo' | 'disponible' */
   function estadoPush() {

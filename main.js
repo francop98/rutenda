@@ -194,7 +194,7 @@
     const bInst = app.querySelector('[data-a="instalar"]');
     if (bInst) bInst.onclick = instalar;
     const bOcultar = app.querySelector('[data-a="ocultarInstalar"]');
-    if (bOcultar) bOcultar.onclick = () => { try { localStorage.setItem('tripbox_oculto_instalar', '1'); } catch (e) { /* sin almacenamiento */ } refrescar(); };
+    if (bOcultar) bOcultar.onclick = () => { try { localStorage.setItem('rutenda_oculto_instalar', '1'); } catch (e) { /* sin almacenamiento */ } refrescar(); };
     const sig = app.querySelector('[data-siguiente]');
     if (sig) sig.onclick = e => {
       e.preventDefault();
@@ -286,7 +286,7 @@
     app.querySelector('#importar').onchange = importar;
   }
 
-  function leerOculto(clave) { try { return localStorage.getItem('tripbox_oculto_' + clave) === '1'; } catch (e) { return false; } }
+  function leerOculto(clave) { try { return localStorage.getItem('rutenda_oculto_' + clave) === '1'; } catch (e) { return false; } }
 
   function destacadoHTML(v) {
     const prog = R.motor.progreso(v);
@@ -335,7 +335,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tripbox-copia-${U.hoyISO()}.json`;
+    a.download = `rutenda-copia-${U.hoyISO()}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();

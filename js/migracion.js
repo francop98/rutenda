@@ -9,7 +9,7 @@ window.R = window.R || {};
 R.migracion = (function () {
   const U = R.util;
 
-  function claveHecho() { return 'tripbox_migrado_' + R.db.uid(); }
+  function claveHecho() { return 'rutenda_migrado_' + R.db.uid(); }
 
   /** Viajes guardados en este dispositivo en modo local (de cualquier cuenta local). */
   function encontrar() {

@@ -11,7 +11,7 @@
 window.R = window.R || {};
 
 R.db = (function () {
-  const PREFIJO = 'tripbox_datos_v1_';
+  const PREFIJO = 'rutenda_datos_v1_';
   const ROLES_ORG = ['organizador', 'coorganizador'];
   let modo = 'local';
   let uid = null;
@@ -273,7 +273,7 @@ R.db = (function () {
   /* ---------------------------------------------------------
      Archivos: IndexedDB en el dispositivo (+ Storage en la nube)
      --------------------------------------------------------- */
-  const BASE_ARCHIVOS = 'tripbox_archivos';
+  const BASE_ARCHIVOS = 'rutenda_archivos';
   const ALMACEN = 'archivos';
   let conexion = null;
   function abrirBase() {

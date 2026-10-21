@@ -7,11 +7,11 @@
    Si queda vacío, Rutenda funciona en modo local
    (todo se guarda solo en este dispositivo).
    ========================================================= */
-window.TRIPBOX_FIREBASE = {
-  apiKey: 'AIzaSyBXclh5AuFF1HEpFznZwjoeK28SVSsh7Og',
-  authDomain: 'tripbox-5e48e.firebaseapp.com',
-  projectId: 'tripbox-5e48e',
-  storageBucket: 'tripbox-5e48e.firebasestorage.app',
-  messagingSenderId: '419084823950',
-  appId: '1:419084823950:web:85071b996d40d7c27e08df'
+window.RUTENDA_FIREBASE = {
+  apiKey: 'AIzaSyDQ9YIIqfSqkOM8oyhqZJBkORBgQEFfzlE',
+  authDomain: 'rutenda-app.firebaseapp.com',
+  projectId: 'rutenda-app',
+  storageBucket: 'rutenda-app.firebasestorage.app',
+  messagingSenderId: '798462216046',
+  appId: '1:798462216046:web:61ee0810ae342a750c637f'
 };

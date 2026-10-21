@@ -9,7 +9,7 @@ window.R = window.R || {};
 
 R.cotizacion = (function () {
   const U = R.util;
-  const CLAVE = 'tripbox_cotizaciones_v1';
+  const CLAVE = 'rutenda_cotizaciones_v1';
   const DOLAR = { tarjeta: 'Dólar tarjeta', oficial: 'Dólar oficial', blue: 'Dólar blue' };
   const DOLARAPI = { EUR: 'eur', BRL: 'brl', CLP: 'clp', UYU: 'uyu' };
 

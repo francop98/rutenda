@@ -19,7 +19,7 @@ module.exports = async (req, res) => {
   const secreto = process.env.CRON_SECRET;
   if (!secreto || (req.headers.authorization || '') !== 'Bearer ' + secreto) return res.status(401).json({ error: 'No autorizado' });
   if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return res.status(503).json({ error: 'Faltan las claves VAPID' });
-  webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:tripbox@example.com', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:rutenda@example.com', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
 
   const resumen = { usuarios: 0, enviados: 0, borradas: 0, errores: 0 };
   const usuarios = await db().collection('usuarios').where('recordatoriosActualizados', '>', '').get();

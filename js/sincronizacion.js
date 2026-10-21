@@ -23,7 +23,7 @@ R.nube = (function () {
   let desuscribir = [];
   const porViaje = {};      // { viajeId: { unsubs: [], ultimo: {principal, movimientos:{}, documentos:{}, valijas:{}}, timer, nuevo } }
 
-  function config() { return window.TRIPBOX_FIREBASE || null; }
+  function config() { return window.RUTENDA_FIREBASE || null; }
   function disponible() {
     const c = config();
     return !!(window.firebase && c && c.apiKey && c.projectId);

@@ -125,7 +125,7 @@ R.gastos = (function () {
   /* ---------- Vista ---------- */
   // Categorías para cargar rápido durante el viaje
   const RAPIDAS = ['comida', 'transporte', 'actividades', 'compras', 'otros'];
-  let vistaGastos = (() => { try { return localStorage.getItem('tripbox_vista_gastos') || 'movimientos'; } catch (e) { return 'movimientos'; } })();
+  let vistaGastos = (() => { try { return localStorage.getItem('rutenda_vista_gastos') || 'movimientos'; } catch (e) { return 'movimientos'; } })();
   let filtroPersona = 'todos';
 
   function monedaSugerida(v) {
@@ -208,7 +208,7 @@ R.gastos = (function () {
     if (bPres) bPres.onclick = () => editarPresupuesto(v);
     cont.querySelectorAll('[data-vista-gastos]').forEach(b => b.onclick = () => {
       vistaGastos = b.dataset.vistaGastos;
-      try { localStorage.setItem('tripbox_vista_gastos', vistaGastos); } catch (e) { /* nada */ }
+      try { localStorage.setItem('rutenda_vista_gastos', vistaGastos); } catch (e) { /* nada */ }
       render(v, cont);
     });
     cont.querySelectorAll('[data-filtro-persona]').forEach(b => b.onclick = () => { filtroPersona = b.dataset.filtroPersona; render(v, cont); });

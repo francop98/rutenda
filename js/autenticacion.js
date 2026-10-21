@@ -10,8 +10,8 @@ window.R = window.R || {};
 R.auth = (function () {
   const U = R.util;
   const { esc } = U;
-  const CLAVE_USUARIOS = 'tripbox_usuarios';
-  const CLAVE_SESION = 'tripbox_sesion';
+  const CLAVE_USUARIOS = 'rutenda_usuarios';
+  const CLAVE_SESION = 'rutenda_sesion';
   let actual = null;           // usuario actual { uid, nombre, apellido, email, nacionalidad, creado, verificado, local }
   let oyente = null;
 

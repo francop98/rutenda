@@ -10,7 +10,7 @@ window.R = window.R || {};
 
 R.clima = (function () {
   const U = R.util;
-  const CLAVE = 'tripbox_clima_v1';
+  const CLAVE = 'rutenda_clima_v1';
   const pendientes = {};
 
   const CODIGOS = [
