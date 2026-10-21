@@ -293,7 +293,7 @@
     const prox = R.motor.proximos(v, 1)[0];
     return `
       <section class="destacado">
-        <a class="destacado-portada" href="#viaje/${v.id}/guia" style="background:${U.portada(v.destino)}">
+        <a class="destacado-portada" href="#viaje/${v.id}/guia" style="background:${R.paisaje.fondo(v)}">
           ${U.paisaje(v)}
           <span class="etiqueta-clara">${R.viajes.estadoViaje(v) === 'en_curso' ? 'Viajando ahora' : 'Tu próximo viaje'}</span>
           <h2>${esc(v.nombre || (v.destinos || []).filter(d => !d.soloDia).map(d => d.nombre).join(' → ') || v.destino)}</h2>
@@ -376,6 +376,18 @@
     render();
     if (cambioDeVista) window.scrollTo(0, 0);
   });
+  // Teclado abierto en el celular: escondemos la barra inferior para que no quede flotando
+  (function () {
+    const esCampo = el => el && (el.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'submit', 'file', 'range', 'color'].includes(el.type) || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+    const revisar = () => {
+      const vv = window.visualViewport;
+      const achicado = vv ? vv.height < window.innerHeight * 0.78 : false;
+      document.body.classList.toggle('teclado-abierto', esCampo(document.activeElement) || achicado);
+    };
+    document.addEventListener('focusin', revisar);
+    document.addEventListener('focusout', () => setTimeout(revisar, 60));
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', revisar);
+  })();
   rutaAnterior = location.hash.split('/').slice(0, 2).join('/');
   app.innerHTML = '<div class="pantalla-carga"><span class="marca-logo grande"></span><p>Abriendo Rutenda…</p></div>';
   R.auth.iniciar().then(async u => {

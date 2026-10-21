@@ -7,7 +7,7 @@
 window.R = window.R || {};
 
 R.aeropuertos = (function () {
-  const normal = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  const normal = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
   let lista = null;
 
   function datos() {

@@ -365,7 +365,9 @@ R.formularios = (function () {
       alGuardar: (v, d) => {
         v.perfil.paquete = { incluye: d.incluye || [] };
         aplicarPaquete(v);
-      }
+      },
+      // Después del paquete, completar uno por uno los datos de lo que incluye
+      despues: v => completarPaquete(v)
     }
   };
 
@@ -374,7 +376,11 @@ R.formularios = (function () {
     excursiones: ['e_excursiones'], seguro: ['p_seguro'], auto: ['mv_auto']
   };
 
-  /** Marca como resuelto (incluido en el paquete) lo que el paquete cubre. */
+  /**
+   * Marca lo que cubre el paquete. Lo que tiene datos para cargar (vuelos,
+   * alojamiento, seguro…) queda "en marcha" hasta que completes sus datos;
+   * lo demás queda resuelto.
+   */
   function aplicarPaquete(v) {
     const incluye = (v.perfil.paquete && v.perfil.paquete.incluye) || [];
     const lista = R.motor.lista(v);
@@ -382,8 +388,34 @@ R.formularios = (function () {
     incluye.forEach(k => (BASES_PAQUETE[k] || []).forEach(base => R.motor.idsDe(v, base).filter(id => k !== 'vuelos' || esVuelo(id)).forEach(id => {
       const previo = v.tareas[id] || {};
       if (previo.estado === 'hecha' && !previo.incluidoEnPaquete) return;
-      v.tareas[id] = Object.assign({}, previo, { estado: 'hecha', incluidoEnPaquete: true, fechaHecha: previo.fechaHecha || new Date().toISOString() });
+      if (previo.estado === 'hecha' && previo.datos) return;
+      const t = lista.find(x => x.id === id);
+      const conDatos = t && tiene(t);
+      v.tareas[id] = conDatos
+        ? Object.assign({}, previo, { estado: 'en_curso', incluidoEnPaquete: true, postergado: false })
+        : Object.assign({}, previo, { estado: 'hecha', incluidoEnPaquete: true, fechaHecha: previo.fechaHecha || new Date().toISOString() });
     })));
+  }
+
+  /** Lo del paquete que todavía espera sus datos, en el orden del viaje. */
+  function faltantesPaquete(v) {
+    const orden = ['t_segmento', 'a_reserva', 'mv_traslado', 'mv_auto', 'e_excursiones', 'p_seguro'];
+    return R.motor.lista(v).filter(t => {
+      const x = v.tareas[t.id] || {};
+      return x.incluidoEnPaquete && x.estado === 'en_curso' && !x.datos && tiene(t);
+    }).sort((a, b) => orden.indexOf(a.base) - orden.indexOf(b.base));
+  }
+
+  /** Abre, uno detrás de otro, los formularios de lo que incluye el paquete. */
+  function completarPaquete(v, hechos) {
+    const actual = R.db.viaje(v.id) || v;
+    const faltan = faltantesPaquete(actual);
+    if (!faltan.length) return;
+    const n = hechos || 0;
+    abrir(actual, faltan[0].id, {
+      cadena: { actual: n + 1, total: n + faltan.length, texto: 'Datos del paquete' },
+      alTerminar: () => setTimeout(() => completarPaquete(actual, n + 1), 450)
+    });
   }
 
   /** ¿Este paso queda cubierto por lo que incluye el paquete? */
@@ -472,7 +504,7 @@ R.formularios = (function () {
 
     const { el } = U.modal({
       titulo: t.titulo,
-      subtitulo: `${R.guia.fase(t.fase).icono} ${R.guia.fase(t.fase).nombre}${ctx.enPaquete ? ' · incluido en el paquete' : ''}`,
+      subtitulo: op.cadena ? `📦 ${op.cadena.texto} · ${op.cadena.actual} de ${op.cadena.total}` : `${R.guia.fase(t.fase).icono} ${R.guia.fase(t.fase).nombre}${ctx.enPaquete ? ' · incluido en el paquete' : ''}`,
       ancho: true,
       cuerpo: '<div id="formPaso"></div>'
     });
@@ -533,7 +565,7 @@ R.formularios = (function () {
         <span>${esc(c.etiqueta)}</span>
         <input type="hidden" data-campo="${c.id}" data-lista="${clave.lista}" data-item="${clave.i}" value="${esc(val)}">
         <div class="aero-chips">${sug.map(chip).join('')}${elegido ? chip(elegido) : ''}</div>
-        <input type="text" class="aero-manual" maxlength="3" placeholder="${sug.length ? 'Otro: código (ej. COR)' : 'Código del aeropuerto (ej. EZE)'}" data-aero-manual="${clave.lista}|${clave.i}|${c.id}">
+        <input type="text" class="aero-manual" maxlength="3" placeholder="${sug.length ? 'Otro: código de 3 letras' : 'Código del aeropuerto (3 letras, ej. MAD)'}" data-aero-manual="${clave.lista}|${clave.i}|${c.id}">
       </div>`;
     }
 
@@ -756,6 +788,7 @@ R.formularios = (function () {
         if (deducidas.length) setTimeout(() => U.toast(`También di por resuelto: ${deducidas.map(x => x.titulo).slice(0, 3).join(', ')}.`), 2600);
         else if (destrabadas.length) setTimeout(() => U.toast(`Se destrabó: ${destrabadas.map(x => x.titulo).slice(0, 2).join(', ')}`), 2600);
         if (op.alTerminar) op.alTerminar();
+        else if (d.despues) setTimeout(() => d.despues(v), 450);
       } catch (e) {
         console.error(e);
         boton.disabled = false;
@@ -779,5 +812,5 @@ R.formularios = (function () {
     return lineas.filter(Boolean);
   }
 
-  return { tiene, abrir, resumen, aplicarPaquete, incluidoEnPaquete, MODOS };
+  return { tiene, abrir, resumen, aplicarPaquete, incluidoEnPaquete, completarPaquete, faltantesPaquete, MODOS };
 })();

@@ -235,7 +235,10 @@ R.motor = (function () {
 
   /** Cambia el estado de un paso. Devuelve los pasos que quedaron destrabados. */
   function setEstado(v, id, nuevo) {
-    const antes = analizar(v).filter(t => t.bloqueada).map(t => t.id);
+    const info = analizar(v);
+    // Lo que tiene ventana (como el check-in) no se da por hecho antes de que se habilite
+    if (nuevo === 'hecha' && (info.find(t => t.id === id) || {}).esperaVentana) { ultimasDeducidas = []; return []; }
+    const antes = info.filter(t => t.bloqueada).map(t => t.id);
     const previo = v.tareas[id] || {};
     v.tareas[id] = Object.assign({}, previo, {
       estado: nuevo,

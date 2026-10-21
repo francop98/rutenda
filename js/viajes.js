@@ -54,7 +54,7 @@ R.viajes = (function () {
   /* ---------- Ayudas de destinos ---------- */
   const conAlojamiento = v => (v.destinos || []).filter(d => !d.soloDia && d.nombre);
   const escapadas = v => (v.destinos || []).filter(d => d.soloDia && d.nombre);
-  const normal = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  const normal = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 
   function destinoCompleto(v) {
     const lista = conAlojamiento(v);
@@ -134,7 +134,7 @@ R.viajes = (function () {
     };
     if (!b.destinos.length) b.destinos.push(nuevoDestino(false));
     b.sinFechas = editando ? !b.fechaInicio : false;
-    // Ciudad de conexión (ej. vivís en Bahía Blanca y el vuelo sale de Buenos Aires)
+    // Conexión previa (si el viaje ya tenía una ciudad de conexión en la ida)
     const conexionPrevia = editando ? R.recorrido.conexionDe(b.recorrido) : null;
     b.conexion = conexionPrevia ? { lugar: conexionPrevia.lugar, medio: conexionPrevia.medio } : null;
     b.conexionAplicada = conexionPrevia ? conexionPrevia.lugar.nombre : '';
@@ -171,8 +171,10 @@ R.viajes = (function () {
 
     function pintarBanda() {
       const lista = b.destinos.filter(d => d.nombre && !d.soloDia).map(d => d.nombre);
-      banda.style.background = U.portada(lista[0] || b.origen.nombre || 'viaje');
-      banda.innerHTML = `${R.paisaje.svg(null, { transporte: b.recorrido && b.recorrido.length ? R.recorrido.medioPrincipal(b.recorrido) : 'avion', progreso: paso / (PASOS.length - 1) })}
+      const primerSeg = b.recorrido && b.recorrido[0] && b.recorrido[0].segmentos[0];
+      const temaBanda = lista.length ? R.paisaje.tema({ destinos: b.destinos, perfil: b.perfil, fechaInicio: primerSeg && primerSeg.sale.fecha }) : 'campo';
+      banda.style.background = R.paisaje.fondo({ id: lista[0] || 'viaje' }, temaBanda);
+      banda.innerHTML = `${R.paisaje.svg(null, { tema: temaBanda, transporte: b.recorrido && b.recorrido.length ? R.recorrido.medioPrincipal(b.recorrido) : 'avion', progreso: paso / (PASOS.length - 1) })}
         <span class="ap-texto">${esc(lista.length ? lista.join(' → ') : 'Tu próximo viaje')}</span>`;
     }
 
@@ -196,15 +198,8 @@ R.viajes = (function () {
       const n = nombrePaso();
       if (n === 'Destinos') return `
         <h4 class="titulo-paso">¿Desde dónde salís?</h4>
+        <p class="ayuda">Tu ciudad. La ida y la vuelta se arman solas desde acá.</p>
         <div id="lugarOrigen"></div>
-        <div class="bloque-conexion ${b.conexion ? 'activo' : ''}">
-          <label class="check"><input type="checkbox" id="aConexion" ${b.conexion ? 'checked' : ''}> Primero viajo a otra ciudad para salir desde ahí <small>(ej: vivís en Bahía Blanca y el vuelo sale de Buenos Aires)</small></label>
-          ${b.conexion ? `
-            <div id="lugarConexion"></div>
-            <span class="etiqueta-campo">¿Cómo llegás hasta ahí?</span>
-            <div class="medios medios-chicos">${['micro', 'auto', 'avion', 'tren'].map(k => { const m = R.recorrido.MEDIOS[k]; return `<button type="button" class="chip-medio ${b.conexion.medio === k ? 'activo' : ''}" data-conexion-medio="${k}"><span>${m.icono}</span>${m.nombre.replace(' propio', '')}</button>`; }).join('')}</div>
-            <p class="ayuda">La sumo a la ida y a la vuelta: no la cargás dos veces. Si volvés por otro lado, lo cambiás en el cronograma.</p>` : ''}
-        </div>
         <h4 class="titulo-paso">¿A dónde vas?</h4>
         <p class="ayuda">Si es un viaje combinado, agregá cada destino en orden.</p>
         <div class="lista-destinos">${b.destinos.map((d, i) => `
@@ -232,7 +227,7 @@ R.viajes = (function () {
         b.conexionAplicada = nueva;
         return `
         <h4 class="titulo-paso">¿Cómo y cuándo viajás?</h4>
-        <p class="ayuda">Para cada traslado elegí el medio y cargá cuándo sale y cuándo llega (la hora es opcional). Las noches en cada lugar se calculan solas. Si en un tramo cambiás de medio, usá "Pasar por otra ciudad".</p>
+        <p class="ayuda">Para cada traslado indicá si es <strong>directo</strong> o <strong>con conexión</strong>, en qué viajás y cuándo salís. Las noches se calculan solas con las fechas (o escribilas y ajusto la salida). Si la ida tiene una conexión, la vuelta la repite.</p>
         <div id="editorCronograma"></div>`;
       }
 
@@ -333,7 +328,6 @@ R.viajes = (function () {
       if (n === 'Destinos') {
         b.destinos = b.destinos.filter((d, i) => d.nombre || i === 0);
         if (!b.destinos.some(d => d.nombre && !d.soloDia)) return 'Contanos a dónde vas (al menos un destino donde te quedes).';
-        if (b.conexion && !(b.conexion.lugar && b.conexion.lugar.nombre)) return 'Escribí la ciudad desde donde sale el viaje (o destildá esa opción).';
       }
       if (n === 'Cronograma' && !b.sinFechas) {
         const v = { recorrido: b.recorrido, destinos: b.destinos, tareas: {} };
@@ -367,14 +361,10 @@ R.viajes = (function () {
         };
         camposLugar.origen = R.lugares.campo(cont.querySelector('#lugarOrigen'), { valor: b.origen, placeholder: 'Tu ciudad de salida', alCambiar: avisar });
         camposLugar.destinos = b.destinos.map((d, i) => R.lugares.campo(cont.querySelector(`[data-lugar-destino="${i}"]`), {
-          valor: d, placeholder: d.soloDia ? 'Lugar que visitás en el día' : 'Ej: Bariloche, Río de Janeiro, Madrid',
+          valor: d, placeholder: d.soloDia ? 'Lugar que visitás en el día' : 'Ej: Roma, Cusco, Nueva York',
           alCambiar: () => { avisar(); }
         }));
         avisar();
-        const chkCon = cont.querySelector('#aConexion');
-        chkCon.onchange = () => { leerPaso(); b.conexion = chkCon.checked ? { lugar: { nombre: '' }, medio: 'micro' } : null; pintar(); if (b.conexion) { const i = cont.querySelector('#lugarConexion .lugar-input'); if (i) i.focus(); } };
-        camposLugar.conexion = b.conexion ? R.lugares.campo(cont.querySelector('#lugarConexion'), { valor: b.conexion.lugar, placeholder: 'Ciudad desde donde sale el viaje (ej: Buenos Aires)' }) : null;
-        cont.querySelectorAll('[data-conexion-medio]').forEach(x => x.onclick = () => { leerPaso(); b.conexion.medio = x.dataset.conexionMedio; pintar(); });
         cont.querySelector('[data-a="masDestino"]').onclick = () => { leerPaso(); b.destinos.push(nuevoDestino(false)); pintar(); };
         cont.querySelector('[data-a="masEscapada"]').onclick = () => { leerPaso(); b.destinos.push(nuevoDestino(true)); pintar(); };
         cont.querySelectorAll('[data-quitar-destino]').forEach(x => x.onclick = () => { leerPaso(); b.destinos.splice(Number(x.dataset.quitarDestino), 1); pintar(); });
@@ -423,7 +413,8 @@ R.viajes = (function () {
       const temp = Object.assign({ tareas: {}, tareasPropias: [], participantes: [R.db.yo().id], personas: {}, itinerario: [], documentos: [], movimientos: [], cambios: [], valijas: {} }, datosDelViaje());
       recalcularTramos(temp);
       const incluye = b.resuelto.paquete ? b.paqueteIncluye : [];
-      return R.motor.lista(temp).filter(t => !t.rec && t.fase !== 'definir' && t.base !== 'pq_paquete' && !R.formularios.incluidoEnPaquete(t, incluye));
+      // Lo que tiene ventana (como el check-in) no se puede tener resuelto de antemano
+      return R.motor.lista(temp).filter(t => !t.rec && !t.ventanaDias && t.fase !== 'definir' && t.base !== 'pq_paquete' && !R.formularios.incluidoEnPaquete(t, incluye));
     }
 
     /** Convierte los viajeros del asistente en personas guardadas (sin duplicar). */
@@ -533,6 +524,12 @@ R.viajes = (function () {
       const prog = R.motor.progreso(v);
       const faltan = R.motor.analizar(v).filter(t => t.faltanDatos).length;
       location.hash = `#viaje/${v.id}/guia`;
+      if (v.perfil.paquete) {
+        // Primero los datos del paquete y después, uno por uno, lo que incluye
+        U.toast('¡Viaje creado! Ahora cargamos los datos del paquete.');
+        setTimeout(() => R.formularios.abrir(R.db.viaje(v.id) || v, 'pq_paquete'), 350);
+        return;
+      }
       U.toast(`¡Viaje creado! Ya tenés ${U.plural(prog.hechas, 'paso resuelto', 'pasos resueltos')}${faltan ? '. Después completamos sus datos' : ''}.`);
     }
 
@@ -564,6 +561,33 @@ R.viajes = (function () {
   /* ---------------------------------------------------------
      Vista de un viaje
      --------------------------------------------------------- */
+  /** Elegir a mano el estilo de la portada (o dejar que se arme solo según el destino). */
+  function elegirPortada(v) {
+    const actual = (v.perfil && v.perfil.portada) || '';
+    const automatico = R.paisaje.tema(Object.assign({}, v, { perfil: Object.assign({}, v.perfil, { portada: '' }) }));
+    const opcion = (id, nombre, idTema) => `
+      <button type="button" class="portada-opcion ${actual === id ? 'activa' : ''}" data-portada="${id}">
+        <span class="portada-muestra" style="background:${R.paisaje.fondo(v, idTema)}">${R.paisaje.svg(null, { tema: idTema, transporte: v.perfil.transporte || 'avion', progreso: 0.6 })}</span>
+        <span>${esc(nombre)}</span>
+      </button>`;
+    U.modal({
+      titulo: 'Estilo de la portada',
+      subtitulo: 'Se arma sola según el destino. Si preferís otra, elegila acá.',
+      ancho: true,
+      cuerpo: `<div class="portada-opciones">
+        ${opcion('', 'Automático · ' + R.paisaje.TEMAS[automatico].nombre, automatico)}
+        ${Object.entries(R.paisaje.TEMAS).map(([id, t]) => opcion(id, t.icono + ' ' + t.nombre, id)).join('')}
+      </div>`,
+      alAbrir: el => el.querySelectorAll('[data-portada]').forEach(b => b.onclick = () => {
+        v.perfil = v.perfil || {};
+        if (b.dataset.portada) v.perfil.portada = b.dataset.portada; else delete v.perfil.portada;
+        R.db.guardarViaje(v);
+        U.cerrarModal();
+        R.app.refrescar();
+      })
+    });
+  }
+
   function renderViaje(app, v, pestana) {
     const prog = R.motor.progreso(v);
     const tipo = tipoDe(v);
@@ -571,7 +595,7 @@ R.viajes = (function () {
     if (!PESTANAS.some(p => p.id === pestana)) pestana = 'guia';
 
     app.innerHTML = `
-      <section class="portada-viaje" style="background:${U.portada(v.destino)}">
+      <section class="portada-viaje" style="background:${R.paisaje.fondo(v)}">
         ${U.paisaje(v)}
         <div class="portada-contenido">
           <a href="#viajes" class="volver">← Mis viajes</a>
@@ -586,7 +610,7 @@ R.viajes = (function () {
             <div class="portada-lado">
               ${U.anillo(prog.pct, 92, 'listo')}
               <div class="portada-acciones">
-                ${R.db.puedeOrganizar(v) ? '<button class="btn btn-vidrio btn-chico" data-a="editar">Editar</button>' : ''}
+                ${R.db.puedeOrganizar(v) ? '<button class="btn btn-vidrio btn-chico" data-a="portada" title="Elegir el estilo de la portada">🎨 Portada</button><button class="btn btn-vidrio btn-chico" data-a="editar">Editar</button>' : ''}
                 ${R.db.esDueno(v) ? '<button class="btn btn-vidrio btn-chico" data-a="eliminar" title="Eliminar viaje">Eliminar</button>' : ''}
               </div>
             </div>
@@ -601,6 +625,8 @@ R.viajes = (function () {
     app.classList.toggle('rol-viajero', !R.db.puedeOrganizar(v));
     const bEditar = app.querySelector('[data-a="editar"]');
     if (bEditar) bEditar.onclick = () => abrirAsistente(v);
+    const bPortada = app.querySelector('[data-a="portada"]');
+    if (bPortada) bPortada.onclick = () => elegirPortada(v);
     const bEliminar = app.querySelector('[data-a="eliminar"]');
     if (bEliminar) bEliminar.onclick = async () => {
       const ok = await U.confirmar(`Se va a borrar "${v.nombre || v.destino}" con sus pasos, documentos y gastos. No se puede deshacer.`, { titulo: 'Eliminar viaje', textoSi: 'Eliminar', peligro: true });
@@ -632,7 +658,7 @@ R.viajes = (function () {
     const personas = v.participantes.map(id => R.db.persona(id)).filter(Boolean);
     return `
       <a class="tarjeta-viaje" href="#viaje/${v.id}/guia">
-        <div class="tv-portada" style="background:${U.portada(v.destino)}">
+        <div class="tv-portada" style="background:${R.paisaje.fondo(v)}">
           ${U.paisaje(v)}
           <span class="tv-cuenta">${esc(cuentaRegresiva(v))}</span>
           <h3>${esc(v.nombre || conAlojamiento(v).map(d => d.nombre).join(' → ') || v.destino)}</h3>

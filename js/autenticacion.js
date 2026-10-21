@@ -111,6 +111,22 @@ R.auth = (function () {
     return actual;
   }
 
+  /* ---------- Recordarme ---------- */
+  const CLAVE_RECORDAR = 'rutenda_recordar';
+  function recordado() {
+    try { const r = JSON.parse(localStorage.getItem(CLAVE_RECORDAR) || 'null'); return r || { si: true, email: '' }; } catch (e) { return { si: true, email: '' }; }
+  }
+  /** Guarda (o no) el mail y define si la sesión sigue abierta al cerrar el navegador. */
+  async function recordarme(si, email) {
+    try { localStorage.setItem(CLAVE_RECORDAR, JSON.stringify({ si, email: si ? normalizarEmail(email || '') : '' })); } catch (e) { /* sin almacenamiento */ }
+    if (enNube()) {
+      try {
+        const P = firebase.auth.Auth && firebase.auth.Auth.Persistence;
+        if (P) await R.nube.auth().setPersistence(si ? P.LOCAL : P.SESSION);
+      } catch (e) { /* el navegador no lo permite: queda la sesión normal */ }
+    }
+  }
+
   async function ingresar(email, clave) {
     email = normalizarEmail(email);
     if (enNube()) {
@@ -244,9 +260,10 @@ R.auth = (function () {
                 <label class="campo"><span>Nacionalidad de tu documento</span><select id="acNac">${R.requisitos.NACIONALIDADES.map(([c, n]) => `<option value="${c}" ${c === 'AR' ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : `
                 <h2>¡Hola de nuevo!</h2>
                 <p class="texto-suave">Ingresá para seguir con tus viajes.</p>`}
-              <label class="campo"><span>Mail</span><input id="acEmail" type="email" autocomplete="email" inputmode="email" required></label>
-              <label class="campo"><span>Contraseña</span><input id="acClave" type="password" autocomplete="${modo === 'registro' ? 'new-password' : 'current-password'}" required></label>
-              ${modo === 'registro' ? `<label class="campo"><span>Repetí la contraseña</span><input id="acClave2" type="password" autocomplete="new-password" required></label>` : ''}
+              <label class="campo"><span>Mail</span><input id="acEmail" type="email" autocomplete="email" inputmode="email" value="${esc(recordado().email)}" required></label>
+              ${U.campoClave('acClave', 'Contraseña', modo === 'registro' ? 'new-password' : 'current-password')}
+              ${modo === 'registro' ? U.campoClave('acClave2', 'Repetí la contraseña', 'new-password') : ''}
+              <label class="check recordarme"><input type="checkbox" id="acRecordar" ${recordado().si ? 'checked' : ''}> Recordarme en este dispositivo</label>
               <p class="acceso-error" id="acError" role="alert"></p>
               <button class="btn btn-primario btn-grande btn-bloque" type="submit">${modo === 'registro' ? 'Crear cuenta' : 'Ingresar'}</button>
               ${modo === 'ingresar' ? '<button type="button" class="btn btn-texto btn-bloque" data-a="olvide">¿Olvidaste tu contraseña?</button>' : ''}
@@ -256,6 +273,7 @@ R.auth = (function () {
         </section>`;
 
       app.querySelectorAll('[data-modo]').forEach(b => b.onclick = () => { modo = b.dataset.modo; pintar(); });
+      U.enlazarClaves(app);
       const olvide = app.querySelector('[data-a="olvide"]');
       if (olvide) olvide.onclick = () => abrirRecuperar(app.querySelector('#acEmail').value);
 
@@ -268,6 +286,8 @@ R.auth = (function () {
         boton.disabled = true;
         boton.textContent = modo === 'registro' ? 'Creando tu cuenta…' : 'Ingresando…';
         try {
+          const recordar = app.querySelector('#acRecordar').checked;
+          await recordarme(recordar, val('acEmail'));
           if (modo === 'registro') {
             if (val('acClave') !== val('acClave2')) throw new Error('Las contraseñas no coinciden.');
             await registrar({ nombre: val('acNombre'), apellido: val('acApellido'), email: val('acEmail'), clave: val('acClave'), nacionalidad: val('acNac') });
@@ -335,14 +355,15 @@ R.auth = (function () {
         <details class="detalle-plegable">
           <summary>Cambiar contraseña</summary>
           <div class="grilla-2">
-            <label class="campo"><span>Contraseña actual</span><input id="mcClave" type="password" autocomplete="current-password"></label>
-            <label class="campo"><span>Nueva contraseña</span><input id="mcNueva" type="password" autocomplete="new-password"></label>
+            ${U.campoClave('mcClave', 'Contraseña actual', 'current-password')}
+            ${U.campoClave('mcNueva', 'Nueva contraseña', 'new-password')}
           </div>
         </details>
         ${R.app.puedeInstalar() ? '<button type="button" class="btn btn-suave btn-bloque" data-a="instalarApp">📲 Instalar Rutenda como app</button>' : ''}
         <p class="ayuda version-app">Rutenda · versión ${R.VERSION}</p>
         <p class="ayuda">Cuenta creada el ${U.fmtFecha(String(u.creado).slice(0, 10))}. ${enNube() ? 'Tus datos se guardan en la nube y se sincronizan en tus dispositivos.' : 'Modo local: tus datos se guardan en este dispositivo.'}</p>`,
       alAbrir: el => {
+        U.enlazarClaves(el);
         const b = el.querySelector('[data-a="instalarApp"]');
         if (b) b.onclick = () => { U.cerrarModal(); R.app.instalar(); };
         const r = el.querySelector('[data-a="reenviar"]');

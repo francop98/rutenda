@@ -31,7 +31,8 @@ R.lugares = (function () {
       region: x.admin1 || '',
       pais: x.country || '',
       codigoPais: (x.country_code || '').toUpperCase(),
-      lat: x.latitude, lon: x.longitude, zona: x.timezone || ''
+      lat: x.latitude, lon: x.longitude, zona: x.timezone || '',
+      elevacion: x.elevation != null ? x.elevation : null, poblacion: x.population || 0, tipoLugar: x.feature_code || ''
     }));
     cache[clave] = lista;
     return lista;

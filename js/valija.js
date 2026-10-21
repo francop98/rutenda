@@ -11,7 +11,7 @@ window.R = window.R || {};
 R.valija = (function () {
   const U = R.util;
   const { esc } = U;
-  const normal = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  const normal = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 
   const CATEGORIAS = [
     { id: 'documentos', nombre: 'Documentos y dinero', icono: '🛂' },

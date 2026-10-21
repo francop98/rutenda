@@ -997,9 +997,15 @@ body.sin-sesion .nav-inferior { display: none !important; }
   .nav-inferior {
     display: flex; align-items: flex-end; position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
     padding: 0 6px env(safe-area-inset-bottom);
-    background: color-mix(in srgb, var(--papel) 94%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-    border-top: 1px solid var(--linea);
+    /* Fondo sólido y capa propia: el desenfoque hacía que la barra "saltara" al scrollear en iPhone */
+    background: var(--papel); border-top: 1px solid var(--linea);
+    transform: translate3d(0, 0, 0); -webkit-transform: translate3d(0, 0, 0); will-change: transform;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    transition: opacity .15s ease;
   }
+  /* Con el teclado abierto la barra se esconde (si no, queda flotando en el medio) */
+  body.teclado-abierto .nav-inferior { opacity: 0; pointer-events: none; visibility: hidden; }
+  body.teclado-abierto { padding-bottom: 0; }
   .toast { bottom: calc(92px + env(safe-area-inset-bottom)); }
   .pestanas { top: calc(52px + env(safe-area-inset-top)); }
   /* Evita el zoom automático de iOS al tocar campos */
@@ -1412,3 +1418,60 @@ body.sin-scroll { position: fixed; left: 0; right: 0; width: 100%; overflow: hid
 .segmentado-gastos button { white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 2px; }
 .acceso-marca h1 { font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600; letter-spacing: .02em; font-size: 3.4rem; }
 .version-app { margin-bottom: 0; font-weight: 600; color: var(--tinta-suave); }
+
+/* ---------- v11: contraseña visible y recordarme ---------- */
+.clave-envoltura { position: relative; display: block; }
+.clave-envoltura input { width: 100%; padding-right: 48px; }
+.ver-clave { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border: 0; background: transparent; color: var(--tinta-tenue); border-radius: 10px; display: grid; place-items: center; cursor: pointer; }
+.ver-clave:hover { color: var(--tinta); background: var(--arena-2); }
+.ver-clave svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ver-clave .tachado { display: none; }
+.ver-clave.visible { color: var(--mar); }
+.ver-clave.visible .tachado { display: inline; }
+.recordarme { margin: 2px 0 10px; font-size: .92rem; }
+
+/* ---------- v11: cronograma por tramos ---------- */
+.cr-tramo { position: relative; display: grid; gap: 10px; padding: 12px; border: 1px solid var(--linea); border-radius: var(--radio); background: color-mix(in srgb, var(--papel) 70%, var(--arena)); }
+.cr-tramo::before { content: ''; position: absolute; left: -17px; top: 22px; width: 10px; height: 10px; border-radius: 50%; background: var(--mar); }
+.cr-tramo-cab { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.cr-tramo-cab > div { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.cr-tramo-cab strong { font-size: 1.02rem; }
+.cr-tramo .cr-seg { box-shadow: none; }
+.cr-tramo .cr-seg::before { display: none; }
+.cr-parte { font-size: .74rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--tinta-tenue); }
+.cr-medio-pregunta { font-size: .9rem; font-weight: 600; color: var(--tinta-suave); }
+.cr-tramo .cr-parada { position: relative; padding-left: 36px; }
+.cr-tramo .cr-parada .cr-punto { left: 6px; }
+.cr-agregar-parada strong { font-size: .95rem; }
+.cr-agregar-parada small { color: var(--tinta-suave); margin-top: -6px; }
+.cr-noches-campo { display: inline-flex; align-items: center; gap: 8px; background: var(--papel); border: 1px solid var(--linea); border-radius: 12px; padding: 4px 10px 4px 4px; }
+.cr-noches-campo input { width: 64px; border: 0; background: var(--arena); border-radius: 9px; padding: 8px 6px; text-align: center; font: inherit; font-weight: 700; font-size: 1.05rem; color: var(--tinta); }
+.cr-noches-campo input:disabled { opacity: .5; }
+.cr-noches-campo span { font-weight: 600; color: var(--tinta-suave); }
+
+/* ---------- v11 · Portadas según el destino ---------- */
+.p-nieve { fill: rgba(255, 255, 255, .78); }
+.p-copo circle { fill: rgba(255, 255, 255, .75); }
+.p-arbol { fill: rgba(255, 255, 255, .26); }
+.p-lago { fill: rgba(255, 255, 255, .24); }
+.p-reflejo { fill: none; stroke: rgba(255, 255, 255, .5); stroke-width: 2; stroke-linecap: round; }
+.p-cascada path { fill: none; stroke: rgba(255, 255, 255, .55); stroke-width: 9; stroke-linecap: round; }
+.p-bruma ellipse { fill: rgba(255, 255, 255, .35); }
+.p-tronco { fill: none; stroke: rgba(255, 255, 255, .36); stroke-linecap: round; }
+.p-hoja { fill: rgba(255, 255, 255, .34); }
+.p-cactus { fill: none; stroke: rgba(255, 255, 255, .34); stroke-linecap: round; stroke-linejoin: round; }
+.p-estrato { fill: none; stroke: rgba(255, 255, 255, .14); stroke-width: 3; }
+.p-mar-playa { fill: rgba(255, 255, 255, .2); }
+.p-arena { fill: rgba(255, 238, 205, .42); }
+.p-velero { fill: rgba(255, 255, 255, .7); }
+.p-edificio-lejos { fill: rgba(255, 255, 255, .12); }
+.p-edificio { fill: rgba(255, 255, 255, .2); }
+.p-ventanita { fill: rgba(255, 236, 190, .55); }
+.portada-opciones { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.portada-opcion {
+  display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 16px; border: 2px solid transparent;
+  background: none; cursor: pointer; font: inherit; font-size: .88rem; color: var(--tinta); text-align: left;
+}
+.portada-opcion.activa { border-color: var(--oro, #D4AF6A); }
+.portada-muestra { position: relative; display: block; height: 78px; border-radius: 12px; overflow: hidden; }
+.portada-muestra .paisaje { height: 100%; }

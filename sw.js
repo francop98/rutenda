@@ -4,7 +4,7 @@
    recibir recordatorios. Al cambiar archivos, subir el número
    de VERSION para que los celulares descarguen la versión nueva.
    ========================================================= */
-const VERSION = 'rutenda-10.2';
+const VERSION = 'rutenda-11';
 const ARCHIVOS = [
   './',
   './index.html',

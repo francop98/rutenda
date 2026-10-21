@@ -416,7 +416,7 @@ R.itinerario = (function () {
         ${existente && existente.origen ? `<p class="aviso-suave">🧭 Lo cargó el paso "${esc(R.motor.nombre(v, existente.origen))}". Si volvés a guardar ese paso, se actualiza.</p>` : ''}
         <div class="chips-elegir" id="iTipos">${TIPOS.map(t => `<button type="button" class="chip-op ${e.tipo === t.id ? 'activo' : ''}" data-tipo="${t.id}">${t.icono} ${t.nombre}</button>`).join('')}</div>
         <input type="hidden" id="iTipo" value="${esc(e.tipo)}">
-        <label class="campo"><span>Título *</span><input id="iTitulo" value="${esc(e.titulo)}" placeholder="Ej: Cerro Catedral, cena en el centro"></label>
+        <label class="campo"><span>Título *</span><input id="iTitulo" value="${esc(e.titulo)}" placeholder="Ej: visita guiada, cena especial"></label>
         <div class="grilla-2">
           <label class="campo"><span>Fecha</span><input type="date" id="iFecha" value="${esc(e.fecha)}" min="${esc(v.fechaInicio || '')}" max="${esc(v.fechaFin || '')}"></label>
           <label class="campo"><span>Hora</span><input type="time" id="iHora" value="${esc(e.hora)}"></label>

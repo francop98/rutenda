@@ -262,7 +262,7 @@ R.participantes = (function () {
             </div>
           </div>
           <ul class="comp-viajes">${viajes.map(v => `
-            <li><a href="#viaje/${v.id}/guia"><span class="punto" style="background:${U.portada(v.destino)}"></span>${esc(v.nombre || v.destino)}<small>${esc(v.fechaInicio ? U.fmtFecha(v.fechaInicio) : 'Sin fecha')}</small></a></li>`).join('')}</ul>
+            <li><a href="#viaje/${v.id}/guia"><span class="punto" style="background:${R.paisaje.fondo(v)}"></span>${esc(v.nombre || v.destino)}<small>${esc(v.fechaInicio ? U.fmtFecha(v.fechaInicio) : 'Sin fecha')}</small></a></li>`).join('')}</ul>
         </article>`).join('')}</div>` : `
         <div class="vacio">
           <div class="vacio-icono">👥</div>

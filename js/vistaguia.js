@@ -21,6 +21,8 @@ R.vistaGuia = (function () {
     return `<span class="chip">${U.fmtFecha(t.fechaLimite, 'corto')}</span>`;
   }
 
+  const esPaqueteSinDatos = (v, t) => { const x = v.tareas[t.id] || {}; return !!x.incluidoEnPaquete && x.estado === 'en_curso' && !x.datos && t.tieneFormulario; };
+
   function chipEstado(t) {
     if (t.esperaVentana) return '<span class="chip chip-gris">Más adelante</span>';
     if (t.postergado || t.estado === 'en_curso') return '<span class="chip chip-gris">Pendiente</span>';
@@ -60,10 +62,12 @@ R.vistaGuia = (function () {
               <div class="lista-siguientes">${pendientes.map(t => `
                 <div class="fila-siguiente fila-pendiente">
                   <span class="num">${t.esperaVentana ? '⏳' : R.guia.fase(t.fase).icono}</span>
-                  <span class="fs-texto" data-tarea="${t.id}"><strong>${esc(t.titulo)}</strong><small>${t.esperaVentana ? `Se habilita el ${U.fmtFecha(t.habilitaEl, 'largo')}` : esc(R.guia.fase(t.fase).nombre)}${t.diasRestantes != null && t.diasRestantes < 0 && !t.esperaVentana ? ' · atrasado' : ''}</small></span>
+                  <span class="fs-texto" data-tarea="${t.id}"><strong>${esc(t.titulo)}</strong><small>${t.esperaVentana ? `Se habilita el ${U.fmtFecha(t.habilitaEl, 'largo')}` : esPaqueteSinDatos(v, t) ? '📦 Incluido en el paquete · faltan los datos' : esc(R.guia.fase(t.fase).nombre)}${t.diasRestantes != null && t.diasRestantes < 0 && !t.esperaVentana ? ' · atrasado' : ''}</small></span>
                   <span class="fp-acciones">
-                    <button class="btn btn-primario btn-chico" data-rapido="hecha" data-id="${t.id}">✓ Listo</button>
-                    ${t.esperaVentana ? '' : `<button class="btn btn-texto btn-chico" data-reactivar="${t.id}">A la guía</button>`}
+                    ${t.esperaVentana ? '<span class="chip chip-gris">Todavía no</span>'
+                      : esPaqueteSinDatos(v, t) ? `<button class="btn btn-primario btn-chico" data-completar="${t.id}">Completar datos</button>`
+                      : `<button class="btn btn-primario btn-chico" data-rapido="hecha" data-id="${t.id}">✓ Listo</button>
+                         <button class="btn btn-texto btn-chico" data-reactivar="${t.id}">A la guía</button>`}
                   </span>
                 </div>`).join('')}</div>
             </div>` : ''}
@@ -295,6 +299,14 @@ R.vistaGuia = (function () {
   /** Cambia el estado; "Listo" en un paso con formulario abre la carga de datos. */
   function cambiarEstado(v, id, nuevo) {
     if (nuevo === 'hecha' && id === 'd_fechas') { R.itinerario.editarCronograma(v); return; }
+    if (nuevo === 'hecha') {
+      // Lo que tiene ventana (como el check-in) no se puede dar por hecho antes de tiempo
+      const info = R.motor.analizar(v).find(x => x.id === id);
+      if (info && info.esperaVentana) {
+        U.toast(`Todavía no se puede: se habilita el ${U.fmtFecha(info.habilitaEl, 'largo')}. Ese día te aviso.`);
+        return;
+      }
+    }
     if (nuevo === 'hecha' && R.motor.estado(v, id) !== 'hecha') {
       const t = R.motor.lista(v).find(x => x.id === id);
       if (t && R.formularios.tiene(t) && R.formularios.abrir(v, id)) return;
@@ -345,13 +357,13 @@ R.vistaGuia = (function () {
       ancho: true,
       cuerpo: `
         <div class="segmentado segmentado-estado">${Object.entries(R.guia.ESTADOS).filter(([k]) => (k !== 'revisar' || t.estado === 'revisar') && (k !== 'en_curso' || t.estado === 'en_curso')).map(([k, e]) =>
-          `<button type="button" data-estado="${k}" class="${t.estado === k ? 'activo' : ''}">${e.nombre}</button>`).join('')}</div>
+          `<button type="button" data-estado="${k}" class="${t.estado === k ? 'activo' : ''}" ${k === 'hecha' && t.esperaVentana ? 'disabled title="Todavía no se puede hacer"' : ''}>${e.nombre}</button>`).join('')}</div>
         ${datos.incluidoEnPaquete ? '<p class="aviso-suave">📦 Incluido en el paquete que compraste.</p>' : ''}
         ${datos.deducido && t.estado === 'hecha' ? '<p class="aviso-suave">✓ Lo di por resuelto porque completaste un paso que lo necesitaba.</p>' : ''}
         ${t.esperaVentana ? `<p class="aviso-suave">⏳ Se habilita el ${U.fmtFecha(t.habilitaEl, 'largo')}. Hasta entonces queda en tus pendientes.</p>`
           : t.postergado ? '<p class="aviso-suave">📋 Está en tus pendientes. <button type="button" class="btn-texto-mini" data-a="reactivar">Volver a la guía</button></p>' : ''}
         ${t.desc ? `<p class="detalle-desc">${esc(t.desc)}</p>` : ''}
-        ${t.tieneFormulario ? `
+        ${t.tieneFormulario && !t.esperaVentana ? `
           <div class="detalle-datos">
             <div class="bloque-cab"><h4>Datos cargados</h4><button type="button" class="btn ${datos.datos ? 'btn-suave' : 'btn-primario'} btn-chico" data-a="formulario">${datos.datos ? 'Editar datos' : (t.estado === 'hecha' ? 'Cargar datos' : 'Listo, cargar datos')}</button></div>
             ${datos.datos ? `<ul class="lista-resumen">${R.formularios.resumen(v, t).map(l => `<li>${esc(l)}</li>`).join('') || '<li>Sin detalles.</li>'}</ul>` : '<p class="texto-suave">Cuando lo resuelvas, cargá los datos (horarios, códigos, costo, archivos) y se suman solos al itinerario, a los gastos y a documentos.</p>'}

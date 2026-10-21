@@ -88,7 +88,7 @@ R.requisitos = (function () {
     }
   };
 
-  const normal = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  const normal = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 
   function nacionalidad() { const u = R.auth && R.auth.usuarioActual(); return (u && u.nacionalidad) || 'AR'; }
 

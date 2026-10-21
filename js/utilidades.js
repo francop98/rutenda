@@ -5,7 +5,7 @@
 window.R = window.R || {};
 
 /** Versión de la app (cambios chicos: 10.1, 10.2…; cambios grandes: 11, 12…). Igual que VERSION en sw.js. */
-window.R.VERSION = '10.2';
+window.R.VERSION = '11';
 
 R.util = (function () {
   const pad = n => String(n).padStart(2, '0');
@@ -251,7 +251,28 @@ R.util = (function () {
     return MONEDAS.map(m => `<option value="${m}" ${m === seleccionada ? 'selected' : ''}>${m}</option>`).join('');
   }
 
+  /** Campo de contraseña con botón para mostrarla u ocultarla. */
+  function campoClave(id, etiqueta, autocomplete) {
+    return `<label class="campo campo-clave"><span>${esc(etiqueta)}</span>
+      <span class="clave-envoltura"><input id="${id}" type="password" autocomplete="${autocomplete || 'current-password'}">
+      <button type="button" class="ver-clave" data-ver-clave="${id}" aria-label="Mostrar contraseña" aria-pressed="false">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path class="tachado" d="M4 4l16 16"/></svg>
+      </button></span></label>`;
+  }
+  function enlazarClaves(cont) {
+    cont.querySelectorAll('[data-ver-clave]').forEach(b => b.onclick = e => {
+      e.preventDefault();
+      const input = cont.querySelector('#' + b.dataset.verClave);
+      const ver = input.type === 'password';
+      input.type = ver ? 'text' : 'password';
+      b.classList.toggle('visible', ver);
+      b.setAttribute('aria-pressed', String(ver));
+      b.setAttribute('aria-label', ver ? 'Ocultar contraseña' : 'Mostrar contraseña');
+    });
+  }
+
   return {
+    campoClave, enlazarClaves,
     MONEDAS, fondoBloqueado, id, esc, aISO, hoyISO, aFecha, sumarDias, diasEntre, fmtFecha, fmtRango, plural,
     redondear, fmtMoneda, fmtTamano, numero, hash, portada, colorPersona, iniciales, avatar,
     anillo, saludo, frase, paisaje, modal, cerrarModal, confirmar, toast, opcionesMoneda

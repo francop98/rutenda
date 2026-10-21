@@ -31,7 +31,7 @@ R.recorrido = (function () {
     estimado: { nombre: 'Estimado', clase: 'cr-estimado' },
     confirmado: { nombre: 'Confirmado', clase: 'cr-confirmado' }
   };
-  const normal = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  const normal = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
   const nuevoId = p => (R.util ? R.util.id(p) : p + Math.random().toString(36).slice(2, 8));
   const lugar = l => ({
     nombre: (l && l.nombre) || '', region: (l && l.region) || '', pais: (l && l.pais) || '', codigoPais: (l && l.codigoPais) || '',
@@ -165,7 +165,7 @@ R.recorrido = (function () {
   }
 
   /**
-   * Ciudad de conexión del viaje (ej. vivís en Bahía Blanca y el vuelo sale de Buenos Aires):
+   * Ciudad de conexión del viaje (ej. el vuelo sale de otra ciudad):
    * la suma a la ida y a la vuelta con el medio elegido para llegar hasta ahí.
    */
   function aplicarConexion(recorrido, conexion) {

@@ -44,16 +44,33 @@ R.cronogramaEditor = (function () {
       bloques.push(`<div class="cr-hito"><span class="cr-punto">🏠</span><div><strong>Salís de ${esc((b.origen && b.origen.nombre) || 'tu ciudad')}</strong>${!(b.origen && b.origen.nombre) ? '<small>Cargá tu ciudad de salida para sumar la ida y la vuelta.</small>' : ''}</div></div>`);
 
       tramos.forEach((t, ti) => {
+        const conConexion = t.segmentos.length > 1 || paradaAbierta === ti;
+        const partes = [];
         t.segmentos.forEach((s, si) => {
-          bloques.push(segmentoHTML(t, ti, s, si, M));
-          if (si < t.segmentos.length - 1) bloques.push(paradaHTML(t, ti, s, si));
+          partes.push(segmentoHTML(t, ti, s, si, M));
+          if (si < t.segmentos.length - 1) partes.push(paradaHTML(t, ti, s, si));
         });
         if (paradaAbierta === ti) {
-          bloques.push(`<div class="cr-agregar-parada"><div id="crLugarParada"></div>
-            <div class="acciones-fila"><button type="button" class="btn btn-primario btn-chico" data-cr="confirmarParada">Agregar parada</button><button type="button" class="btn btn-texto btn-chico" data-cr="cancelarParada">Cancelar</button></div></div>`);
-        } else {
-          bloques.push(`<button type="button" class="btn btn-texto btn-chico cr-btn-parada" data-cr-parada="${ti}">+ Pasar por otra ciudad en este tramo</button>`);
+          partes.push(`<div class="cr-agregar-parada">
+            <strong>${t.segmentos.length > 1 ? '¿Dónde es la otra conexión?' : '¿En qué ciudad hacés la conexión?'}</strong>
+            <small>La ciudad donde cambiás de transporte o de vuelo.</small>
+            <div id="crLugarParada"></div>
+            <div class="acciones-fila"><button type="button" class="btn btn-primario btn-chico" data-cr="confirmarParada">Listo</button><button type="button" class="btn btn-texto btn-chico" data-cr="cancelarParada">Cancelar</button></div></div>`);
+        } else if (t.segmentos.length > 1) {
+          partes.push(`<button type="button" class="btn btn-texto btn-chico cr-btn-parada" data-cr-parada="${ti}">+ Otra conexión</button>`);
         }
+        bloques.push(`
+          <section class="cr-tramo">
+            <header class="cr-tramo-cab">
+              <div><span class="tr-tipo tr-${t.tipo}">${C().TIPOS_TRAMO[t.tipo]}</span>
+                <strong>${esc(t.desde.nombre || '¿?')} → ${esc(t.hasta.nombre || '¿?')}</strong></div>
+              <span class="segmentado segmentado-chico" role="group" aria-label="¿Es directo o con conexión?">
+                <button type="button" data-cr-tipo="${ti}|directo" class="${!conConexion ? 'activo' : ''}">Directo</button>
+                <button type="button" data-cr-tipo="${ti}|conexion" class="${conConexion ? 'activo' : ''}">Con conexión</button>
+              </span>
+            </header>
+            ${partes.join('')}
+          </section>`);
         if (t.tipo !== 'vuelta') {
           const e = est.find(x => x.id === t.destId);
           if (e) bloques.push(estadiaHTML(t, ti, e));
@@ -81,8 +98,7 @@ R.cronogramaEditor = (function () {
       return `
         <div class="cr-seg" data-seg="${s.id}">
           <div class="cr-seg-cab">
-            <span class="tr-tipo tr-${t.tipo}">${C().TIPOS_TRAMO[t.tipo]}${t.segmentos.length > 1 ? ` · ${si + 1}/${t.segmentos.length}` : ''}</span>
-            <strong>${esc(s.desde.nombre || '¿?')} → ${esc(s.hasta.nombre || '¿?')}</strong>
+            ${t.segmentos.length > 1 ? `<span class="cr-parte">Parte ${si + 1} de ${t.segmentos.length}</span><strong>${esc(s.desde.nombre || '¿?')} → ${esc(s.hasta.nombre || '¿?')}</strong>` : '<strong class="cr-medio-pregunta">¿En qué viajás?</strong>'}
             ${b.sinFechas ? '' : `<span class="cr-estado ${est.clase}">${s.estado === 'confirmado' ? '✓ ' : ''}${est.nombre}</span>`}
           </div>
           <div class="medios">${Object.entries(M).map(([k, m]) =>
@@ -116,7 +132,7 @@ R.cronogramaEditor = (function () {
                 <button type="button" data-cr-noche="${ti}|${si}|si" class="${s.noche ? 'activo' : ''}">Sí${noches ? ` · ${U.plural(noches, 'noche', 'noches')}` : ''}</button>
               </span>
             </div>
-            <button type="button" class="btn-texto-mini" data-cr-unir="${ti}|${si}">Quitar esta parada</button>
+            <button type="button" class="btn-texto-mini" data-cr-unir="${ti}|${si}">Quitar esta conexión</button>
           </div>
         </div>`;
     }
@@ -143,18 +159,14 @@ R.cronogramaEditor = (function () {
             <strong>${esc(e.nombre)}</strong>
             ${mismoDia ? `<div class="cr-noche cr-pregunta-paso">Llegás y te vas el mismo día. ¿Dormís acá?
               <span class="segmentado segmentado-chico">
-                <button type="button" data-cr-noches="${ti}|1">Sí, sumo una noche</button>
+                <button type="button" data-cr-noches-set="${ti}|1">Sí, sumo una noche</button>
                 <button type="button" data-cr-depaso="${e.id}|si">No, es de paso</button>
               </span></div>` : ''}
             ${b.sinFechas ? '<small>Las noches se calculan cuando cargues las fechas.</small>' : `
             <div class="cr-noches">
-              <span>${e.desde ? 'Llegás el ' + U.fmtFecha(e.desde, 'corto') : 'Llegada a definir'}</span>
-              <span class="cr-contador">
-                <button type="button" class="btn-icono" data-cr-noches="${ti}|-1" aria-label="Una noche menos" ${!e.desde || !e.noches ? 'disabled' : ''}>−</button>
-                <strong>${e.noches != null ? U.plural(e.noches, 'noche', 'noches') : '— noches'}</strong>
-                <button type="button" class="btn-icono" data-cr-noches="${ti}|1" aria-label="Una noche más" ${!e.desde ? 'disabled' : ''}>+</button>
-              </span>
-              <span>${e.hasta ? 'Te vas el ' + U.fmtFecha(e.hasta, 'corto') : ''}</span>
+              <span>${e.desde ? 'Llegás el ' + U.fmtFecha(e.desde, 'dia') : 'Llegada a definir'}</span>
+              <label class="cr-noches-campo"><input type="number" inputmode="numeric" min="0" max="365" data-cr-noches-input="${ti}" value="${e.noches != null ? e.noches : ''}" placeholder="—" ${!e.desde ? 'disabled' : ''} aria-label="Cantidad de noches"> <span>noches</span></label>
+              <span>${e.hasta ? 'Te vas el ' + U.fmtFecha(e.hasta, 'dia') : (e.desde ? 'Escribí las noches o la fecha de salida' : '')}</span>
             </div>`}
             ${escapadas.map(d => `
               <div class="cr-escapada">☀️ Escapada a <strong>${esc(d.nombre)}</strong>
@@ -239,7 +251,7 @@ R.cronogramaEditor = (function () {
       });
       q('[data-cr-parada]').forEach(x => x.onclick = () => { paradaAbierta = Number(x.dataset.crParada); pintar(); });
       const cp = cont.querySelector('#crLugarParada');
-      if (cp) { campoParada = R.lugares.campo(cp, { placeholder: 'Ciudad por la que pasás (ej: Buenos Aires)' }); campoParada.input.focus(); }
+      if (cp) { campoParada = R.lugares.campo(cp, { placeholder: 'Escribí la ciudad' }); campoParada.input.focus(); }
       const conf = cont.querySelector('[data-cr="confirmarParada"]');
       if (conf) conf.onclick = () => {
         const l = campoParada.obtener();
@@ -255,19 +267,23 @@ R.cronogramaEditor = (function () {
       const canc = cont.querySelector('[data-cr="cancelarParada"]');
       if (canc) canc.onclick = () => { paradaAbierta = null; pintar(); };
 
-      q('[data-cr-noches]').forEach(x => x.onclick = () => {
-        const [ti, delta] = x.dataset.crNoches.split('|').map(Number);
+      /** Fija la cantidad de noches en un destino (corre la salida y, si corresponde, lo que sigue). */
+      function fijarNoches(ti, total) {
         const dest = (b.destinos || []).find(d => d.id === b.recorrido[ti].destId);
-        if (dest && delta > 0) dest.dePaso = false;
+        if (dest && total > 0) dest.dePaso = false;
         const llegaTramo = b.recorrido[ti];
         const ultimoSeg = llegaTramo.segmentos[llegaTramo.segmentos.length - 1];
         const sale = b.recorrido[ti + 1];
-        if (!sale) return;
+        if (!sale || !C().fechaLlega(ultimoSeg)) return;
         const primero = sale.segmentos[0];
         if (!primero.sale.fecha) {
-          primero.sale.fecha = U.sumarDias(C().fechaLlega(ultimoSeg), Math.max(1, delta));
+          primero.sale.fecha = U.sumarDias(C().fechaLlega(ultimoSeg), total);
           primero.estado = 'estimado';
-        } else if (b.moverJunto) {
+          return;
+        }
+        const delta = total - U.diasEntre(C().fechaLlega(ultimoSeg), primero.sale.fecha);
+        if (!delta) return;
+        if (b.moverJunto) {
           // Una noche más o menos corre todo lo que sigue
           C().desplazarDesde(ctxViaje(), ultimoSeg.id, delta);
         } else {
@@ -277,6 +293,36 @@ R.cronogramaEditor = (function () {
             if (z.llega.fecha) z.llega.fecha = U.sumarDias(z.llega.fecha, delta);
             if (z.estado === 'confirmado') z.estado = 'estimado';
           });
+        }
+      }
+      q('[data-cr-noches-input]').forEach(x => x.onchange = () => {
+        const n = Math.max(0, Math.min(365, parseInt(x.value, 10)));
+        if (isNaN(n)) return;
+        fijarNoches(Number(x.dataset.crNochesInput), n);
+        pintar();
+      });
+      q('[data-cr-noches-set]').forEach(x => x.onclick = () => {
+        const [ti, n] = x.dataset.crNochesSet.split('|').map(Number);
+        fijarNoches(ti, n);
+        pintar();
+      });
+      q('[data-cr-tipo]').forEach(x => x.onclick = async () => {
+        const [tiTxt, tipo] = x.dataset.crTipo.split('|');
+        const ti = Number(tiTxt);
+        const t = b.recorrido[ti];
+        if (tipo === 'conexion') {
+          if (t.segmentos.length === 1) { paradaAbierta = ti; pintar(); }
+          return;
+        }
+        if (paradaAbierta === ti) paradaAbierta = null;
+        if (t.segmentos.length > 1) {
+          const ok = await U.confirmar(`Se quitan las conexiones de este tramo y queda un solo traslado de ${t.desde.nombre} a ${t.hasta.nombre}.`, { titulo: 'Pasar a directo', textoSi: 'Sí, es directo' });
+          if (!ok) return;
+          while (t.segmentos.length > 1) {
+            const i = t.segmentos.length - 2;
+            C().desespejarParada(b.recorrido, t, i);
+            C().unir(t, i);
+          }
         }
         pintar();
       });
