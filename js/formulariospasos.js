@@ -579,7 +579,7 @@ R.formularios = (function () {
           <label class="campo medio"><span>Moneda</span><select data-costo="moneda">${U.opcionesMoneda(c.moneda)}</select></label>
           ${c.moneda !== v.monedaBase ? `<label class="campo completo"><span>Cotización: 1 ${esc(c.moneda)} = ? ${esc(v.monedaBase)}</span><input data-costo="cotizacion" inputmode="decimal" value="${esc(c.cotizacion)}"><small class="ayuda" data-cotiz-ayuda></small></label>` : ''}
           ${varios ? `
-            <label class="campo completo"><span>¿Quién pagó?</span><select data-costo="persona">${v.participantes.map(pid => `<option value="${pid}" ${pid === c.persona ? 'selected' : ''}>${esc((R.db.persona(pid) || {}).nombre)}</option>`).join('')}</select></label>
+            <label class="campo completo"><span>¿Quién pagó?</span><select data-costo="persona">${U.ordenAlfa(v.participantes, pid => (R.db.persona(pid) || {}).nombre).map(pid => `<option value="${pid}" ${pid === c.persona ? 'selected' : ''}>${esc((R.db.persona(pid) || {}).nombre)}</option>`).join('')}</select></label>
             <div class="campo completo"><span>¿Entre quiénes se divide?</span>
               <div class="segmentado segmentado-chico" data-seg-costo>
                 ${[['igual', 'Partes iguales'], ['montos', 'Montos'], ['porcentajes', 'Porcentajes']].map(([k, t]) => `<button type="button" data-modo-costo="${k}" class="${(c.modo || 'igual') === k ? 'activo' : ''}">${t}</button>`).join('')}

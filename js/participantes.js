@@ -227,7 +227,7 @@ R.participantes = (function () {
     const diasViajados = realizados.reduce((a, v) => a + (v.fechaInicio && v.fechaFin ? U.diasEntre(v.fechaInicio, v.fechaFin) + 1 : 0), 0);
     const destinos = new Set(misViajes.flatMap(v => (v.destinos || []).map(d => (d.nombre || '').toLowerCase()))).size;
     const otros = personas.filter(p => !p.esYo).map(p => ({ p, viajes: viajesCon(p.id) })).filter(x => x.viajes.length)
-      .sort((a, b) => b.viajes.length - a.viajes.length || a.p.nombre.localeCompare(b.p.nombre));
+      .sort((a, b) => U.alfa(a.p.nombre, b.p.nombre));
 
     app.innerHTML = `
       <section class="encabezado-simple">
@@ -264,11 +264,7 @@ R.participantes = (function () {
           <ul class="comp-viajes">${viajes.map(v => `
             <li><a href="#viaje/${v.id}/guia"><span class="punto" style="background:${R.paisaje.fondo(v)}"></span>${esc(v.nombre || v.destino)}<small>${esc(v.fechaInicio ? U.fmtFecha(v.fechaInicio) : 'Sin fecha')}</small></a></li>`).join('')}</ul>
         </article>`).join('')}</div>` : `
-        <div class="vacio">
-          <div class="vacio-icono">👥</div>
-          <h3>Todavía no sumaste compañeros</h3>
-          <p>Cuando agregues viajeros a tus viajes, acá vas a ver el historial de con quién viajaste.</p>
-        </div>`}`;
+        ${U.vacio({ icono: '👥', titulo: 'Todavía no sumaste compañeros', texto: 'Cuando sumes viajeros a un viaje, acá ves con quién viajaste.' })}`}`;
 
     app.querySelector('[data-a="cuenta"]').onclick = () => R.auth.abrirMiCuenta();
     app.querySelectorAll('[data-editar]').forEach(b => b.onclick = () => editarPersona(b.dataset.editar));

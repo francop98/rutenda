@@ -14,8 +14,12 @@
   let rutaAnterior = '';
   let listo = false;
 
+  const esPublica = () => /^#familia\//.test(location.hash);
   function render() {
     if (!listo) return;
+    // Link para la familia: se ve sin cuenta
+    document.body.classList.toggle('vista-publica', esPublica());
+    if (esPublica()) { R.familia.renderPublico(app, location.hash.split('/')[1] || ''); return; }
     if (!R.auth.usuarioActual()) {
       document.body.classList.add('sin-sesion');
       document.title = 'Rutenda · Ingresá';
@@ -28,7 +32,7 @@
     const hash = location.hash.replace(/^#/, '') || 'inicio';
     const [vista, id, pestana] = hash.split('/');
     document.querySelectorAll('[data-nav]').forEach(a => {
-      a.classList.toggle('activo', a.dataset.nav === vista || (vista === 'viaje' && a.dataset.nav === 'viajes') || (vista === 'personas' && a.dataset.nav === 'viajes' && a.closest('.nav-inferior')));
+      a.classList.toggle('activo', a.dataset.nav === vista || (vista === 'viaje' && a.dataset.nav === 'viajes'));
     });
 
     if (vista === 'unirse' && id) {
@@ -84,14 +88,15 @@
 
   /** Avatar del usuario en la barra. */
   function pintarUsuario() {
-    const boton = document.getElementById('btnUsuario');
+    // La cuenta está en el menú ☰: acá solo actualizamos su descripción
+    const boton = document.getElementById('btnMenu');
     const u = R.auth.usuarioActual();
-    if (!u) { boton.innerHTML = ''; return; }
-    boton.innerHTML = U.avatar(R.db.yo(), 34);
-    boton.title = `${u.nombre} · Mi cuenta`;
+    if (boton) boton.title = u ? `Menú · ${u.nombre}` : 'Menú';
   }
 
   async function arrancarSesion(u) {
+    // En el link de la familia no hace falta esperar tus viajes
+    if (esPublica()) { render(); R.db.cargar(u || R.auth.usuarioActual()).then(pintarUsuario).catch(() => {}); return; }
     app.innerHTML = '<div class="pantalla-carga"><span class="marca-logo grande"></span><p>Cargando tus viajes…</p></div>';
     await R.db.cargar(u || R.auth.usuarioActual());
     pintarUsuario();
@@ -99,8 +104,8 @@
     render();
     window.scrollTo(0, 0);
     R.migracion.ofrecer();
-    if (R.recordatorios) { R.recordatorios.actualizar(); R.recordatorios.revisar(); }
     if (R.tour) R.tour.siCorresponde();
+    if (R.recordatorios) { R.recordatorios.actualizar(); R.recordatorios.revisar(); }
     // Pasajes y reservas de los viajes cercanos, guardados para usarlos sin señal
     setTimeout(() => R.db.precargarArchivos().catch(() => {}), 4000);
   }
@@ -154,7 +159,7 @@
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }
 
-  window.R.app = { render, refrescar, refrescarRemoto, trasCerrarModal, pintarUsuario, puedeInstalar, instalar };
+  window.R.app = { render, refrescar, refrescarRemoto, trasCerrarModal, pintarUsuario, puedeInstalar, instalar, exportar, importar };
 
   /* ---------------------------------------------------------
      Pantalla de inicio
@@ -228,13 +233,6 @@
     if (bInst) bInst.onclick = instalar;
     const bOcultar = app.querySelector('[data-a="ocultarInstalar"]');
     if (bOcultar) bOcultar.onclick = () => { try { localStorage.setItem('rutenda_oculto_instalar', '1'); } catch (e) { /* sin almacenamiento */ } refrescar(); };
-    const sig = app.querySelector('[data-siguiente]');
-    if (sig) sig.onclick = e => {
-      e.preventDefault();
-      const v = R.db.viaje(sig.dataset.viaje);
-      location.hash = `#viaje/${v.id}/guia`;
-      setTimeout(() => R.vistaGuia.abrirTarea(v, sig.dataset.siguiente), 200);
-    };
     enCurso.forEach(v => R.itinerario.enlazarHoy(app, v));
     if (destacado && R.salida) R.salida.enlazar(app, destacado);
     if (R.recordatorios) R.recordatorios.enlazarAvisos(app);
@@ -250,6 +248,7 @@
         <span class="fv-texto">
           <strong>${esc(v.nombre || (v.destinos || []).filter(d => !d.soloDia).map(d => d.nombre).join(' → ') || v.destino)}</strong>
           <small>${esc(U.fmtRango(v.fechaInicio, v.fechaFin))} · ${esc(R.viajes.cuentaRegresiva(v))}</small>
+          ${R.viajes.siguienteHTML(v)}
         </span>
         ${est === 'pasado' ? '<span class="fv-estado">✓</span>' : `<span class="fv-pct">${prog.pct}%</span>`}
       </a>`;
@@ -308,11 +307,7 @@
       </div>`}
 
       <footer class="pie">
-        <p>${R.db.modo() === 'nube' ? '☁️ Tus datos están guardados en tu cuenta y se sincronizan en tus dispositivos.' : 'Tus datos se guardan en este dispositivo.'}</p>
-        <div class="pie-acciones">
-          <button class="btn btn-texto btn-chico" data-a="exportar">Descargar copia de seguridad</button>
-          <label class="btn btn-texto btn-chico">Restaurar copia<input type="file" accept="application/json" id="importar" hidden></label>
-        </div>
+        <p>${R.db.modo() === 'nube' ? '☁️ Tus datos están guardados en tu cuenta y se sincronizan en tus dispositivos.' : 'Tus datos se guardan en este dispositivo.'} La copia de seguridad está en Mi cuenta.</p>
       </footer>`;
 
     app.querySelectorAll('[data-a="nuevo"]').forEach(b => b.onclick = () => R.viajes.abrirAsistente());
@@ -322,8 +317,6 @@
       R.mapa.mostrarTodos(el.querySelector('#mapaTodos'), R.db.viajes());
     };
     app.querySelectorAll('[data-filtro-viajes]').forEach(b => b.onclick = () => { filtroViajes = b.dataset.filtroViajes; renderMisViajes(); });
-    app.querySelector('[data-a="exportar"]').onclick = exportar;
-    app.querySelector('#importar').onchange = importar;
   }
 
   function leerOculto(clave) { try { return localStorage.getItem('rutenda_oculto_' + clave) === '1'; } catch (e) { return false; } }
@@ -374,7 +367,7 @@
       </section>`;
   }
 
-  /* ---------- Copia de seguridad ---------- */
+  /* ---------- Copia de seguridad (desde Mi cuenta) ---------- */
   function exportar() {
     const blob = new Blob([R.db.exportar()], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -385,20 +378,21 @@
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 5000);
-    U.toast('Copia descargada. Los archivos adjuntos no se incluyen.');
+    R.db.guardarPrefs({ ultimaCopia: U.hoyISO() });
+    U.toast('Copia descargada. Guardala en Drive o en tu mail.');
   }
 
-  function importar(e) {
-    const archivo = e.target.files[0];
+  function importar(archivo, alTerminar) {
     if (!archivo) return;
     const lector = new FileReader();
     lector.onload = async () => {
-      const ok = await U.confirmar('Esto reemplaza los datos actuales por los de la copia.', { titulo: 'Restaurar copia', textoSi: 'Restaurar', peligro: true });
+      const ok = await U.confirmar('Se suman los viajes de la copia. Si alguno ya está, se reemplaza por el de la copia. No se borra nada.', { titulo: 'Restaurar copia', textoSi: 'Restaurar' });
       if (!ok) return;
       try {
-        R.db.importar(lector.result);
-        U.toast('Copia restaurada.');
+        const r = R.db.importar(lector.result);
+        U.toast(r.nuevos || r.actualizados ? `Listo: ${[r.nuevos ? U.plural(r.nuevos, 'viaje nuevo', 'viajes nuevos') : '', r.actualizados ? U.plural(r.actualizados, 'actualizado', 'actualizados') : ''].filter(Boolean).join(' y ')}.` : 'La copia no tenía viajes para sumar.');
         render();
+        if (alTerminar) alTerminar();
       } catch (err) {
         U.toast(err.message || 'No se pudo leer la copia.');
       }
@@ -406,13 +400,29 @@
     lector.readAsText(archivo);
   }
 
+  /* ---------- "Resolverlo": abre el paso directo desde una tarjeta ---------- */
+  function abrirSiguiente(e) {
+    const sig = e.target.closest && e.target.closest('[data-siguiente]');
+    if (!sig || !app.contains(sig)) return;
+    if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    e.stopPropagation();
+    const v = R.db.viaje(sig.dataset.viaje);
+    if (!v) return;
+    location.hash = `#viaje/${v.id}/guia`;
+    setTimeout(() => R.vistaGuia.abrirTarea(v, sig.dataset.siguiente), 200);
+  }
+  app.addEventListener('click', abrirSiguiente, true);
+  app.addEventListener('keydown', abrirSiguiente, true);
+
   /* ---------- Arranque ---------- */
   R.db.alCambiar(() => { if (listo && R.auth.usuarioActual()) { refrescarRemoto(); if (R.recordatorios) R.recordatorios.actualizar(); } });
   R.auth.alCambiarUsuario(u => { if (!u) { listo = true; render(); } });
   document.getElementById('btnNuevoViajeBarra').onclick = () => R.viajes.abrirAsistente();
-  document.getElementById('btnUsuario').onclick = () => R.auth.abrirMiCuenta();
   document.getElementById('btnNuevoViajeNav').onclick = () => R.viajes.abrirAsistente();
-  document.getElementById('btnCuentaNav').onclick = () => R.auth.abrirMiCuenta();
+  document.getElementById('btnMenu').onclick = () => R.menu.abrir();
+  document.getElementById('btnCargarNav').onclick = () => R.cargar.abrir();
+  document.getElementById('btnCargarBarra').onclick = () => R.cargar.abrir();
   /* ---------- Botón "Volver" en todas las pantallas (menos el inicio) ---------- */
   const pila = [];
   const clavePila = h => { const p = (h || '#inicio').replace(/^#/, '').split('/'); return p[0] === 'viaje' ? 'viaje/' + p[1] : p[0] || 'inicio'; };
@@ -437,6 +447,7 @@
   };
   window.addEventListener('hashchange', anotarRuta);
   window.addEventListener('hashchange', () => {
+    if (R.menu) R.menu.cerrar();
     const ruta = location.hash.split('/').slice(0, 2).join('/');
     const cambioDeVista = ruta !== rutaAnterior;
     rutaAnterior = ruta;

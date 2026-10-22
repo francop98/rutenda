@@ -26,7 +26,9 @@ R.valija = (function () {
     { id: 'otros', nombre: 'Otros', icono: '📦' }
   ];
   const categoria = id => CATEGORIAS.find(c => c.id === id) || CATEGORIAS[CATEGORIAS.length - 1];
-  const opcionesCategoria = sel => CATEGORIAS.map(c => `<option value="${c.id}" ${c.id === sel ? 'selected' : ''}>${c.icono} ${c.nombre}</option>`).join('');
+  /** Categorías en orden alfabético ("Otros" siempre al final). */
+  const categoriasOrdenadas = () => U.ordenAlfa(CATEGORIAS.filter(c => c.id !== 'otros'), 'nombre').concat(CATEGORIAS.filter(c => c.id === 'otros'));
+  const opcionesCategoria = sel => categoriasOrdenadas().map(c => `<option value="${c.id}" ${c.id === sel ? 'selected' : ''}>${c.icono} ${c.nombre}</option>`).join('');
 
   /* ---------- Datos del viaje ---------- */
   /** La valija de una persona del viaje (por defecto, la tuya). Cada viajero arma la suya. */
@@ -103,7 +105,7 @@ R.valija = (function () {
     if (v.perfil.equipamiento) s('otros', 'Equipo y ropa para la actividad');
     if (v.perfil.eventoEspecial) s('ropa', 'Ropa para el evento especial');
     if (R.recorrido.usaMedio(v, 'auto')) { s('otros', 'Documentación y seguro del auto'); s('otros', 'Kit de emergencia del auto'); }
-    return r;
+    return r.sort((a, b) => U.alfa(a[1], b[1]));
   }
 
   /* ---------- Pestaña del viaje ---------- */
@@ -115,7 +117,7 @@ R.valija = (function () {
     const sug = ida ? sugerencias(v) : [];
     const listas = R.db.listasValija();
     const items = itemsDe(v, modo);
-    const grupos = CATEGORIAS.map(c => ({ c, items: items.filter(i => i.categoria === c.id) })).filter(g => g.items.length);
+    const grupos = categoriasOrdenadas().map(c => ({ c, items: U.ordenAlfa(items.filter(i => i.categoria === c.id), 'texto') })).filter(g => g.items.length);
 
     cont.innerHTML = `
       <div class="bloque-cab cab-seccion">
@@ -162,11 +164,9 @@ R.valija = (function () {
                   ${ida || i.soloVuelta ? `<button class="btn-icono" data-borrar="${i.id}" title="Quitar">×</button>` : ''}
                 </li>`).join('')}</ul>
             </div>`).join('') : `
-            <div class="vacio">
-              <div class="vacio-icono">${ida ? '🧳' : '🏠'}</div>
-              <h3>${ida ? 'Tu valija está vacía' : 'Todavía no hay nada para chequear'}</h3>
-              <p>${ida ? 'Arrancá con las sugerencias o escribí lo que quieras.' : 'Primero tildá lo que guardás para ir: eso es lo que después tenés que traer de vuelta.'}</p>
-            </div>`}
+            ${ida
+              ? U.vacio({ icono: '🧳', titulo: 'Tu valija está vacía', texto: 'Sumá lo sugerido para este viaje o escribí lo que quieras arriba.', boton: sug.length ? `✨ Sumar lo sugerido (${sug.length})` : '', accion: 'todasSug' })
+              : U.vacio({ icono: '🏠', titulo: 'Nada para chequear todavía', texto: 'Primero armá la valija para ir: eso es lo que después traés de vuelta.', boton: '🛫 Ir a “Para ir”', accion: 'irIda' })}`}
         </div>
 
         ${ida ? `<aside class="col-lateral">
@@ -212,8 +212,9 @@ R.valija = (function () {
       agregarItem(v, texto, cat, null);
       guardarYRefrescar();
     });
-    const todas = cont.querySelector('[data-a="todasSug"]');
-    if (todas) todas.onclick = () => { sug.forEach(([cat, texto]) => agregarItem(v, texto, cat, null)); guardarYRefrescar(`${U.plural(sug.length, 'sugerencia agregada', 'sugerencias agregadas')}.`); };
+    const bIda = cont.querySelector('[data-a="irIda"]');
+    if (bIda) bIda.onclick = () => { modoPorViaje[v.id] = 'ida'; R.app.refrescar(); };
+    cont.querySelectorAll('[data-a="todasSug"]').forEach(todas => todas.onclick = () => { sug.forEach(([cat, texto]) => agregarItem(v, texto, cat, null)); guardarYRefrescar(`${U.plural(sug.length, 'sugerencia agregada', 'sugerencias agregadas')}.`); });
     cont.querySelectorAll('[data-lista]').forEach(x => x.onclick = () => {
       const l = R.db.listasValija().find(y => y.id === x.dataset.lista);
       let n = 0;
@@ -280,7 +281,7 @@ R.valija = (function () {
     const ida = modo !== 'vuelta';
     const val = valijaDe(v);
     const todos = () => itemsDe(v, modo);
-    const pasos = CATEGORIAS.filter(c => todos().some(i => i.categoria === c.id));
+    const pasos = categoriasOrdenadas().filter(c => todos().some(i => i.categoria === c.id));
     let paso = Math.max(0, pasos.findIndex(c => todos().some(i => i.categoria === c.id && !listo(i, modo))));
     const { el } = U.modal({
       titulo: ida ? 'Armemos la valija' : 'Chequeo para volver',
@@ -307,7 +308,7 @@ R.valija = (function () {
           </div>`;
       } else {
         const c = pasos[paso];
-        const items = todos().filter(i => i.categoria === c.id);
+        const items = U.ordenAlfa(todos().filter(i => i.categoria === c.id), 'texto');
         cont.innerHTML = `
           <div class="paso-movil visible"><span>${c.icono} ${paso + 1} de ${pasos.length}</span><strong>${esc(c.nombre)}</strong>
             <span class="pm-puntos">${pasos.map((x, i) => `<i class="${i < paso ? 'listo' : i === paso ? 'actual' : ''}"></i>`).join('')}</span></div>
@@ -353,6 +354,7 @@ R.valija = (function () {
   }
 
   /* ---------- Pantalla "Mis listas" ---------- */
+  let creandoLista = false;
   function renderMisListas(app, alCambiar) {
     const refrescar = () => (alCambiar ? alCambiar() : R.app.refrescar());
     const listas = R.db.listasValija();
@@ -362,17 +364,25 @@ R.valija = (function () {
         <p class="texto-suave">Lo que llevás siempre. En cada viaje la sumás con un toque.</p>
       </section>
       <div class="acciones-fila">
-        <button class="btn btn-primario" data-a="nueva">+ Nueva lista</button>
+        ${creandoLista ? '' : '<button class="btn btn-primario" data-a="nueva">+ Nueva lista</button>'}
       </div>
+      ${creandoLista ? `
+        <form class="bloque nueva-lista" data-form="nuevaLista">
+          <label class="campo"><span>Nombre de la lista nueva</span><input id="nlNombre" placeholder="Ej: Playa, Nieve, Trabajo" maxlength="40" autocomplete="off"></label>
+          <div class="acciones-fila">
+            <button type="button" class="btn btn-texto" data-a="cancelarLista">Cancelar</button>
+            <button type="submit" class="btn btn-primario">✓ Crear lista</button>
+          </div>
+        </form>` : ''}
       ${listas.length ? `<div class="grilla-listas">${listas.map(l => `
         <article class="bloque lista-personal" data-id="${l.id}">
           <div class="bloque-cab">
             <input class="titulo-lista" data-renombrar="${l.id}" value="${esc(l.nombre)}" aria-label="Nombre de la lista">
             <button class="btn-icono" data-eliminar="${l.id}" title="Eliminar lista">🗑</button>
           </div>
-          ${CATEGORIAS.filter(c => l.items.some(i => i.categoria === c.id)).map(c => `
+          ${categoriasOrdenadas().filter(c => l.items.some(i => i.categoria === c.id)).map(c => `
             <div class="lp-grupo"><small>${c.icono} ${esc(c.nombre)}</small>
-              <ul class="lista-chips">${l.items.filter(i => i.categoria === c.id).map(i => `<li>${esc(i.texto)} <button data-quitar="${l.id}|${i.id}" aria-label="Quitar">×</button></li>`).join('')}</ul>
+              <ul class="lista-chips">${U.ordenAlfa(l.items.filter(i => i.categoria === c.id), 'texto').map(i => `<li>${esc(i.texto)} <button data-quitar="${l.id}|${i.id}" aria-label="Quitar">×</button></li>`).join('')}</ul>
             </div>`).join('') || '<p class="texto-suave">Lista vacía.</p>'}
           <div class="fila-agregar fila-valija">
             <input data-texto="${l.id}" placeholder="Agregar a esta lista">
@@ -380,19 +390,31 @@ R.valija = (function () {
             <button class="btn btn-suave" data-agregar="${l.id}">+</button>
           </div>
         </article>`).join('')}</div>` : `
-        <div class="vacio">
-          <div class="vacio-icono">📝</div>
-          <h3>Todavía no tenés listas</h3>
-          <p>Por ejemplo: "Playa", "Nieve", "Viaje de trabajo". Después las sumás a cualquier viaje con un toque.</p>
-        </div>`}`;
+        ${creandoLista ? '' : U.vacio({ icono: '📝', titulo: 'Todavía no tenés listas', texto: 'Por ejemplo “Playa” o “Nieve”. Después la sumás a cualquier viaje con un toque.', boton: '+ Crear mi primera lista', accion: 'nueva' })}`}`;
 
     const guardar = l => { R.db.guardarListaValija(l); refrescar(); };
-    app.querySelector('[data-a="nueva"]').onclick = () => {
-      const l = { id: U.id('lst'), nombre: 'Nueva lista', items: [] };
-      R.db.guardarListaValija(l);
-      refrescar();
-      setTimeout(() => { const i = document.querySelector(`[data-renombrar="${l.id}"]`); if (i) { i.focus(); i.select(); } }, 30);
-    };
+    // Nueva lista: primero el nombre y después "Crear lista" (nada se crea sin confirmar)
+    app.querySelectorAll('[data-a="nueva"]').forEach(bN => bN.onclick = () => {
+      creandoLista = true;
+      renderMisListas(app, alCambiar);
+      setTimeout(() => { const i = app.querySelector('#nlNombre'); if (i) i.focus(); }, 30);
+    });
+    const fNueva = app.querySelector('[data-form="nuevaLista"]');
+    if (fNueva) {
+      fNueva.onsubmit = e => {
+        e.preventDefault();
+        const nombre = fNueva.querySelector('#nlNombre').value.trim();
+        if (!nombre) { U.toast('Poné un nombre para la lista.'); fNueva.querySelector('#nlNombre').focus(); return; }
+        if (R.db.listasValija().some(x => normal(x.nombre) === normal(nombre))) { U.toast('Ya tenés una lista con ese nombre.'); return; }
+        const l = { id: U.id('lst'), nombre, items: [] };
+        creandoLista = false;
+        R.db.guardarListaValija(l);
+        U.toast(`Lista "${nombre}" creada. Sumale lo que llevás siempre.`);
+        refrescar();
+        setTimeout(() => { const i = document.querySelector(`[data-texto="${l.id}"]`); if (i) { i.focus(); i.scrollIntoView({ block: 'center' }); } }, 40);
+      };
+      fNueva.querySelector('[data-a="cancelarLista"]').onclick = () => { creandoLista = false; renderMisListas(app, alCambiar); };
+    }
     app.querySelectorAll('[data-renombrar]').forEach(x => x.onchange = () => {
       const l = R.db.listasValija().find(y => y.id === x.dataset.renombrar);
       l.nombre = x.value.trim() || 'Lista sin nombre';
@@ -428,5 +450,12 @@ R.valija = (function () {
     });
   }
 
-  return { render, renderMisListas, sugerencias, progreso, valijaDe, CATEGORIAS };
+  /** Suma algo a tu valija de un viaje y lo guarda. Devuelve false si ya estaba. */
+  function agregar(v, texto, cat) {
+    if (!agregarItem(v, texto, cat || 'otros', null)) return false;
+    R.db.guardarViaje(v);
+    return true;
+  }
+
+  return { render, renderMisListas, sugerencias, progreso, valijaDe, agregar, CATEGORIAS };
 })();

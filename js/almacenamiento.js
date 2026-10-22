@@ -248,7 +248,7 @@ R.db = (function () {
      --------------------------------------------------------- */
   function prefs() { return estado.prefs; }
   function guardarPrefs(cambios) { Object.assign(estado.prefs, cambios); guardar(); }
-  function listasValija() { return estado.listasValija; }
+  function listasValija() { estado.listasValija.sort((a, b) => R.util.alfa(a.nombre, b.nombre)); return estado.listasValija; }
   function guardarListaValija(l) {
     const i = estado.listasValija.findIndex(x => x.id === l.id);
     if (i >= 0) estado.listasValija[i] = l; else estado.listasValija.push(l);
@@ -260,17 +260,42 @@ R.db = (function () {
      Copia de seguridad
      --------------------------------------------------------- */
   function exportar() { return JSON.stringify({ version: 2, viajes: estado.viajes, prefs: estado.prefs, listasValija: estado.listasValija }, null, 2); }
+  /**
+   * Restaura una copia sin borrar nada: suma los viajes que no están y
+   * actualiza los que sí (conservando quiénes son miembros de cada uno).
+   * Devuelve { nuevos, actualizados }.
+   */
   function importar(texto) {
-    const nuevo = JSON.parse(texto);
+    let nuevo;
+    try { nuevo = JSON.parse(texto); } catch (e) { throw new Error('El archivo no parece una copia de Rutenda.'); }
     if (!nuevo || !Array.isArray(nuevo.viajes)) throw new Error('El archivo no parece una copia de Rutenda.');
     estado.legado = Array.isArray(nuevo.personas) ? nuevo.personas : [];
+    let nuevos = 0, actualizados = 0;
     nuevo.viajes.forEach(v => {
-      if (modo === 'nube') { v.owner = uid; v.miembros = [uid]; v.roles = { [uid]: 'organizador' }; }
+      if (!v || !v.id) return;
+      const actual = estado.viajes.find(x => x.id === v.id);
+      if (actual) {
+        // Los permisos del viaje no se tocan: siguen los de la nube
+        ['owner', 'miembros', 'roles', 'codigoUnion', 'invitacion', 'linkFamilia'].forEach(k => { if (k in actual) v[k] = actual[k]; else delete v[k]; });
+        if (modo === 'nube' && !puedeOrganizar(actual)) return;
+        actualizados++;
+      } else {
+        if (modo === 'nube') { v.owner = uid; v.miembros = [uid]; v.roles = { [uid]: 'organizador' }; }
+        delete v.invitacion; delete v.linkFamilia;
+        nuevos++;
+      }
       guardarViaje(v);
     });
     if (nuevo.prefs) Object.assign(estado.prefs, nuevo.prefs);
-    if (Array.isArray(nuevo.listasValija)) estado.listasValija = nuevo.listasValija;
+    if (Array.isArray(nuevo.listasValija)) {
+      nuevo.listasValija.forEach(l => {
+        if (!l || !l.id) return;
+        const i = estado.listasValija.findIndex(x => x.id === l.id);
+        if (i >= 0) estado.listasValija[i] = l; else estado.listasValija.push(l);
+      });
+    }
     guardar();
+    return { nuevos, actualizados };
   }
 
   /* ---------------------------------------------------------

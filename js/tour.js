@@ -12,10 +12,11 @@ R.tour = (function () {
 
   const PASOS = [
     { titulo: '¡Bienvenido a Rutenda! 👋', texto: 'Te muestro en un minuto cómo funciona. Podés saltearlo cuando quieras.' },
-    { sel: ['#btnNuevoViajeNav', '#btnNuevoViajeBarra'], titulo: 'Armá un viaje', texto: 'Tres preguntas: a dónde vas, cuándo y qué ya tenés. Con eso Rutenda arma tu guía paso a paso.' },
+    { sel: ['#btnNuevoViajeNav', '#btnNuevoViajeBarra'], titulo: 'Armá un viaje', texto: 'Con el + de arriba. Tres preguntas: a dónde vas, cuándo y qué ya tenés. Con eso Rutenda arma tu guía paso a paso.' },
+    { sel: ['#btnCargarNav', '#btnCargarBarra'], titulo: 'Cargá al toque', texto: 'Un gasto, un documento o algo para la valija, sin entrar al viaje. Si estás viajando, ya sabe a qué viaje va.' },
     { sel: ['.nav-inferior [data-nav="viajes"]', '.barra .nav [data-nav="viajes"]'], titulo: 'Tus viajes', texto: 'Los próximos, el que estás haciendo y los que ya hiciste, con el mapa de todos tus destinos.' },
     { sel: ['.nav-inferior [data-nav="valijas"]', '.barra .nav [data-nav="valijas"]'], titulo: 'Listas de valija', texto: 'Armá una vez lo que llevás siempre y sumalo a cada viaje con un toque.' },
-    { sel: ['#btnCuentaNav', '#btnUsuario'], titulo: 'Tu cuenta', texto: 'Tus datos, el alias para cobrar tu parte de los gastos y los recordatorios.' },
+    { sel: ['#btnMenu'], titulo: 'El menú ☰', texto: 'Tus datos, el modo claro u oscuro, la copia de seguridad y tus compañeros de viaje.' },
     { titulo: 'Adentro de cada viaje', texto: '🧭 Guía: qué resolver y en qué orden.\n🗓️ Itinerario: los días y tu lista de qué hacer.\n💸 Gastos: quién pagó y cuentas claras.\n🧳 Valija y 📁 Docs: todo a mano, también sin señal.\n☀️ Y mientras viajás, la pestaña Hoy con lo de cada día.' }
   ];
 

@@ -32,6 +32,18 @@ service cloud.firestore {
       return yo() in v.miembros && v.roles[yo()] in ['organizador', 'coorganizador'];
     }
 
+    // ---------- Link para la familia (solo lectura, sin cuenta) ----------
+    // Cualquiera con el link puede verlo mientras esté activo; nadie puede listarlos.
+    match /familia/{token} {
+      allow get: if resource.data.activo == true;
+      allow list: if false;
+      allow create: if logueado() && request.resource.data.creadoPor == yo()
+        && organiza(request.resource.data.viajeId);
+      allow update: if logueado() && organiza(resource.data.viajeId)
+        && request.resource.data.viajeId == resource.data.viajeId;
+      allow delete: if logueado() && organiza(resource.data.viajeId);
+    }
+
     // ---------- Viajes ----------
     match /viajes/{viajeId} {
       function miembro() { return logueado() && yo() in resource.data.miembros; }

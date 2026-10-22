@@ -352,6 +352,30 @@ R.recorrido = (function () {
     return (b - a) / 60;
   }
 
+  /** Zona horaria de casa: la de tu ciudad de salida o, si no, la del celular. */
+  function zonaCasa(v) {
+    if (v && v.origen && v.origen.zona) return v.origen.zona;
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Argentina/Buenos_Aires'; } catch (e) { return 'America/Argentina/Buenos_Aires'; }
+  }
+  /** Horas de diferencia entre un lugar y tu casa (positivo: allá es más tarde). null si no se sabe. */
+  function difConCasa(v, lugar, fecha) {
+    if (!lugar || !lugar.zona) return null;
+    const a = offsetMin(zonaCasa(v), fecha), b = offsetMin(lugar.zona, fecha);
+    if (a == null || b == null) return null;
+    return (b - a) / 60;
+  }
+  /** "5 h más", "1 h 30 min menos". */
+  function fmtDif(h) {
+    const abs = Math.abs(h);
+    const ent = Math.floor(abs), min = Math.round((abs - ent) * 60);
+    const t = ent ? `${ent} h${min ? ' ' + min + ' min' : ''}` : `${min} min`;
+    return `${t} ${h > 0 ? 'más' : 'menos'}`;
+  }
+  /** Hora actual (HH:MM) en una zona. */
+  function horaEn(zona) {
+    try { return new Intl.DateTimeFormat('es-AR', { timeZone: zona, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()); } catch (e) { return ''; }
+  }
+
   /* ---------------------------------------------------------
      Validador: detecta inconsistencias y avisos útiles
      --------------------------------------------------------- */
@@ -477,6 +501,6 @@ R.recorrido = (function () {
   return {
     MEDIOS, TIPOS_TRAMO, ESTADOS, construir, dividir, unir, espejarParada, desespejarParada, espejarMedio, aplicarConexion, quitarConexion, conexionDe, segmentos, todosLosSegmentos, usaMedio, medioPrincipal,
     etiquetaSegmento, estadias, completo, recalcular, validar, desplazarDesde, autocompletar, normalizarSegmento,
-    duracion, fmtDuracion, difHoraria, offsetMin, momento, fechaSale, fechaLlega, medio
+    duracion, fmtDuracion, difHoraria, offsetMin, momento, fechaSale, fechaLlega, medio, zonaCasa, difConCasa, fmtDif, horaEn
   };
 })();

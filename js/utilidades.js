@@ -5,7 +5,7 @@
 window.R = window.R || {};
 
 /** Versión de la app (cambios chicos: 10.1, 10.2…; cambios grandes: 11, 12…). Igual que VERSION en sw.js. */
-window.R.VERSION = '17';
+window.R.VERSION = '19';
 
 R.util = (function () {
   const pad = n => String(n).padStart(2, '0');
@@ -283,7 +283,44 @@ R.util = (function () {
     });
   }
 
+  /* ---------- Modo claro / oscuro ('auto' sigue al celular) ---------- */
+  function tema() {
+    try { const t = localStorage.getItem('rutenda_tema'); return t === 'claro' || t === 'oscuro' ? t : 'auto'; } catch (e) { return 'auto'; }
+  }
+  function aplicarTema(t) {
+    try { if (t === 'claro' || t === 'oscuro') localStorage.setItem('rutenda_tema', t); else localStorage.removeItem('rutenda_tema'); } catch (e) { /* sin almacenamiento */ }
+    if (t === 'claro' || t === 'oscuro') document.documentElement.setAttribute('data-tema', t);
+    else document.documentElement.removeAttribute('data-tema');
+  }
+
+  /**
+   * Pantalla vacía: un ícono, una frase y (si hace falta) un botón.
+   * o: { icono, titulo, texto, boton, accion, chico, claseBoton }
+   */
+  function vacio(o) {
+    return `
+      <div class="vacio ${o.chico ? 'vacio-chico' : ''}">
+        <div class="vacio-icono">${o.icono || '✨'}</div>
+        ${o.titulo ? `<h3>${esc(o.titulo)}</h3>` : ''}
+        ${o.texto ? `<p>${esc(o.texto)}</p>` : ''}
+        ${o.boton ? `<button type="button" class="btn btn-primario ${o.claseBoton || ''}" data-a="${o.accion || 'vacio'}">${esc(o.boton)}</button>` : ''}
+      </div>`;
+  }
+
+  /* ---------- Orden alfabético (sin importar mayúsculas ni tildes) ---------- */
+  const colador = (() => { try { return new Intl.Collator('es', { sensitivity: 'base', numeric: true }); } catch (e) { return null; } })();
+  function alfa(a, b) {
+    const x = String(a || ''), y = String(b || '');
+    return colador ? colador.compare(x, y) : x.toLowerCase().localeCompare(y.toLowerCase());
+  }
+  /** Copia ordenada alfabéticamente por un campo (o por lo que devuelva la función). */
+  function ordenAlfa(lista, campo) {
+    const f = typeof campo === 'function' ? campo : (x => (campo ? x[campo] : x));
+    return (lista || []).slice().sort((a, b) => alfa(f(a), f(b)));
+  }
+
   return {
+    tema, aplicarTema, vacio, alfa, ordenAlfa,
     campoClave, enlazarClaves, sugerirFechas,
     MONEDAS, fondoBloqueado, id, esc, aISO, hoyISO, aFecha, sumarDias, diasEntre, fmtFecha, fmtRango, plural,
     redondear, fmtMoneda, fmtTamano, numero, hash, portada, colorPersona, iniciales, avatar,

@@ -217,6 +217,7 @@ R.nube = (function () {
         if (Object.keys(cambios).length) await ref.update(cambios);
         p.ultimo.principal = firma;
         if (v.invitacion && v.invitacion.activa) actualizarInvitacion(v).catch(() => {});
+        if (v.linkFamilia && v.linkFamilia.activo && R.familia) R.familia.actualizar(v);
       } else {
         // Un viajero no puede cambiar la organización: se vuelve a lo último sincronizado
         const ultimo = JSON.parse(p.ultimo.principal);
@@ -387,6 +388,27 @@ R.nube = (function () {
   }
 
   /* ---------------------------------------------------------
+     Link para la familia (solo lectura, sin cuenta)
+     familia/{token}: { viajeId, creadoPor, activo, actualizado, datos }
+     --------------------------------------------------------- */
+  async function guardarFamilia(v, datos) {
+    const token = (v.linkFamilia && v.linkFamilia.token) || (nuevoCodigo() + nuevoCodigo());
+    await db.collection('familia').doc(token).set(limpio({ viajeId: v.id, creadoPor: uid, activo: true, actualizado: new Date().toISOString(), datos }));
+    return token;
+  }
+  async function apagarFamilia(v) {
+    if (!v.linkFamilia || !v.linkFamilia.token) return;
+    await db.collection('familia').doc(v.linkFamilia.token).set({ viajeId: v.id, creadoPor: uid, activo: false, actualizado: new Date().toISOString(), datos: null });
+  }
+  async function leerFamilia(token) {
+    iniciarApp();
+    try {
+      const s = await db.collection('familia').doc(token).get();
+      return s.exists && s.data().activo ? s.data() : null;
+    } catch (e) { return null; }   // apagado o inexistente
+  }
+
+  /* ---------------------------------------------------------
      Archivos (Storage)
      --------------------------------------------------------- */
   const rutaArchivo = (viajeId, id) => `viajes/${viajeId}/archivos/${id}`;
@@ -432,6 +454,7 @@ R.nube = (function () {
   return {
     disponible, iniciarApp, iniciar, detener, programar, enviarTodo, eliminarViaje, salirDelViaje,
     guardarPerfil, actualizarPerfil, crearInvitacion, desactivarInvitacion, leerInvitacion, unirse, cambiarRol, quitarMiembro,
+    guardarFamilia, apagarFamilia, leerFamilia,
     subirArchivo, bajarArchivo, urlArchivo, borrarArchivo, guardarSuscripcion, borrarSuscripcion, borrarSuscripciones,
     auth: () => { iniciarApp(); return auth; }, db: () => { iniciarApp(); return db; }
   };

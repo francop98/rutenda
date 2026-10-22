@@ -21,7 +21,11 @@ R.gastos = (function () {
     { id: 'otros', nombre: 'Otros', icono: '📌' }
   ];
   /** Categorías base + las que creó el usuario. */
-  function categorias() { return CATEGORIAS.concat((R.db.prefs().categoriasGasto || [])); }
+  function categorias() {
+    const todas = CATEGORIAS.concat((R.db.prefs().categoriasGasto || []));
+    // Orden alfabético, con "Otros" al final
+    return U.ordenAlfa(todas.filter(c => c.id !== 'otros'), 'nombre').concat(todas.filter(c => c.id === 'otros'));
+  }
   function categoria(id) { return categorias().find(c => c.id === id) || CATEGORIAS[CATEGORIAS.length - 1]; }
   function crearCategoria(nombreCat, icono) {
     const lista = (R.db.prefs().categoriasGasto || []).slice();
@@ -243,10 +247,7 @@ R.gastos = (function () {
           <header class="dg-cab"><strong>${esc(g.titulo)}${g.dia ? ` <small>· Día ${g.dia}</small>` : ''}</strong><span>${U.fmtMoneda(g.total, v.monedaBase)}</span></header>
           <div class="lista-movs">${g.movs.map(m => filaMovimiento(v, m)).join('')}</div>
         </section>`).join('') : `
-        <div class="bloque vacio vacio-chico">
-          <div class="vacio-icono">💸</div>
-          <p>${filtroPersona === 'todos' ? 'Cargá cada gasto (lo que sale) y cada ingreso o reintegro (lo que vuelve), con quién lo pagó o lo recibió y entre quiénes se divide. Rutenda hace las cuentas.' : 'No hay movimientos con este filtro.'}</p>
-        </div>`}`;
+        <div class="bloque">${U.vacio({ icono: '💸', chico: true, texto: filtroPersona === 'todos' ? 'Cuando pagues algo, tocá “− Gasto” y Rutenda hace las cuentas.' : 'No hay movimientos con este filtro.' })}</div>`}`;
   }
 
   /** Mensaje listo para mandar por WhatsApp pidiendo la parte de alguien. */
@@ -403,7 +404,7 @@ R.gastos = (function () {
     </button>`;
   }
 
-  const FORMAS_PAGO = ['Efectivo', 'Transferencia', 'Mercado Pago', 'Tarjeta', 'Otra'];
+  const FORMAS_PAGO = ['Efectivo', 'Mercado Pago', 'Tarjeta', 'Transferencia', 'Otra'];
   /** "Transferencia · mié 21 oct, 18:40 · nota" */
   function detallePago(m) {
     return [m.formaPago, U.fmtFecha(m.fecha, 'corto') + (m.hora ? ', ' + m.hora : ''), m.nota].filter(Boolean).join(' · ');
@@ -493,7 +494,7 @@ R.gastos = (function () {
         <label class="campo"><span>Fecha</span><input type="date" id="mFecha" value="${esc(m.fecha)}"></label>
         ${m.moneda !== v.monedaBase ? `<label class="campo"><span>Cotización: 1 ${esc(m.moneda)} = ? ${esc(v.monedaBase)}</span><input id="mCotiz" inputmode="decimal" value="${esc(m.cotizacion)}" placeholder="Ej: 1200"><small class="ayuda" id="mCotizAyuda"></small></label>` : ''}
         <label class="campo"><span>${esGasto ? '¿Quién pagó?' : '¿Quién lo recibió?'}</span>
-          <select id="mPersona">${v.participantes.map(p => `<option value="${p}" ${m.persona === p ? 'selected' : ''}>${esc(nombre(p))}</option>`).join('')}</select>
+          <select id="mPersona">${U.ordenAlfa(v.participantes, p => nombre(p)).map(p => `<option value="${p}" ${m.persona === p ? 'selected' : ''}>${esc(nombre(p))}</option>`).join('')}</select>
         </label>
         ${variosViajeros ? `
           <div class="campo">
@@ -688,6 +689,7 @@ R.gastos = (function () {
 
   /** Cargar un gasto desde cualquier pantalla (por ejemplo, la de Hoy). */
   function nuevo(v) { editar(v, null, 'gasto'); }
+  function nuevoIngreso(v) { editar(v, null, 'ingreso'); }
 
-  return { CATEGORIAS, categorias, render, nuevo, saldos, transferencias, totales, montoBase, partes, parteDe, personaTieneMovimientos };
+  return { CATEGORIAS, categorias, render, nuevo, nuevoIngreso, saldos, transferencias, totales, montoBase, partes, parteDe, personaTieneMovimientos };
 })();

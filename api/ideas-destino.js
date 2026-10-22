@@ -27,8 +27,11 @@ async function json(url, ms) {
   } catch (e) { return null; } finally { clearTimeout(t); }
 }
 
-/** Texto de las secciones "Ver/Hacer" de Wikivoyage (español y, si no hay, inglés). */
-async function wikivoyage(nombre) {
+const SECCIONES_HACER = /^==\s*(Ver|Hacer|Qué ver|Qué hacer|Excursiones|Alrededores|See|Do|Go next|Day trips)\s*==/i;
+
+/** Texto de algunas secciones de Wikivoyage (español y, si no hay, inglés). Por defecto, "Ver/Hacer". */
+async function wikivoyage(nombre, secciones, maximo) {
+  const patron = secciones || SECCIONES_HACER;
   const variantes = [nombre, nombre.replace(/^San Carlos de /i, '')].filter((x, i, a) => x && a.indexOf(x) === i);
   for (const idioma of ['es', 'en']) {
     for (const v of variantes) {
@@ -42,8 +45,8 @@ async function wikivoyage(nombre) {
       if (!texto || texto.length < 400) continue;
       // Solo las secciones útiles para "qué hacer"
       const partes = texto.split(/\n(?===\s)/);
-      const utiles = partes.filter(p => /^==\s*(Ver|Hacer|Qué ver|Qué hacer|Excursiones|Alrededores|See|Do|Go next|Day trips)\s*==/i.test(p));
-      const elegido = (utiles.length ? utiles.join('\n') : texto).slice(0, 7000);
+      const utiles = partes.filter(p => patron.test(p));
+      const elegido = (utiles.length ? utiles.join('\n') : texto).slice(0, maximo || 7000);
       return { texto: elegido, url: `https://${idioma}.wikivoyage.org/wiki/${encodeURIComponent(titulo.replace(/ /g, '_'))}`, titulo };
     }
   }

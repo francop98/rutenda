@@ -34,7 +34,8 @@ R.documentos = (function () {
     urlsVivas.forEach(u => URL.revokeObjectURL(u));
     urlsVivas = [];
     const docs = v.documentos.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
-    const grupos = CATEGORIAS.map(c => ({ c, docs: docs.filter(d => d.categoria === c.id) })).filter(g => g.docs.length);
+    const grupos = U.ordenAlfa(CATEGORIAS.filter(c => c.id !== 'otro'), 'nombre').concat(CATEGORIAS.filter(c => c.id === 'otro'))
+      .map(c => ({ c, docs: U.ordenAlfa(docs.filter(d => d.categoria === c.id), 'nombre') })).filter(g => g.docs.length);
 
     cont.innerHTML = `
       <div class="bloque-cab cab-seccion">
@@ -47,19 +48,16 @@ R.documentos = (function () {
           ${grupos.length ? '<button class="btn btn-primario" data-a="subir">+ Subir</button>' : ''}
         </div>
       </div>
+      ${R.emergencias ? R.emergencias.html(v) : ''}
       ${grupos.length ? grupos.map(g => `
         <div class="bloque">
           <h3 class="bloque-titulo">${g.c.icono} ${esc(g.c.nombre)} <span class="contador">${g.docs.length}</span></h3>
           <div class="grilla-docs">${g.docs.map(d => tarjetaDoc(v, d)).join('')}</div>
         </div>`).join('') : `
-        <div class="vacio">
-          <div class="vacio-icono">📁</div>
-          <h3>Todavía no hay documentos</h3>
-          <p>Subí pasajes, reservas, seguro y copias de tu documentación. Así no dependés de buscar mails el día del viaje.</p>
-          <button class="btn btn-primario" data-a="subir2">Subir el primero</button>
-        </div>`}`;
+        ${U.vacio({ icono: '📁', titulo: 'Todavía no hay documentos', texto: 'Subí pasajes, reservas y seguro para tenerlos a mano, también sin señal.', boton: '+ Subir el primero', accion: 'subir2' })}`}`;
 
     cont.querySelectorAll('[data-a="subir"],[data-a="subir2"]').forEach(b => b.onclick = () => subir(v));
+    if (R.emergencias) R.emergencias.enlazar(cont, v, () => render(v, cont));
     const esc1 = cont.querySelector('[data-a="escanear"]');
     if (esc1) esc1.onclick = () => R.escaneo.escanearYAbrir(v);
     cont.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => abrir(v.documentos.find(d => d.id === b.dataset.abrir)));
@@ -122,7 +120,7 @@ R.documentos = (function () {
         </label>
         <label class="campo"><span>Nombre</span><input id="dNombre" placeholder="Se completa con el nombre del archivo"></label>
         <div class="grilla-2">
-          <label class="campo"><span>Categoría</span><select id="dCategoria">${CATEGORIAS.map(c => `<option value="${c.id}" ${c.id === catInicial ? 'selected' : ''}>${c.icono} ${c.nombre}</option>`).join('')}</select></label>
+          <label class="campo"><span>Categoría</span><select id="dCategoria">${U.ordenAlfa(CATEGORIAS.filter(c => c.id !== 'otro'), 'nombre').concat(CATEGORIAS.filter(c => c.id === 'otro')).map(c => `<option value="${c.id}" ${c.id === catInicial ? 'selected' : ''}>${c.icono} ${c.nombre}</option>`).join('')}</select></label>
           <label class="campo"><span>Paso de la guía</span><select id="dTarea"><option value="">Ninguno</option>${tareas.map(t => `<option value="${t.id}" ${t.id === op.tareaId ? 'selected' : ''}>${esc(t.titulo)}</option>`).join('')}</select></label>
         </div>
         <label class="campo"><span>Nota (opcional)</span><input id="dNota" placeholder="Ej: código de reserva ABC123"></label>

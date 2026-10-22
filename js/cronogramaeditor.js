@@ -85,10 +85,30 @@ R.cronogramaEditor = (function () {
 
       cont.innerHTML = `
         ${op.permitirSinFechas ? `<label class="check"><input type="checkbox" data-cr="sinFechas" ${b.sinFechas ? 'checked' : ''}> Todavía no tengo fechas (las cargo después)</label>` : ''}
+        ${!b.sinFechas && R.feriados && R.feriados.aplica(b.origen) ? '<div class="cr-feriados"></div>' : ''}
         <div class="cronograma ${b.sinFechas ? 'sin-fechas' : ''}">${bloques.join('')}</div>
         ${avisos.length ? `<div class="cr-avisos">${avisos.map(a => `<p class="cr-aviso cr-${a.nivel}">${a.nivel === 'error' ? '⛔' : a.nivel === 'aviso' ? '⚠️' : 'ℹ️'} ${esc(a.texto)}</p>`).join('')}</div>` : ''}`;
       enlazar();
+      pintarFeriados();
       if (op.alCambiar) op.alCambiar(b);
+    }
+
+    /** Fines de semana largos y feriados (Argentina). */
+    function pintarFeriados() {
+      const caja = cont.querySelector('.cr-feriados');
+      if (!caja) return;
+      const segs = C().todosLosSegmentos(b.recorrido).map(x => x.seg);
+      if (!segs.length) return;
+      const inicio = segs[0].sale.fecha;
+      const ult = segs[segs.length - 1];
+      const fin = C().fechaLlega(ult) || ult.sale.fecha || '';
+      R.feriados.pintarAviso(caja, inicio, fin > inicio ? fin : '', (desde, hasta) => {
+        segs[0].sale.fecha = desde;
+        const vuelta = b.recorrido.find(t => t.tipo === 'vuelta');
+        if (vuelta && vuelta.segmentos[0]) vuelta.segmentos[0].sale.fecha = hasta;
+        U.toast(vuelta ? `Listo: del ${U.fmtFecha(desde, 'dia')} al ${U.fmtFecha(hasta, 'dia')}. Ajustá lo que quieras.` : `Listo: salís el ${U.fmtFecha(desde, 'dia')}.`);
+        pintar();
+      });
     }
 
     function segmentoHTML(t, ti, s, si, M) {
@@ -121,12 +141,12 @@ R.cronogramaEditor = (function () {
           ${abierto ? `
           <div class="cr-horarios">
             <div class="cr-hora"><small>Hora de salida</small><input type="time" data-cr-f="${clave}|sale|hora" value="${esc(s.sale.hora)}"></div>
-            <div class="cr-hora"><small>Llegás</small><input type="date" data-cr-f="${clave}|llega|fecha" value="${esc(s.llega.fecha)}" ${s.sale.fecha || previa ? `min="${s.sale.fecha || previa}" data-sugerir="${s.sale.fecha || previa}"` : ''}><input type="time" data-cr-f="${clave}|llega|hora" value="${esc(s.llega.hora)}"></div>
+            <div class="cr-hora"><small>Llegás${C().difHoraria(s) ? ` <i>(hora de ${esc(s.hasta.nombre)})</i>` : ''}</small><input type="date" data-cr-f="${clave}|llega|fecha" value="${esc(s.llega.fecha)}" ${s.sale.fecha || previa ? `min="${s.sale.fecha || previa}" data-sugerir="${s.sale.fecha || previa}"` : ''}><input type="time" data-cr-f="${clave}|llega|hora" value="${esc(s.llega.hora)}"></div>
           </div>
           <p class="cr-nota">${[
             dur != null && dur >= 0 ? `⏱ ${C().fmtDuracion(dur)} de viaje` : '',
             nocturno ? '🌙 Viajás de noche' : '',
-            s.desde.zona && s.hasta.zona && C().difHoraria(s) ? `🕒 Hora local en cada ciudad` : ''
+            s.desde.zona && s.hasta.zona && C().difHoraria(s) ? `🕒 En ${esc(s.hasta.nombre)} es ${C().fmtDif(C().difHoraria(s))} que en ${esc(s.desde.nombre)}: cada hora va en la hora local` : ''
           ].filter(Boolean).join(' · ')}</p>` : ''}`}
         </div>`;
     }

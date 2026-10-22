@@ -745,10 +745,15 @@ R.viajes = (function () {
   /** Menú ⋯ del viaje: lo que se usa poco, fuera de la vista. */
   function menuViaje(v) {
     const ops = [];
-    if (R.db.puedeOrganizar(v)) ops.push(['editar', '✏️', 'Editar destinos, fechas y opciones']);
+    if (R.db.puedeOrganizar(v)) {
+      ops.push(['editar', '✏️', 'Editar destinos, fechas y opciones']);
+      if (estadoViaje(v) !== 'pasado') ops.push(['cambio', '🔄', 'Cambiaron los planes']);
+    }
     ops.push(['viajeros', '👥', 'Viajeros']);
+    ops.push(['ruta', '🗺️', 'Ver la ruta en Google Maps']);
     if (estadoViaje(v) === 'en_curso') ops.push(['guia', '🧭', 'Guía de organización']);
     ops.push(['pdf', '📄', 'Descargar itinerario en PDF']);
+    if (R.familia && R.db.modo() === 'nube') ops.push(['familia', '👪', v.linkFamilia && v.linkFamilia.activo ? 'Link para la familia (activo)' : 'Link para la familia']);
     if (v.fechaInicio) ops.push(['resumen', '🖼️', 'Resumen para compartir']);
     if (R.db.esDueno(v)) ops.push(['eliminar', '🗑', 'Eliminar viaje']);
     const { el } = U.modal({
@@ -759,10 +764,13 @@ R.viajes = (function () {
       const op = b.dataset.op;
       U.cerrarModal();
       if (op === 'editar') abrirAsistente(v);
+      else if (op === 'cambio') R.vistaGuia.cambioDePlanes(v);
+      else if (op === 'ruta') R.gmaps.abrirRutaViaje(v);
       else if (op === 'viajeros') location.hash = `#viaje/${v.id}/viajeros`;
       else if (op === 'guia') location.hash = `#viaje/${v.id}/guia`;
       else if (op === 'pdf') R.itinerarioPdf.descargar(v);
       else if (op === 'resumen') R.resumen.abrir(v);
+      else if (op === 'familia') R.familia.abrir(v);
       else if (op === 'eliminar') {
         const ok = await U.confirmar(`Se borra "${v.nombre || v.destino}" con sus pasos, documentos y gastos. No se puede deshacer.`, { titulo: 'Eliminar viaje', textoSi: 'Eliminar', peligro: true });
         if (!ok) return;
@@ -828,6 +836,15 @@ R.viajes = (function () {
   /* ---------------------------------------------------------
      Tarjeta para la pantalla de inicio
      --------------------------------------------------------- */
+  /** "Falta: …" con un toque para resolverlo, sin entrar al viaje. */
+  function siguienteHTML(v) {
+    if (v.ejemplo || estadoViaje(v) === 'pasado' || !R.db.puedeOrganizar(v)) return '';
+    const t = R.motor.proximos(v, 1)[0];
+    if (!t) return '';
+    return `<span class="sigue" role="button" tabindex="0" data-siguiente="${t.id}" data-viaje="${v.id}">
+      <span class="sigue-texto"><small>Falta</small>${R.guia.fase(t.fase).icono} ${esc(t.titulo)}</span><b>Resolver →</b></span>`;
+  }
+
   function tarjeta(v) {
     const prog = R.motor.progreso(v);
     const personas = v.participantes.map(id => R.db.persona(id)).filter(Boolean);
@@ -846,6 +863,7 @@ R.viajes = (function () {
             <span>${prog.pct}% organizado</span>
             <span class="tv-avatares">${personas.slice(0, 4).map(p => U.avatar(p, 24)).join('')}${personas.length > 4 ? `<span class="mas">+${personas.length - 4}</span>` : ''}</span>
           </div>
+          ${siguienteHTML(v)}
         </div>
       </a>`;
   }
@@ -911,6 +929,6 @@ R.viajes = (function () {
   return {
     crearEjemplo, borrarEjemplo,
     TIPOS, PESTANAS, EXTRAS, tipoDe, etiquetaTransporte, estadoViaje, cuentaRegresiva, destinoCompleto, deteccionInternacional, recalcularTramos,
-    abrirAsistente, renderViaje, tarjeta, marcarRaizResuelta
+    abrirAsistente, renderViaje, tarjeta, siguienteHTML, marcarRaizResuelta
   };
 })();

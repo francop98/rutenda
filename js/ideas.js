@@ -46,7 +46,7 @@ R.ideas = (function () {
   function todos(v) { return Object.entries(v.planes || {}).flatMap(([destId, l]) => l.map(p => Object.assign({ destId }, p))); }
   /** Lo que "va" para un día (lo usa el itinerario). */
   function delDia(v, fecha) { return todos(v).filter(p => p.estado === 'va' && p.fecha === fecha); }
-  function sinDia(v) { return todos(v).filter(p => p.estado === 'va' && !p.fecha); }
+  function sinDia(v) { return U.ordenAlfa(todos(v).filter(p => p.estado === 'va' && !p.fecha), 'titulo'); }
   function cuenta(v) { return todos(v).filter(p => p.estado !== 'descarto').length; }
 
   function diasDeEstadia(v, destId) {
@@ -133,7 +133,7 @@ R.ideas = (function () {
               <div class="plan-lista">${porZona(quiero).map(g => zonaHTML(v, d, g)).join('')}</div>` : ''}`
             : '<p class="texto-suave plan-vacio">Anotá todo lo que te interese, sin filtro. Después decidís qué va y qué descartás.</p>'}
           ${fuera.length ? `<details class="plan-descartadas" ${verDescartadas[d.id] ? 'open' : ''} data-plan-descartadas="${d.id}"><summary>Descartadas (${fuera.length})</summary>
-            <div class="plan-lista">${fuera.map(p => itemHTML(v, d, p)).join('')}</div></details>` : ''}
+            <div class="plan-lista">${U.ordenAlfa(fuera, 'titulo').map(p => itemHTML(v, d, p)).join('')}</div></details>` : ''}
           ${org ? `<div class="plan-ia">
             ${sug && sug.ideas && sug.ideas.length ? sugerenciasHTML(v, d, sug) : `
               <button type="button" class="btn btn-suave btn-chico" data-plan-ia="${d.id}">✨ Sugerir ideas con IA</button>
@@ -147,7 +147,7 @@ R.ideas = (function () {
   function porZona(lista) {
     const mapa = new Map();
     lista.forEach(p => { const z = (p.zona || '').trim(); if (!mapa.has(z)) mapa.set(z, []); mapa.get(z).push(p); });
-    return Array.from(mapa.entries()).sort((a, b) => (a[0] ? 0 : 1) - (b[0] ? 0 : 1) || a[0].localeCompare(b[0])).map(([zona, items]) => ({ zona, items }));
+    return Array.from(mapa.entries()).sort((a, b) => (a[0] ? 0 : 1) - (b[0] ? 0 : 1) || U.alfa(a[0], b[0])).map(([zona, items]) => ({ zona, items: U.ordenAlfa(items, 'titulo') }));
   }
   function zonaHTML(v, d, g) {
     const hayZonas = planesDe(v, d.id).some(p => p.zona);
@@ -179,14 +179,14 @@ R.ideas = (function () {
             <button type="button" class="plan-btn" data-plan-estado="${d.id}|${p.id}|descarto" title="Descartar">✕</button>`
             : `<button type="button" class="plan-btn" data-plan-estado="${d.id}|${p.id}|quiero">Recuperar</button>`) : ''}
           ${grupo ? `<button type="button" class="idea-voto ${quienes.includes(yo) ? 'activo' : ''}" data-plan-votar="${p.id}">👍 ${quienes.length || ''}</button>` : ''}
-          <a class="plan-mapa" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.lugar || [p.titulo, d.nombre].join(', '))}" target="_blank" rel="noopener" title="Ver en Maps">🗺️</a>
+          <a class="plan-mapa" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.lugar || [p.titulo, d.nombre].join(', '))}" target="_blank" rel="noopener" title="Ver en Google Maps">🗺️</a>
         </div>
       </div>`;
   }
 
   function sugerenciasHTML(v, d, sug) {
     const ya = new Set(planesDe(v, d.id).map(p => p.titulo.toLowerCase()));
-    const pendientes = sug.ideas.filter(i => !ya.has(String(i.titulo).toLowerCase()));
+    const pendientes = U.ordenAlfa(sug.ideas.filter(i => !ya.has(String(i.titulo).toLowerCase())), 'titulo');
     return `
       <div class="plan-sugerencias">
         <div class="ps-cab"><strong>✨ Ideas sugeridas</strong>${pendientes.length > 1 ? `<button type="button" class="btn-texto-mini" data-plan-todas="${d.id}">Agregar todas</button>` : ''}</div>
@@ -265,7 +265,7 @@ R.ideas = (function () {
         </div>
         <div class="grilla-2">
           <label class="campo"><span>Duración</span><input id="plDuracion" value="${esc(p.duracion)}" placeholder="Ej: medio día" ${org ? '' : 'disabled'}></label>
-          <label class="campo"><span>Tipo</span><select id="plTipo" ${org ? '' : 'disabled'}>${Object.entries(ICONOS).map(([k, ic]) => `<option value="${k}" ${p.tipo === k ? 'selected' : ''}>${ic} ${k === 'gastronomia' ? 'gastronomía' : k === 'excursion' ? 'excursión' : k}</option>`).join('')}</select></label>
+          <label class="campo"><span>Tipo</span><select id="plTipo" ${org ? '' : 'disabled'}>${Object.entries(ICONOS).sort((a, b) => (a[0] === 'otro') - (b[0] === 'otro') || U.alfa(a[0], b[0])).map(([k, ic]) => `<option value="${k}" ${p.tipo === k ? 'selected' : ''}>${ic} ${k === 'gastronomia' ? 'gastronomía' : k === 'excursion' ? 'excursión' : k}</option>`).join('')}</select></label>
         </div>
         ${dias.length ? `<div class="grilla-2 grilla-fh">
           <label class="campo"><span>Día</span><select id="plFecha" ${org ? '' : 'disabled'}><option value="">Sin día</option>${dias.map(f => `<option value="${f}" ${p.fecha === f ? 'selected' : ''}>${U.fmtFecha(f, 'dia')}</option>`).join('')}</select></label>

@@ -405,7 +405,7 @@ R.auth = (function () {
     if (!u) return;
     const push = R.recordatorios ? R.recordatorios.estadoPush() : 'no';
     U.modal({
-      titulo: 'Mi cuenta',
+      titulo: 'Mis datos',
       subtitulo: u.email,
       cuerpo: `
         ${enNube() && !u.verificado ? `<p class="aviso-suave">✉️ Todavía no confirmaste tu mail. <button type="button" class="btn-texto-mini" data-a="reenviar">Reenviar el mail</button></p>` : ''}
@@ -430,16 +430,10 @@ R.auth = (function () {
             ${U.campoClave('mcNueva', 'Nueva contraseña', 'new-password')}
           </div>
         </details>`}
-        ${R.app.puedeInstalar() ? '<button type="button" class="btn btn-suave btn-bloque" data-a="instalarApp">📲 Instalar Rutenda como app</button>' : ''}
-        <button type="button" class="btn btn-texto btn-bloque" data-a="verTour">🧭 Ver el tour de la app</button>
         <p class="ayuda version-app">Rutenda · versión ${R.VERSION}</p>
         <p class="ayuda">Cuenta creada el ${U.fmtFecha(String(u.creado).slice(0, 10))}. ${enNube() ? 'Tus datos se guardan en la nube y se sincronizan en tus dispositivos.' : 'Modo local: tus datos se guardan en este dispositivo.'}</p>`,
       alAbrir: el => {
-        const bTour = el.querySelector('[data-a="verTour"]');
-        if (bTour) bTour.onclick = () => { U.cerrarModal(); R.tour.iniciar(); };
         U.enlazarClaves(el);
-        const b = el.querySelector('[data-a="instalarApp"]');
-        if (b) b.onclick = () => { U.cerrarModal(); R.app.instalar(); };
         const r = el.querySelector('[data-a="reenviar"]');
         if (r) r.onclick = () => reenviarVerificacion().then(() => U.toast('Te reenviamos el mail de confirmación.')).catch(() => U.toast('No se pudo reenviar. Probá en un rato.'));
         const p = el.querySelector('[data-a="push"]');
@@ -448,7 +442,6 @@ R.auth = (function () {
         if (pn) pn.onclick = () => R.recordatorios.desactivarPush().then(() => { U.cerrarModal(); U.toast('Recordatorios desactivados en este dispositivo.'); });
       },
       acciones: [
-        { texto: 'Cerrar sesión', clase: 'btn-texto peligro', onClick: () => { salir().then(() => { location.hash = '#inicio'; location.reload(); }); return false; } },
         { texto: 'Cancelar' },
         {
           texto: 'Guardar', clase: 'btn-primario', onClick: el => {

@@ -48,6 +48,7 @@ R.vistaGuia = (function () {
     const ahora = proximos.slice(0, 3);
     const rec = R.motor.recomendaciones(v);
     const reqHTML = R.requisitos.tarjeta(v);
+    const cosHTML = R.costumbres ? R.costumbres.html(v) : '';
     const est = R.viajes.estadoViaje(v);
     const plegable = (id, titulo, cuenta, cuerpo, abierto) => `
       <details class="plegable" data-plegable="${id}" ${abierto || plegado[id] ? 'open' : ''}>
@@ -97,6 +98,8 @@ R.vistaGuia = (function () {
 
       ${reqHTML ? plegable('req', v.perfil.internacional ? 'Documentos y salud para este destino' : 'Salud en este destino', null, reqHTML) : ''}
 
+      ${cosHTML ? plegable('costumbres', '🌎 Cómo es allá', null, cosHTML) : ''}
+
       ${est !== 'planificando' ? plegable('notas', 'Notas y recuerdos del viaje', null, `<textarea id="notasViaje" rows="3" placeholder="Lo que te gustó, lo que harías distinto…">${esc(v.notasViaje || '')}</textarea>`) : ''}
 
       ${plegable('todos', 'Todos los pasos', `${prog.hechas}/${prog.total}`, `
@@ -108,6 +111,7 @@ R.vistaGuia = (function () {
       </div>`;
 
     if (R.salida) R.salida.enlazar(cont, v);
+    if (R.costumbres) R.costumbres.enlazar(cont, v);
     cont.querySelectorAll('details[data-plegable]').forEach(d => d.addEventListener('toggle', () => { plegado[d.dataset.plegable] = d.open; }));
     cont.querySelectorAll('[data-tarea]').forEach(x => x.addEventListener('click', e => {
       // Los botones de adentro (Listo, Más tarde, etc.) no abren el detalle
