@@ -2264,3 +2264,72 @@ button.menu-item:hover, label.menu-item:hover { background: var(--arena-2); }
 .anio-linea { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: .92rem; }
 .anio-pais { padding: 4px 10px; border-radius: 999px; background: var(--arena-2); font-size: .86rem; }
 @media (max-width: 420px) { .anio-grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---------- v21 · Tamaño de letra ---------- */
+html[data-letra="grande"] { font-size: 112.5%; }
+html[data-letra="grande"] body { font-size: 17.4px; }
+html[data-letra="enorme"] { font-size: 125%; }
+html[data-letra="enorme"] body { font-size: 19.4px; }
+.menu-sub { display: block; margin-top: 10px; color: var(--tinta-suave); font-size: .8rem; font-weight: 600; }
+
+/* ---------- v21 · El pasaje a mano ---------- */
+.pasaje-hoy { margin: 16px 0; padding: 16px; border-radius: var(--radio); background: var(--papel); border: 1.5px solid color-mix(in srgb, var(--mar) 45%, transparent); box-shadow: var(--sombra); display: grid; gap: 10px; }
+.ph-cab { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: center; }
+.ph-icono { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--mar-claro); font-size: 1.4rem; }
+.ph-ruta { display: grid; min-width: 0; }
+.ph-ruta small { color: var(--tinta-suave); font-size: .8rem; font-weight: 600; }
+.ph-ruta strong { font-size: 1.1rem; overflow-wrap: anywhere; }
+.ph-ruta span { color: var(--tinta-suave); font-size: .86rem; }
+.ph-codigo { display: grid; justify-items: center; gap: 2px; width: 100%; padding: 12px; border-radius: 14px; border: 1.5px dashed var(--mar); background: var(--mar-claro); color: var(--tinta); font: inherit; cursor: pointer; }
+.ph-codigo small { font-size: .74rem; letter-spacing: .06em; text-transform: uppercase; color: var(--tinta-suave); font-weight: 700; }
+.ph-codigo strong { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 1.9rem; letter-spacing: .12em; overflow-wrap: anywhere; }
+.ph-codigo span { font-size: .74rem; color: var(--tinta-tenue); }
+.ph-falta { margin: 0; color: var(--tinta-suave); font-size: .88rem; }
+.ph-datos { margin: 0; font-size: .92rem; }
+.ph-imagen { border-radius: 12px; overflow: hidden; background: #fff; border: 1px solid var(--linea); cursor: zoom-in; min-height: 60px; display: grid; place-items: center; }
+.ph-imagen img { display: block; width: 100%; height: auto; }
+.ph-docs { display: flex; flex-wrap: wrap; gap: 8px; }
+.repaso-vuelta { border-color: color-mix(in srgb, var(--terracota) 40%, transparent); }
+
+/* ---------- v21 · Ordenar el día ---------- */
+.dia-ruta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.dia-ordenar { font-weight: 600; }
+.ordenar { display: grid; gap: 12px; }
+.ordenar-lista { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+.ordenar-lista li { padding-left: 2px; }
+.ordenar-lista li small { color: var(--tinta-suave); }
+.ordenar-lista .ol-dist { display: block; font-size: .78rem; color: var(--tinta-tenue); }
+.ordenar-lista .ol-casa { list-style: none; margin-left: -22px; color: var(--tinta-suave); font-size: .88rem; }
+.ordenar-resumen { margin: 0; }
+
+/* ---------- v21 · Link de cuentas (vista pública) ---------- */
+.cv-deuda { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 10px 0; border-top: 1px solid var(--linea); }
+.cv-deuda:first-of-type { border-top: 0; }
+.cv-deuda small { grid-column: 1 / -1; color: var(--tinta-suave); }
+.cv-monto { font-size: 1.1rem; }
+.cv-personas { display: grid; gap: 8px; }
+.cv-persona { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--arena-2); }
+.cv-persona small { color: var(--tinta-suave); }
+.cv-persona span { font-weight: 700; }
+.cv-mov { display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--linea); }
+.cv-mov:first-of-type { border-top: 0; }
+.cv-icono { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; background: var(--g-icono-gasto); }
+.cv-mtexto { display: grid; min-width: 0; }
+.cv-mtexto small { color: var(--tinta-suave); font-size: .8rem; overflow-wrap: anywhere; }
+.cuentas-vista .familia-portada { background: var(--g-hero); }
+
+/* ---------- v21 · Presupuesto sugerido ---------- */
+.presupuesto { display: grid; gap: 12px; }
+.presupuesto-niveles { display: flex; width: 100%; }
+.presupuesto-niveles button { flex: 1; }
+.pres-total { display: grid; justify-items: center; gap: 2px; padding: 16px; border-radius: var(--radio); background: var(--g-hero); color: #fff; text-align: center; }
+.pres-total strong { font-family: var(--fuente-titulo); font-size: 2.2rem; line-height: 1.1; }
+.pres-total small { opacity: .85; }
+.pres-total span { font-weight: 600; }
+.pres-total span small { font-weight: 400; }
+.pres-cats { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pres-cats li { display: flex; justify-content: space-between; gap: 10px; padding: 9px 12px; border-radius: 12px; background: var(--arena-2); }
+.pres-nota { margin: 0; font-size: .9rem; }
+.pres-consejos { padding: 12px 14px; border-radius: 12px; background: var(--sol-claro); font-size: .9rem; }
+.pres-consejos ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.pres-ayuda { margin-top: -4px; text-align: center; }

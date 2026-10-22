@@ -5,6 +5,7 @@
     "api/costumbres-destino.js": { "maxDuration": 30 },
     "api/recibir-mail.js": { "maxDuration": 60 },
     "api/preguntar.js": { "maxDuration": 30 },
+    "api/presupuesto.js": { "maxDuration": 30 },
     "api/enviar-recordatorios.js": { "maxDuration": 60 }
   },
   "crons": [

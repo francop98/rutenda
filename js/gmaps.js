@@ -105,7 +105,8 @@ R.gmaps = (function () {
   }
   function enlaceDiaHTML(d) {
     const url = rutaDia(d);
-    return url ? `<p class="dia-linea dia-ruta"><a href="${esc(url)}" target="_blank" rel="noopener">🗺️ Ver el recorrido del día en Google Maps</a></p>` : '';
+    const ordenar = R.ordenar ? R.ordenar.botonHTML(d) : '';
+    return url ? `<p class="dia-linea dia-ruta"><a href="${esc(url)}" target="_blank" rel="noopener">🗺️ Ver el recorrido del día en Google Maps</a>${ordenar}</p>` : '';
   }
   /** Botoncito "Cómo llegar" para un evento del itinerario. */
   function enlaceItemHTML(lugar) {

@@ -400,6 +400,23 @@ R.nube = (function () {
     if (!v.linkFamilia || !v.linkFamilia.token) return;
     await db.collection('familia').doc(v.linkFamilia.token).set({ viajeId: v.id, creadoPor: uid, activo: false, actualizado: new Date().toISOString(), datos: null });
   }
+  /* Link de cuentas para el grupo: cuentas/{token} (mismo esquema que el de la familia) */
+  async function guardarCuentas(v, datos) {
+    const token = (v.linkCuentas && v.linkCuentas.token) || (nuevoCodigo() + nuevoCodigo());
+    await db.collection('cuentas').doc(token).set(limpio({ viajeId: v.id, creadoPor: uid, activo: true, actualizado: new Date().toISOString(), datos }));
+    return token;
+  }
+  async function apagarCuentas(v) {
+    if (!v.linkCuentas || !v.linkCuentas.token) return;
+    await db.collection('cuentas').doc(v.linkCuentas.token).set({ viajeId: v.id, creadoPor: uid, activo: false, actualizado: new Date().toISOString(), datos: null });
+  }
+  async function leerCuentas(token) {
+    iniciarApp();
+    try {
+      const s = await db.collection('cuentas').doc(token).get();
+      return s.exists && s.data().activo ? s.data() : null;
+    } catch (e) { return null; }
+  }
   async function leerFamilia(token) {
     iniciarApp();
     try {
@@ -461,7 +478,7 @@ R.nube = (function () {
   return {
     disponible, iniciarApp, iniciar, detener, programar, enviarTodo, eliminarViaje, salirDelViaje,
     guardarPerfil, actualizarPerfil, crearInvitacion, desactivarInvitacion, leerInvitacion, unirse, cambiarRol, quitarMiembro,
-    guardarFamilia, apagarFamilia, leerFamilia,
+    guardarFamilia, apagarFamilia, leerFamilia, guardarCuentas, apagarCuentas, leerCuentas,
     subirArchivo, bajarArchivo, urlArchivo, borrarArchivo, bajarRuta, borrarRuta, miUid, guardarSuscripcion, borrarSuscripcion, borrarSuscripciones,
     auth: () => { iniciarApp(); return auth; }, db: () => { iniciarApp(); return db; }
   };

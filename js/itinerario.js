@@ -197,6 +197,7 @@ R.itinerario = (function () {
     cont.querySelectorAll('[data-evento]').forEach(b => b.onclick = () => editar(v, b.dataset.evento));
     cont.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const [d, id] = b.dataset.plan.split('|'); R.ideas.editar(v, d, id, () => render(v, cont)); });
     cont.querySelectorAll('[data-doc]').forEach(b => b.onclick = e => { e.stopPropagation(); R.documentos.abrir(v.documentos.find(d => d.id === b.dataset.doc), v); });
+    if (R.ordenar) R.ordenar.enlazar(cont, v);
     if (subvista === 'que' && R.ideas) R.ideas.enlazar(v, cont, () => render(v, cont));
     else { cargarClima(v, cont); cargarFeriados(v, cont); }
   }
@@ -625,6 +626,8 @@ R.itinerario = (function () {
         </section>
 
         ${R.salida ? R.salida.tarjetaHTML(v) : ''}
+        ${R.pasaje ? R.pasaje.html(v) : ''}
+        ${R.vuelta ? R.vuelta.tarjetaHTML(v) : ''}
         ${paraHoy.length ? `
           <section class="bloque hoy-pendiente">
             <h3 class="bloque-titulo">Para hacer hoy</h3>
@@ -655,7 +658,7 @@ R.itinerario = (function () {
         <button type="button" class="btn btn-texto btn-chico hoy-algo-mal" data-a="algoMal">🧭 ¿Algo salió mal? Qué hacer si…</button>
         ${R.preguntar && R.db.modo() === 'nube' ? '<button type="button" class="barra-preguntar" data-a="preguntar"><span>✨</span><span><strong>Preguntale a Rutenda</strong><small>¿Qué hay mañana? ¿Cuánto llevo gastado?</small></span><b>Preguntar →</b></button>' : ''}
 
-        ${ultimo ? `
+        ${ultimo && !(R.vuelta && R.vuelta.aplica(v)) ? `
           <section class="bloque">
             <h3 class="bloque-titulo">🏠 Hoy volvés</h3>
             <p class="texto-suave">Revisá que no quede nada en el alojamiento.</p>
@@ -674,6 +677,9 @@ R.itinerario = (function () {
     const bMal = cont.querySelector('[data-a="algoMal"]');
     if (bMal) bMal.onclick = () => R.queHacerSi.ir(v);
     if (R.salida) R.salida.enlazar(cont, v);
+    if (R.pasaje) R.pasaje.enlazar(cont, v);
+    if (R.ordenar) R.ordenar.enlazar(cont, v);
+    if (R.vuelta) R.vuelta.enlazar(cont, v);
     cargarFeriados(v, cont);
     const bAct = cont.querySelector('[data-a="actividad"]');
     if (bAct) bAct.onclick = () => editar(v, null, hoy);

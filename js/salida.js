@@ -34,8 +34,8 @@ R.salida = (function () {
   }
 
   /** Hora para salir de casa: hora del traslado − anticipación − lo que tardás en llegar. */
-  function horaDeSalir(v) {
-    const s = primerTraslado(v);
+  function horaDeSalir(v, seg) {
+    const s = seg || primerTraslado(v);
     if (!s || !s.sale.hora) return null;
     const inter = s.medio === 'avion' && v.perfil && v.perfil.internacional;
     const antes = inter ? ANTICIPACION.avionInter : (ANTICIPACION[s.medio] != null ? ANTICIPACION[s.medio] : 30);
@@ -137,5 +137,5 @@ R.salida = (function () {
     };
   }
 
-  return { aplica, tarjetaHTML, enlazar, horaDeSalir, items };
+  return { aplica, tarjetaHTML, enlazar, horaDeSalir, items, minutosHasta };
 })();

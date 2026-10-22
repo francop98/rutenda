@@ -755,6 +755,7 @@ R.viajes = (function () {
     if (estadoViaje(v) === 'en_curso') ops.push(['guia', '🧭', 'Guía de organización']);
     ops.push(['pdf', '📄', 'Descargar itinerario en PDF']);
     if (R.familia && R.db.modo() === 'nube') ops.push(['familia', '👪', v.linkFamilia && v.linkFamilia.activo ? 'Link para la familia (activo)' : 'Link para la familia']);
+    if (R.linkCuentas && R.db.modo() === 'nube' && (v.participantes || []).length > 1) ops.push(['linkCuentas', '🔗', v.linkCuentas && v.linkCuentas.activo ? 'Link de cuentas (activo)' : 'Link de cuentas para el grupo']);
     if (v.fechaInicio) ops.push(['resumen', '🖼️', 'Resumen para compartir']);
     if (R.db.esDueno(v)) ops.push(['eliminar', '🗑', 'Eliminar viaje']);
     const { el } = U.modal({
@@ -773,6 +774,7 @@ R.viajes = (function () {
       else if (op === 'pdf') R.itinerarioPdf.descargar(v);
       else if (op === 'resumen') R.resumen.abrir(v);
       else if (op === 'familia') R.familia.abrir(v);
+      else if (op === 'linkCuentas') R.linkCuentas.abrir(v);
       else if (op === 'eliminar') {
         const ok = await U.confirmar(`Se borra "${v.nombre || v.destino}" con sus pasos, documentos y gastos. No se puede deshacer.`, { titulo: 'Eliminar viaje', textoSi: 'Eliminar', peligro: true });
         if (!ok) return;

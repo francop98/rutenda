@@ -4,7 +4,7 @@
    recibir recordatorios. Al cambiar archivos, subir el número
    de VERSION para que los celulares descarguen la versión nueva.
    ========================================================= */
-const VERSION = 'rutenda-20';
+const VERSION = 'rutenda-21';
 const ARCHIVOS = [
   './',
   './index.html',
@@ -46,6 +46,11 @@ const ARCHIVOS = [
   './js/quehacersi.js',
   './js/anio.js',
   './js/cierre.js',
+  './js/pasaje.js',
+  './js/vuelta.js',
+  './js/ordenar.js',
+  './js/linkcuentas.js',
+  './js/presupuesto.js',
   './js/familia.js',
   './js/costumbres.js',
   './js/emergencias.js',

@@ -44,6 +44,9 @@ R.menu = (function () {
             <span class="menu-texto"><strong>Apariencia</strong>
               <span class="segmentado segmentado-tema" role="group" aria-label="Modo de la app">${[['auto', 'Automático'], ['claro', '☀️ Claro'], ['oscuro', '🌙 Oscuro']].map(([k, n]) =>
                 `<button type="button" data-tema="${k}" class="${U.tema() === k ? 'activo' : ''}">${n}</button>`).join('')}</span>
+              <small class="menu-sub">Tamaño de letra</small>
+              <span class="segmentado segmentado-tema" role="group" aria-label="Tamaño de letra">${[['normal', 'Normal'], ['grande', 'Grande'], ['enorme', 'Más grande']].map(([k, n]) =>
+                `<button type="button" data-letra="${k}" class="${U.letra() === k ? 'activo' : ''}">${n}</button>`).join('')}</span>
             </span>
           </div>
           ${op('copia', '💾', 'Descargar copia de seguridad', ultimaCopia())}
@@ -106,6 +109,10 @@ R.menu = (function () {
     };
     capa.querySelectorAll('button[data-menu]').forEach(b => { if (acciones[b.dataset.menu]) b.onclick = acciones[b.dataset.menu]; });
     capa.querySelector('#menuRestaurar').onchange = e => { const f = e.target.files[0]; cerrar(); if (f) R.app.importar(f); };
+    capa.querySelectorAll('[data-letra]').forEach(x => x.onclick = () => {
+      U.aplicarLetra(x.dataset.letra);
+      capa.querySelectorAll('[data-letra]').forEach(y => y.classList.toggle('activo', y === x));
+    });
     capa.querySelectorAll('[data-tema]').forEach(x => x.onclick = () => {
       U.aplicarTema(x.dataset.tema);
       capa.querySelectorAll('[data-tema]').forEach(y => y.classList.toggle('activo', y === x));

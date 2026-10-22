@@ -5,7 +5,7 @@
 window.R = window.R || {};
 
 /** Versión de la app (cambios chicos: 10.1, 10.2…; cambios grandes: 11, 12…). Igual que VERSION en sw.js. */
-window.R.VERSION = '20';
+window.R.VERSION = '21';
 
 R.util = (function () {
   const pad = n => String(n).padStart(2, '0');
@@ -293,6 +293,16 @@ R.util = (function () {
     else document.documentElement.removeAttribute('data-tema');
   }
 
+  /* ---------- Tamaño de letra ('normal' | 'grande' | 'enorme') ---------- */
+  function letra() {
+    try { const t = localStorage.getItem('rutenda_letra'); return t === 'grande' || t === 'enorme' ? t : 'normal'; } catch (e) { return 'normal'; }
+  }
+  function aplicarLetra(t) {
+    try { if (t === 'grande' || t === 'enorme') localStorage.setItem('rutenda_letra', t); else localStorage.removeItem('rutenda_letra'); } catch (e) { /* sin almacenamiento */ }
+    if (t === 'grande' || t === 'enorme') document.documentElement.setAttribute('data-letra', t);
+    else document.documentElement.removeAttribute('data-letra');
+  }
+
   /**
    * Pantalla vacía: un ícono, una frase y (si hace falta) un botón.
    * o: { icono, titulo, texto, boton, accion, chico, claseBoton }
@@ -320,7 +330,7 @@ R.util = (function () {
   }
 
   return {
-    tema, aplicarTema, vacio, alfa, ordenAlfa,
+    tema, aplicarTema, letra, aplicarLetra, vacio, alfa, ordenAlfa,
     campoClave, enlazarClaves, sugerirFechas,
     MONEDAS, fondoBloqueado, id, esc, aISO, hoyISO, aFecha, sumarDias, diasEntre, fmtFecha, fmtRango, plural,
     redondear, fmtMoneda, fmtTamano, numero, hash, portada, colorPersona, iniciales, avatar,

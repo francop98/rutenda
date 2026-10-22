@@ -44,6 +44,17 @@ service cloud.firestore {
       allow delete: if logueado() && organiza(resource.data.viajeId);
     }
 
+    // ---------- Link de cuentas para el grupo (solo lectura, sin cuenta) ----------
+    match /cuentas/{token} {
+      allow get: if resource.data.activo == true;
+      allow list: if false;
+      allow create: if logueado() && request.resource.data.creadoPor == yo()
+        && organiza(request.resource.data.viajeId);
+      allow update: if logueado() && organiza(resource.data.viajeId)
+        && request.resource.data.viajeId == resource.data.viajeId;
+      allow delete: if logueado() && organiza(resource.data.viajeId);
+    }
+
     // ---------- Viajes ----------
     match /viajes/{viajeId} {
       function miembro() { return logueado() && yo() in resource.data.miembros; }

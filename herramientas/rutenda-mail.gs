@@ -36,11 +36,17 @@ function revisar() {
   hilos.forEach(hilo => {
     let todoBien = true;
     hilo.getMessages().filter(m => m.isUnread()).forEach(m => {
+      if (automatico(m.getFrom())) { m.markRead(); return; }   // avisos de Google, Firebase o Vercel: se ignoran
       try { procesar(m, clave); m.markRead(); }
       catch (e) { console.error(e); todoBien = false; }   // queda sin leer: se reintenta en 5 minutos
     });
     if (todoBien) { hilo.addLabel(etiqueta); hilo.moveToArchive(); }
   });
+}
+
+/** Mails que no manda una persona (no se procesan ni se responden). */
+function automatico(de) {
+  return /mailer-daemon|postmaster|@google\.com|@accounts\.google\.com|@firebase|@vercel/i.test(String(de || ''));
 }
 
 function procesar(m, clave) {
@@ -59,6 +65,7 @@ function procesar(m, clave) {
   });
   const codigo = r.getResponseCode();
   if (codigo === 404) {
+    if (/no-?reply/i.test(m.getFrom())) return;   // a un "no-reply" no tiene sentido responderle
     m.reply('¡Hola! Recibimos tu mail, pero no encontramos una cuenta de Rutenda con esta dirección.\n\n' +
       'Reenviá las reservas desde el mismo mail con el que entrás a Rutenda (lo ves en ☰ → Mis datos).\n\nRutenda · tu viaje, paso a paso');
   } else if (codigo === 429) {

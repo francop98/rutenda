@@ -223,6 +223,8 @@ R.gastos = (function () {
     });
     cont.querySelectorAll('[data-filtro-persona]').forEach(b => b.onclick = () => { filtroPersona = b.dataset.filtroPersona; render(v, cont); });
     cont.querySelectorAll('[data-a="categorias"]').forEach(b => b.onclick = () => administrarCategorias());
+    const bLink = cont.querySelector('[data-a="linkCuentas"]');
+    if (bLink) bLink.onclick = () => R.linkCuentas.abrir(v);
     cont.querySelectorAll('[data-a="ingreso"]').forEach(b => b.onclick = () => editar(v, null, 'ingreso'));
     cont.querySelectorAll('[data-mov]').forEach(b => b.onclick = () => editar(v, b.dataset.mov));
     cont.querySelectorAll('[data-saldar]').forEach(b => b.onclick = () => registrarPago(v, tr[Number(b.dataset.saldar)]));
@@ -275,6 +277,7 @@ R.gastos = (function () {
               <button class="btn btn-suave btn-chico" data-saldar="${i}">Ya pagó ✓</button>
             </span>
           </div>`).join('')}</div>` : `<p class="texto-suave">${v.movimientos.length ? 'Todos están a mano. 🙌' : 'Cuando haya gastos, acá ves quién le debe a quién.'}</p>`}
+        ${R.linkCuentas && R.db.modo() === 'nube' ? `<button type="button" class="btn btn-texto btn-chico" data-a="linkCuentas">🔗 Link de cuentas para el grupo${v.linkCuentas && v.linkCuentas.activo ? ' · activo' : ''}</button>` : ''}
       </div>
       <div class="bloque">
         <h3 class="bloque-titulo">Cada uno</h3>
@@ -367,7 +370,9 @@ R.gastos = (function () {
           <label class="campo"><span>Presupuesto total</span><input id="gPres" inputmode="decimal" value="${esc(v.presupuesto || '')}" placeholder="Sin tope"></label>
           <label class="campo"><span>Moneda principal</span><select id="gMoneda" ${conMovs ? 'disabled' : ''}>${U.opcionesMoneda(v.monedaBase)}</select></label>
         </div>
-        ${conMovs ? '<p class="ayuda">La moneda principal no se puede cambiar cuando ya hay gastos cargados.</p>' : ''}`,
+        ${conMovs ? '<p class="ayuda">La moneda principal no se puede cambiar cuando ya hay gastos cargados.</p>' : ''}
+        ${R.presupuesto && R.db.modo() === 'nube' ? '<button type="button" class="btn btn-suave btn-bloque" data-a="sugerirPresupuesto">✨ ¿Cuánto me va a salir? Sugerime un presupuesto</button>' : ''}`,
+      alAbrir: el => { const b = el.querySelector('[data-a="sugerirPresupuesto"]'); if (b) b.onclick = () => { U.cerrarModal(); R.presupuesto.abrir(v); }; },
       acciones: [
         { texto: 'Cancelar' },
         {

@@ -275,5 +275,5 @@ R.documentos = (function () {
     U.toast('Documento eliminado.');
   }
 
-  return { CATEGORIAS, render, subir, abrir, descargar, iconoDoc, guardarArchivos };
+  return { CATEGORIAS, render, subir, abrir, descargar, iconoDoc, guardarArchivos, blobDe };
 })();

@@ -171,6 +171,8 @@ R.db = (function () {
     Object.keys(v.personas).forEach(pid => { delete pool[pid]; });
     if (modo === 'local') guardarLocal(); else R.nube.programar(v);
     if (R.recordatorios) R.recordatorios.actualizar();
+    // El link de cuentas del grupo se actualiza solo (si está activo)
+    if (modo === 'nube' && v.linkCuentas && v.linkCuentas.activo && R.linkCuentas) R.linkCuentas.actualizar(v);
     return v;
   }
   async function eliminarViaje(id) {

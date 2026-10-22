@@ -14,12 +14,12 @@
   let rutaAnterior = '';
   let listo = false;
 
-  const esPublica = () => /^#familia\//.test(location.hash);
+  const esPublica = () => /^#(familia|cuentas)\//.test(location.hash);
   function render() {
     if (!listo) return;
     // Link para la familia: se ve sin cuenta
     document.body.classList.toggle('vista-publica', esPublica());
-    if (esPublica()) { R.familia.renderPublico(app, location.hash.split('/')[1] || ''); return; }
+    if (esPublica()) { const tk = location.hash.split('/')[1] || ''; if (/^#cuentas\//.test(location.hash)) R.linkCuentas.renderPublico(app, tk); else R.familia.renderPublico(app, tk); return; }
     if (!R.auth.usuarioActual()) {
       document.body.classList.add('sin-sesion');
       document.title = 'Rutenda · Ingresá';
@@ -230,6 +230,7 @@
       ${R.recordatorios ? R.recordatorios.avisosHTML() : ''}
       ${R.bandeja ? R.bandeja.inicioHTML() : ''}
 
+      ${enCurso.map(v => (R.pasaje ? R.pasaje.html(v) : '') + (R.vuelta ? R.vuelta.tarjetaHTML(v) : '')).join('')}
       ${enCurso.map(v => R.itinerario.hoyHTML(v)).join('')}
       ${R.cierre ? R.cierre.inicioHTML() : ''}
 
@@ -251,7 +252,7 @@
     if (bInst) bInst.onclick = instalar;
     const bOcultar = app.querySelector('[data-a="ocultarInstalar"]');
     if (bOcultar) bOcultar.onclick = () => { try { localStorage.setItem('rutenda_oculto_instalar', '1'); } catch (e) { /* sin almacenamiento */ } refrescar(); };
-    enCurso.forEach(v => R.itinerario.enlazarHoy(app, v));
+    enCurso.forEach(v => { R.itinerario.enlazarHoy(app, v); if (R.pasaje) R.pasaje.enlazar(app, v); if (R.vuelta) R.vuelta.enlazar(app, v); });
     if (destacado && R.salida) R.salida.enlazar(app, destacado);
     if (R.recordatorios) R.recordatorios.enlazarAvisos(app);
     if (R.bandeja) R.bandeja.enlazarInicio(app);
