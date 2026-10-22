@@ -4,7 +4,7 @@
    recibir recordatorios. Al cambiar archivos, subir el número
    de VERSION para que los celulares descarguen la versión nueva.
    ========================================================= */
-const VERSION = 'rutenda-19';
+const VERSION = 'rutenda-20';
 const ARCHIVOS = [
   './',
   './index.html',
@@ -40,6 +40,12 @@ const ARCHIVOS = [
   './js/tour.js',
   './js/menu.js',
   './js/cargar.js',
+  './js/compartido.js',
+  './js/bandeja.js',
+  './js/preguntar.js',
+  './js/quehacersi.js',
+  './js/anio.js',
+  './js/cierre.js',
   './js/familia.js',
   './js/costumbres.js',
   './js/emergencias.js',
@@ -72,13 +78,35 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(claves => Promise.all(claves.filter(k => k !== VERSION).map(k => caches.delete(k))))
+      .then(claves => Promise.all(claves.filter(k => k !== VERSION && k !== 'rutenda-compartido').map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
+/* ---------- Compartir hacia Rutenda (desde Gmail, WhatsApp, Archivos…) ---------- */
+const CACHE_COMPARTIDO = 'rutenda-compartido';
+async function recibirCompartido(req) {
+  try {
+    const form = await req.formData();
+    const c = await caches.open(CACHE_COMPARTIDO);
+    for (const k of await c.keys()) await c.delete(k);   // solo lo último que compartiste
+    const archivos = form.getAll('archivos').filter(f => f && f.size);
+    let i = 0;
+    for (const f of archivos.slice(0, 5)) {
+      await c.put(new Request(`./compartido/${i++}`), new Response(f, { headers: { 'Content-Type': f.type || 'application/octet-stream', 'X-Nombre': encodeURIComponent(f.name || 'archivo') } }));
+    }
+    const texto = [form.get('title'), form.get('text'), form.get('url')].filter(Boolean).join('\n').slice(0, 20000);
+    if (texto) await c.put(new Request('./compartido/texto'), new Response(texto, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }));
+  } catch (err) { /* si falla, la app abre igual */ }
+  return Response.redirect('./index.html#compartido', 303);
+}
+
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+  if (e.request.method === 'POST' && url.origin === self.location.origin && url.pathname.endsWith('/compartir')) {
+    e.respondWith(recibirCompartido(e.request));
+    return;
+  }
   if (e.request.method !== 'GET') return;
   if (url.origin === self.location.origin) {
     if (url.pathname.startsWith('/api/')) return; // funciones del servidor: siempre a la red

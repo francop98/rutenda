@@ -49,6 +49,7 @@ R.documentos = (function () {
         </div>
       </div>
       ${R.emergencias ? R.emergencias.html(v) : ''}
+      ${R.queHacerSi ? R.queHacerSi.html(v) : ''}
       ${grupos.length ? grupos.map(g => `
         <div class="bloque">
           <h3 class="bloque-titulo">${g.c.icono} ${esc(g.c.nombre)} <span class="contador">${g.docs.length}</span></h3>
@@ -58,6 +59,7 @@ R.documentos = (function () {
 
     cont.querySelectorAll('[data-a="subir"],[data-a="subir2"]').forEach(b => b.onclick = () => subir(v));
     if (R.emergencias) R.emergencias.enlazar(cont, v, () => render(v, cont));
+    if (R.queHacerSi) R.queHacerSi.enlazar(cont);
     const esc1 = cont.querySelector('[data-a="escanear"]');
     if (esc1) esc1.onclick = () => R.escaneo.escanearYAbrir(v);
     cont.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => abrir(v.documentos.find(d => d.id === b.dataset.abrir)));

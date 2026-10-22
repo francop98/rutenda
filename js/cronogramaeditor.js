@@ -218,6 +218,7 @@ R.cronogramaEditor = (function () {
               <span>${e.desde ? 'Llegás el ' + U.fmtFecha(e.desde, 'dia') + '. ¿Cuántas noches te quedás?' : 'Cargá cuándo salís y te calculo la llegada'}</span>
               <label class="cr-noches-campo"><input type="number" inputmode="numeric" min="0" max="365" data-cr-noches-input="${ti}" value="${e.noches != null && e.hasta ? e.noches : ''}" placeholder="—" ${!e.desde ? 'disabled' : ''} aria-label="Cantidad de noches"> <span>noches</span></label>
               ${e.hasta ? `<span>Te vas el ${U.fmtFecha(e.hasta, 'dia')}</span>` : ''}
+              ${e.desde ? `<small class="cr-noches-tip">💡 No hace falta contarlas: si cargás la fecha en que te vas (abajo, en el próximo traslado o la vuelta), las noches se calculan solas.</small>` : ''}
             </div>`}`}
             ${escapadas.map(d => `
               <div class="cr-escapada">☀️ Escapada a <strong>${esc(d.nombre)}</strong>

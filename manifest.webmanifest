@@ -35,5 +35,64 @@
       "purpose": "maskable"
     }
   ],
-  "id": "./"
+  "id": "./",
+  "shortcuts": [
+    {
+      "name": "Cargar un gasto",
+      "short_name": "Gasto",
+      "description": "Cargá un gasto, un documento o algo para la valija",
+      "url": "./index.html#cargar",
+      "icons": [
+        {
+          "src": "assets/icono-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Hoy en el viaje",
+      "short_name": "Hoy",
+      "url": "./index.html#hoy",
+      "icons": [
+        {
+          "src": "assets/icono-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Itinerario",
+      "short_name": "Itinerario",
+      "url": "./index.html#itinerario",
+      "icons": [
+        {
+          "src": "assets/icono-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "share_target": {
+    "action": "./compartir",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "archivos",
+          "accept": [
+            "application/pdf",
+            ".pdf",
+            "image/*"
+          ]
+        }
+      ]
+    }
+  }
 }

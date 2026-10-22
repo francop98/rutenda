@@ -29,6 +29,17 @@
     document.body.classList.remove('sin-sesion');
     app.classList.remove('rol-viajero');
     document.body.classList.remove('fondo-inicio');
+    // Atajos del ícono y "Compartir → Rutenda"
+    const atajo = (location.hash.replace(/^#/, '') || '').split('/')[0];
+    if (['cargar', 'compartido', 'hoy'].includes(atajo)) {
+      if (atajo === 'hoy') {
+        const enCurso = R.db.viajes().find(x => R.viajes.estadoViaje(x) === 'en_curso');
+        location.replace(enCurso ? `#viaje/${enCurso.id}/hoy` : '#itinerario');
+        return;
+      }
+      history.replaceState(null, '', '#inicio');
+      setTimeout(() => (atajo === 'cargar' ? R.cargar.abrir() : R.compartido.recibir()), 150);
+    }
     const hash = location.hash.replace(/^#/, '') || 'inicio';
     const [vista, id, pestana] = hash.split('/');
     document.querySelectorAll('[data-nav]').forEach(a => {
@@ -42,6 +53,9 @@
       if (!v) { location.hash = '#inicio'; return; }
       document.title = `${v.nombre || v.destino} · Rutenda`;
       R.viajes.renderViaje(app, v, pestana || '');
+    } else if (vista === 'itinerario') {
+      document.title = 'Itinerario · Rutenda';
+      renderItinerario(id);
     } else if (vista === 'valijas') {
       document.title = 'Mis listas de valija · Rutenda';
       R.valija.renderMisListas(app);
@@ -105,6 +119,8 @@
     window.scrollTo(0, 0);
     R.migracion.ofrecer();
     if (R.tour) R.tour.siCorresponde();
+    // Reservas que llegaron por mail
+    if (R.bandeja) R.bandeja.cargar().then(l => { if (l.length && /^#?(inicio)?$/.test(location.hash)) refrescar(); }).catch(() => {});
     if (R.recordatorios) { R.recordatorios.actualizar(); R.recordatorios.revisar(); }
     // Pasajes y reservas de los viajes cercanos, guardados para usarlos sin señal
     setTimeout(() => R.db.precargarArchivos().catch(() => {}), 4000);
@@ -212,8 +228,10 @@
         </div>` : ''}
 
       ${R.recordatorios ? R.recordatorios.avisosHTML() : ''}
+      ${R.bandeja ? R.bandeja.inicioHTML() : ''}
 
       ${enCurso.map(v => R.itinerario.hoyHTML(v)).join('')}
+      ${R.cierre ? R.cierre.inicioHTML() : ''}
 
       ${destacado ? destacadoHTML(destacado) : ''}
       ${destacado && R.salida ? R.salida.tarjetaHTML(destacado) : ''}
@@ -236,6 +254,8 @@
     enCurso.forEach(v => R.itinerario.enlazarHoy(app, v));
     if (destacado && R.salida) R.salida.enlazar(app, destacado);
     if (R.recordatorios) R.recordatorios.enlazarAvisos(app);
+    if (R.bandeja) R.bandeja.enlazarInicio(app);
+    if (R.cierre) R.cierre.enlazar(app);
   }
 
   /** Fila compacta de un viaje (inicio y listas). */
@@ -351,7 +371,30 @@
             : `<div class="dp-siguiente"><strong>¡Nada pendiente por ahora! 🌴</strong></div>`}
           </div>
         </article>
+        ${semanaHTML(v)}
       </section>`;
+  }
+
+  /** Lo que conviene resolver en los próximos 7 días (o que ya está atrasado). */
+  function semanaHTML(v) {
+    if (!R.db.puedeOrganizar(v)) return '';
+    const hoy = U.hoyISO();
+    const tope = U.sumarDias(hoy, 7);
+    const lista = R.motor.analizar(v)
+      .filter(t => !t.rec && !t.resuelta && !t.bloqueada && t.fechaLimite && t.fechaLimite <= tope)
+      .sort((a, b) => a.fechaLimite.localeCompare(b.fechaLimite));
+    if (!lista.length) return '';
+    const cuando = f => { const d = U.diasEntre(hoy, f); return d < 0 ? `atrasado ${U.plural(-d, 'día', 'días')}` : d === 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`; };
+    return `
+      <div class="dp-semana">
+        <div class="dps-cab"><strong>📅 Esta semana</strong><span class="contador">${lista.length}</span></div>
+        ${lista.slice(0, 3).map(t => `
+          <div class="dps-fila ${t.fechaLimite < hoy ? 'atrasado' : ''}">
+            <span class="dps-texto">${R.guia.fase(t.fase).icono} ${esc(t.titulo)}<small>${esc(cuando(t.fechaLimite))}</small></span>
+            <button type="button" class="btn-texto-mini" data-siguiente="${t.id}" data-viaje="${v.id}">Resolver</button>
+          </div>`).join('')}
+        ${lista.length > 3 ? `<a class="dps-mas" href="#viaje/${v.id}/guia">Ver ${U.plural(lista.length - 3, 'cosa más', 'cosas más')} →</a>` : ''}
+      </div>`;
   }
 
   function comoFunciona() {
@@ -365,6 +408,45 @@
       <section class="como-funciona">
         ${items.map(([i, t, d]) => `<div class="cf-item"><span>${i}</span><strong>${t}</strong><p>${d}</p></div>`).join('')}
       </section>`;
+  }
+
+  /* ---------- Itinerario (barra de abajo): el del viaje que estás haciendo o el próximo ---------- */
+  function viajesConItinerario() {
+    const hoy = U.hoyISO();
+    const todos = R.db.viajes().filter(v => !v.ejemplo);
+    const lista = todos.length ? todos : R.db.viajes();
+    const est = v => R.viajes.estadoViaje(v);
+    const peso = v => est(v) === 'en_curso' ? 0 : est(v) === 'planificando' ? 1 : 2;
+    return lista.slice().sort((a, b) => peso(a) - peso(b)
+      || (peso(a) === 2 ? (b.fechaFin || '').localeCompare(a.fechaFin || '') : (a.fechaInicio || '9999').localeCompare(b.fechaInicio || '9999')))
+      .filter(v => est(v) !== 'pasado' || (v.fechaFin && v.fechaFin >= U.sumarDias(hoy, -30)) || lista.every(x => est(x) === 'pasado'));
+  }
+  function renderItinerario(idElegido) {
+    const lista = viajesConItinerario();
+    if (!lista.length) {
+      app.innerHTML = `
+        <section class="encabezado-simple"><h1>Itinerario</h1></section>
+        ${U.vacio({ icono: '🗓️', titulo: 'Todavía no tenés viajes', texto: 'Armá uno y acá vas a ver cada día: traslados, alojamiento y lo que vas a hacer.', boton: '+ Nuevo viaje', accion: 'nuevo' })}`;
+      app.querySelector('[data-a="nuevo"]').onclick = () => R.viajes.abrirAsistente();
+      return;
+    }
+    const v = lista.find(x => x.id === idElegido) || lista[0];
+    app.classList.toggle('rol-viajero', !R.db.puedeOrganizar(v));
+    const cuando = x => R.viajes.estadoViaje(x) === 'en_curso' ? '✈️ Ahora' : R.viajes.estadoViaje(x) === 'pasado' ? 'Ya fue' : (x.fechaInicio ? U.fmtFecha(x.fechaInicio, 'dia') : 'Sin fecha');
+    const nombre = x => x.nombre || (x.destinos || []).filter(d => d.nombre && !d.soloDia).map(d => d.nombre).join(' → ') || x.destino || 'Viaje';
+    app.innerHTML = `
+      <section class="itin-global-cab">
+        ${lista.length > 1 ? `<div class="itin-global-viajes" role="tablist" aria-label="Viaje">${lista.map(x => `
+          <a href="#itinerario/${x.id}" role="tab" aria-selected="${x.id === v.id}" class="itin-global-viaje ${x.id === v.id ? 'activo' : ''}">
+            <span class="punto" style="background:${R.paisaje.fondo(x)}"></span><span><strong>${esc(nombre(x))}</strong><small>${esc(cuando(x))}</small></span></a>`).join('')}</div>` : ''}
+        ${lista.length > 1 ? `<a class="itin-global-link" href="#viaje/${v.id}/guia">Abrir este viaje →</a>`
+          : `<a class="itin-global-ir" href="#viaje/${v.id}/guia"><span class="punto" style="background:${R.paisaje.fondo(v)}"></span><span><strong>${esc(nombre(v))}</strong><small>${esc(U.fmtRango(v.fechaInicio, v.fechaFin))}</small></span><b>Abrir el viaje →</b></a>`}
+      </section>
+      <div class="itin-global"></div>`;
+    R.itinerario.render(v, app.querySelector('.itin-global'));
+    // Viajando: arranca en el día de hoy
+    const hoyEl = app.querySelector('.itin-global .dia.hoy');
+    if (hoyEl && !idElegido) setTimeout(() => hoyEl.scrollIntoView({ block: 'start', behavior: 'smooth' }), 150);
   }
 
   /* ---------- Copia de seguridad (desde Mi cuenta) ---------- */

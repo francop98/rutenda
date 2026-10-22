@@ -38,6 +38,13 @@ R.itinerario = (function () {
     return t && t.datos ? t.datos : null;
   }
   const normal = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // ¿Es algo al aire libre? (para avisar si llueve)
+  const AIRE_LIBRE = /cerro|playa|parque|caminata|trekking|treking|sendero|excursi|paseo|cataratas|navegaci|kayak|bici|mirador|glaciar|isla|lago|r[ií]o\b|cascada|rafting|cabalgata|safari|picnic|bosque|monta[ñn]a|volc[aá]n|jard[ií]n|aire libre|city ?tour|bote|lancha|surf|snorkel|esqu[ií]/i;
+  function esAireLibre(tipoId, titulo) {
+    if (['naturaleza', 'aventura', 'excursion'].includes(tipoId)) return true;
+    if (['gastronomia', 'compras', 'noche', 'comida', 'alojamiento', 'vuelo', 'traslado'].includes(tipoId)) return false;
+    return AIRE_LIBRE.test(titulo || '');
+  }
   function documentosDe(v, tareaId) { return (v.documentos || []).filter(d => d.tareaId === tareaId); }
 
   /**
@@ -81,15 +88,15 @@ R.itinerario = (function () {
     });
 
     (v.destinos || []).filter(d => d.soloDia && d.nombre && d.fecha === fecha && !d.fechaPendiente).forEach(d => {
-      items.push({ hora: '', icono: '☀️', clase: 'ev-escapada', titulo: `Escapada a ${d.nombre}`, sub: 'Volvés en el día', docs: documentosDe(v, 'e_escapada__' + d.id), lugar: R.gmaps ? R.gmaps.textoLugar(d) : d.nombre });
+      items.push({ hora: '', icono: '☀️', clase: 'ev-escapada', aire: true, titulo: `Escapada a ${d.nombre}`, sub: 'Volvés en el día', docs: documentosDe(v, 'e_escapada__' + d.id), lugar: R.gmaps ? R.gmaps.textoLugar(d) : d.nombre });
     });
 
     (v.itinerario || []).filter(e => e.fecha === fecha && !(e.origen || '').startsWith('t_segmento__')).forEach(e => {
-      items.push({ hora: e.hora, icono: tipo(e.tipo).icono, clase: 'ev-propio', titulo: e.titulo, sub: [e.lugar && '📍 ' + e.lugar, e.confirmacion && 'Cód. ' + e.confirmacion, e.notas].filter(Boolean).join(' · '), evento: e.id, origen: e.origen, docs: [], lugar: conCiudad(e.lugar, ciudad) });
+      items.push({ hora: e.hora, icono: tipo(e.tipo).icono, clase: 'ev-propio', titulo: e.titulo, sub: [e.lugar && '📍 ' + e.lugar, e.confirmacion && 'Cód. ' + e.confirmacion, e.notas].filter(Boolean).join(' · '), evento: e.id, origen: e.origen, docs: [], lugar: conCiudad(e.lugar, ciudad), aire: esAireLibre(e.tipo, e.titulo + ' ' + (e.lugar || '')) });
     });
 
     // Lo que decidiste hacer ese día (desde "Qué hacer")
-    if (R.ideas) R.ideas.delDia(v, fecha).forEach(p => items.push({ hora: p.hora, icono: R.ideas.ICONOS[p.tipo] || '📍', clase: 'ev-plan', titulo: p.titulo, sub: [p.zona && '📍 ' + p.zona, p.reserva && '🎟️ con reserva', p.nota].filter(Boolean).join(' · '), plan: p.destId + '|' + p.id, docs: [], lugar: conCiudad(p.lugar || p.titulo, ((v.destinos || []).find(x => x.id === p.destId) || {}).nombre || ciudad) }));
+    if (R.ideas) R.ideas.delDia(v, fecha).forEach(p => items.push({ hora: p.hora, icono: R.ideas.ICONOS[p.tipo] || '📍', clase: 'ev-plan', titulo: p.titulo, sub: [p.zona && '📍 ' + p.zona, p.reserva && '🎟️ con reserva', p.nota].filter(Boolean).join(' · '), plan: p.destId + '|' + p.id, aire: esAireLibre(p.tipo, p.titulo + ' ' + (p.lugar || '')), docs: [], lugar: conCiudad(p.lugar || p.titulo, ((v.destinos || []).find(x => x.id === p.destId) || {}).nombre || ciudad) }));
 
     items.sort((a, b) => (a.hora || '99:99').localeCompare(b.hora || '99:99'));
 
@@ -198,7 +205,8 @@ R.itinerario = (function () {
   function irAQueHacer(v) {
     subvista = 'que';
     try { localStorage.setItem('rutenda_sub_itinerario', 'que'); } catch (e) { /* nada */ }
-    location.hash = `#viaje/${v.id}/itinerario`;
+    // Desde la pestaña Itinerario de abajo, se queda ahí
+    if (!/^#itinerario/.test(location.hash)) location.hash = `#viaje/${v.id}/itinerario`;
     R.app.refrescar();
   }
 
@@ -276,6 +284,7 @@ R.itinerario = (function () {
         </header>
         ${d.amaneces && d.amaneces !== 'Amanecés en ' + d.lugarNombre ? `<p class="dia-linea">🌅 ${esc(d.amaneces)}</p>` : ''}
         ${enArgentina(v, d) ? `<p class="dia-linea dia-feriado" data-feriado-dia="${d.fecha}" hidden></p>` : ''}
+        ${alertaHTML(d)}
         ${d.items.length ? d.items.map(itemHTML).join('') : '<p class="dia-libre">Día libre ☀️</p>'}
         ${R.gmaps ? R.gmaps.enlaceDiaHTML(d) : ''}
         ${mostrarDormis === false ? '' : dormisHTML(d.dormis)}
@@ -298,6 +307,17 @@ R.itinerario = (function () {
     }));
   }
 
+  /** Lugar para el aviso de lluvia (se completa cuando llega el pronóstico). */
+  function alertaHTML(d) {
+    const aire = d.items.filter(i => i.aire);
+    if (!aire.length) return '';
+    const mover = aire.find(i => i.evento || i.plan);
+    return `<div class="dia-alerta" data-clima-alerta="${d.fecha}" data-que="${esc(aire.map(i => i.titulo).slice(0, 2).join(' y '))}" hidden>
+      <p></p>${mover ? `<button type="button" class="btn-texto-mini solo-org" ${mover.evento ? `data-evento="${mover.evento}"` : `data-plan="${mover.plan}"`}>Cambiar de día</button>` : ''}</div>`;
+  }
+  /** ¿Ese día se espera lluvia de verdad? (solo con pronóstico, no con la referencia del año pasado) */
+  function llueve(d) { return d && ((d.lluvia != null && d.lluvia >= 4) || (d.codigo != null && ((d.codigo >= 61 && d.codigo <= 67) || (d.codigo >= 80 && d.codigo <= 99)))); }
+
   /** Completa el clima de cada día cuando llega (sin redibujar la pantalla). */
   function cargarClima(v, cont) {
     C().estadias(v).forEach(e => {
@@ -307,6 +327,12 @@ R.itinerario = (function () {
         datos.dias.forEach(d => {
           const x = cont.querySelector(`[data-clima-dia="${d.fecha}"]`);
           if (x && !x.textContent) x.innerHTML = `${R.clima.icono(d.codigo, d.lluvia)} ${d.max != null ? d.max + '°' : ''}<small>${d.min != null ? d.min + '°' : ''}</small>${datos.tipo === 'referencia' ? '<i title="Referencia: mismas fechas del año pasado">*</i>' : ''}`;
+          // Lluvia pronosticada + algo al aire libre: avisar
+          const al = cont.querySelector(`[data-clima-alerta="${d.fecha}"]`);
+          if (al && datos.tipo === 'pronostico' && llueve(d)) {
+            al.querySelector('p').textContent = `${d.codigo >= 95 ? '⛈️ Se esperan tormentas' : '🌧️ Se espera lluvia'}${d.lluvia ? ` (${Math.round(d.lluvia)} mm)` : ''} y tenés ${al.dataset.que} al aire libre. ¿Lo pasás a otro día o vas con piloto?`;
+            al.hidden = false;
+          }
         });
       });
     });
@@ -609,6 +635,7 @@ R.itinerario = (function () {
           <h3 class="bloque-titulo">Hoy</h3>
           ${d.amaneces && d.amaneces !== 'Amanecés en ' + d.lugarNombre ? `<p class="dia-linea">🌅 ${esc(d.amaneces)}</p>` : ''}
           ${enArgentina(v, d) ? `<p class="dia-linea dia-feriado" data-feriado-dia="${d.fecha}" hidden></p>` : ''}
+          ${alertaHTML(d)}
           ${d.items.length ? d.items.map(itemHTML).join('') : '<p class="dia-libre">Día libre ☀️ Disfrutalo.</p>'}
           ${R.gmaps ? R.gmaps.enlaceDiaHTML(d) : ''}
           <button class="btn btn-texto btn-chico solo-org" data-a="actividad">+ Agregar algo a hoy</button>
@@ -625,6 +652,8 @@ R.itinerario = (function () {
           <div><small>Gastado hoy</small><strong>${U.fmtMoneda(gastoHoy, v.monedaBase)}</strong></div>
           <button class="btn btn-primario" data-a="gasto">− Cargar gasto</button>
         </section>
+        <button type="button" class="btn btn-texto btn-chico hoy-algo-mal" data-a="algoMal">🧭 ¿Algo salió mal? Qué hacer si…</button>
+        ${R.preguntar && R.db.modo() === 'nube' ? '<button type="button" class="barra-preguntar" data-a="preguntar"><span>✨</span><span><strong>Preguntale a Rutenda</strong><small>¿Qué hay mañana? ¿Cuánto llevo gastado?</small></span><b>Preguntar →</b></button>' : ''}
 
         ${ultimo ? `
           <section class="bloque">
@@ -634,11 +663,16 @@ R.itinerario = (function () {
           </section>` : manana ? `
           <section class="bloque hoy-manana">
             <h3 class="bloque-titulo">Mañana${manana.lugarNombre && manana.lugarNombre !== d.lugarNombre ? ' · ' + esc(manana.lugarNombre) : ''}</h3>
+            ${alertaHTML(manana)}
             ${manana.items.length ? manana.items.slice(0, 3).map(itemHTML).join('') : '<p class="dia-libre">Día libre ☀️</p>'}
           </section>` : ''}
       </div>`;
 
     cont.querySelector('[data-a="gasto"]').onclick = () => R.gastos.nuevo(v);
+    const bPreg = cont.querySelector('[data-a="preguntar"]');
+    if (bPreg) bPreg.onclick = () => R.preguntar.abrir(v);
+    const bMal = cont.querySelector('[data-a="algoMal"]');
+    if (bMal) bMal.onclick = () => R.queHacerSi.ir(v);
     if (R.salida) R.salida.enlazar(cont, v);
     cargarFeriados(v, cont);
     const bAct = cont.querySelector('[data-a="actividad"]');
@@ -647,12 +681,8 @@ R.itinerario = (function () {
     cont.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const [d, id] = b.dataset.plan.split('|'); R.ideas.editar(v, d, id, () => renderHoy(v, cont)); });
     cont.querySelectorAll('[data-evento]').forEach(b => b.onclick = () => editar(v, b.dataset.evento));
     cont.querySelectorAll('[data-doc]').forEach(b => b.onclick = e => { e.stopPropagation(); R.documentos.abrir(v.documentos.find(x => x.id === b.dataset.doc), v); });
-    const e = C().estadias(v).find(x => x.desde <= hoy && hoy <= x.hasta);
-    if (e && e.lugar && e.lugar.lat != null) R.clima.obtener(e.lugar.lat, e.lugar.lon, e.desde, e.hasta).then(datos => {
-      const x = datos && datos.dias.find(y => y.fecha === hoy);
-      const caja = cont.querySelector('.hoy-clima');
-      if (x && caja) caja.innerHTML = `${R.clima.icono(x.codigo, x.lluvia)} ${x.max}°<small>${x.min}°</small>`;
-    }).catch(() => {});
+    // Clima de hoy y de mañana (y aviso si llueve con planes al aire libre)
+    cargarClima(v, cont);
   }
 
   function enlazarHoy(cont, v) {

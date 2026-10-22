@@ -13,6 +13,10 @@ service firebase.storage {
       allow read, delete: if miembro(viajeId);
       allow create, update: if miembro(viajeId) && request.resource.size < 25 * 1024 * 1024;
     }
+    // Reservas que llegaron por mail: solo las ve (y borra) su dueño. Las escribe el servidor.
+    match /bandeja/{uid}/{todo=**} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+    }
     match /{todo=**} {
       allow read, write: if false;
     }

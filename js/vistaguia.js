@@ -47,7 +47,8 @@ R.vistaGuia = (function () {
 
     const ahora = proximos.slice(0, 3);
     const rec = R.motor.recomendaciones(v);
-    const reqHTML = R.requisitos.tarjeta(v);
+    const pas = R.requisitos.pasaporte(v);
+    const reqHTML = (pas && pas.nivel === 'falta' ? R.requisitos.avisoPasaporteHTML(v) : '') + R.requisitos.tarjeta(v);
     const cosHTML = R.costumbres ? R.costumbres.html(v) : '';
     const est = R.viajes.estadoViaje(v);
     const plegable = (id, titulo, cuenta, cuerpo, abierto) => `
@@ -65,6 +66,8 @@ R.vistaGuia = (function () {
         </div>` : ''}
 
       ${R.salida ? R.salida.tarjetaHTML(v) : ''}
+      ${R.cierre ? R.cierre.tarjetaHTML(v) : ''}
+      ${(() => { const p = R.requisitos.pasaporte(v); return p && (p.nivel === 'vencido' || p.nivel === 'justo') && est !== 'pasado' ? R.requisitos.avisoPasaporteHTML(v) : ''; })()}
       <h3 class="guia-seccion">Ahora</h3>
       ${top ? tarjetaProximo(v, top) : tarjetaSinProximo(v, prog, pendientes.length)}
       ${ahora.length > 1 ? `<div class="lista-siguientes lista-ahora">${ahora.slice(1).map(t => filaPaso(v, t)).join('')}</div>` : ''}
@@ -102,6 +105,8 @@ R.vistaGuia = (function () {
 
       ${est !== 'planificando' ? plegable('notas', 'Notas y recuerdos del viaje', null, `<textarea id="notasViaje" rows="3" placeholder="Lo que te gustó, lo que harías distinto…">${esc(v.notasViaje || '')}</textarea>`) : ''}
 
+      ${R.preguntar && R.db.modo() === 'nube' ? '<button type="button" class="barra-preguntar" data-a="preguntar"><span>✨</span><span><strong>¿Dudas con el viaje?</strong><small>Preguntale a Rutenda: sabe lo que cargaste.</small></span><b>Preguntar →</b></button>' : ''}
+
       ${plegable('todos', 'Todos los pasos', `${prog.hechas}/${prog.total}`, `
         <div class="fases">${fases.map(f => faseHTML(v, f)).join('')}</div>
         <div class="acciones-fila guia-pie">
@@ -112,6 +117,10 @@ R.vistaGuia = (function () {
 
     if (R.salida) R.salida.enlazar(cont, v);
     if (R.costumbres) R.costumbres.enlazar(cont, v);
+    if (R.cierre) R.cierre.enlazar(cont);
+    const bPreg = cont.querySelector('[data-a="preguntar"]');
+    if (bPreg) bPreg.onclick = () => R.preguntar.abrir(v);
+    cont.querySelectorAll('[data-a="cargarPasaporte"]').forEach(x => x.onclick = () => R.auth.abrirMiCuenta());
     cont.querySelectorAll('details[data-plegable]').forEach(d => d.addEventListener('toggle', () => { plegado[d.dataset.plegable] = d.open; }));
     cont.querySelectorAll('[data-tarea]').forEach(x => x.addEventListener('click', e => {
       // Los botones de adentro (Listo, Más tarde, etc.) no abren el detalle

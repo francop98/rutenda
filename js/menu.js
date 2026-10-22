@@ -37,7 +37,8 @@ R.menu = (function () {
         <nav class="menu-lista">
           ${op('datos', '👤', 'Mis datos', 'Nombre, documento, alias y recordatorios')}
           ${op('personas', '👥', 'Compañeros', 'Con quién viajaste')}
-          ${op('listas', '📝', 'Mis listas de valija', 'Lo que llevás siempre')}
+          ${R.bandeja && R.db.modo() === 'nube' ? op('bandeja', '📥', 'Reservas por mail', R.bandeja.pendientes() ? `${R.bandeja.pendientes()} para sumar` : 'Reenviá a ' + R.bandeja.CASILLA) : ''}
+          ${op('anio', '📊', 'Mi año viajero', 'Días, países y kilómetros')}
           <div class="menu-item menu-tema">
             <span class="menu-icono">🎨</span>
             <span class="menu-texto"><strong>Apariencia</strong>
@@ -92,7 +93,8 @@ R.menu = (function () {
     const acciones = {
       datos: ir(() => R.auth.abrirMiCuenta()),
       personas: ir(() => { location.hash = '#personas'; }),
-      listas: ir(() => { location.hash = '#valijas'; }),
+      bandeja: ir(() => R.bandeja.abrir()),
+      anio: ir(() => R.anio.abrir()),
       copia: ir(() => R.app.exportar()),
       tour: ir(() => R.tour.iniciar()),
       instalar: ir(() => R.app.instalar()),

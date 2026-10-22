@@ -70,7 +70,7 @@ R.auth = (function () {
   function alCambiarUsuario(fn) { oyente = fn; }
   let errorPendiente = '';
   // Ingresar con Google: se activa cuando esté habilitado en Firebase (Authentication → Google)
-  const GOOGLE_ACTIVO = false;
+  const GOOGLE_ACTIVO = true;
 
   async function desdeFirebase(fu) {
     let perfil = {};
@@ -415,6 +415,8 @@ R.auth = (function () {
         </div>
         <label class="campo"><span>Nacionalidad de tu documento</span><select id="mcNac">${R.requisitos.NACIONALIDADES.map(([c, n]) => `<option value="${c}" ${c === u.nacionalidad ? 'selected' : ''}>${n}</option>`).join('')}</select>
           <small class="ayuda">Con esto Rutenda sabe qué documentación y visas te piden en cada destino.</small></label>
+        <label class="campo"><span>Tu pasaporte vence el <small>(opcional)</small></span><input id="mcPasaporte" type="date" value="${esc(R.db.prefs().pasaporteVence || '')}">
+          <small class="ayuda">Te aviso si no te alcanza para algún viaje: muchos países piden 3 a 6 meses de vigencia.</small></label>
         <label class="campo"><span>Alias o CBU para cobrar <small>(opcional)</small></span><input id="mcAlias" value="${esc(u.alias || '')}" placeholder="Ej: mi.alias.mp" autocomplete="off">
           <small class="ayuda">Va en el mensaje cuando le pedís a alguien que te pague su parte.</small></label>
         <div class="bloque-interno">
@@ -447,6 +449,8 @@ R.auth = (function () {
           texto: 'Guardar', clase: 'btn-primario', onClick: el => {
             const nombre = el.querySelector('#mcNombre').value.trim();
             if (!nombre) { U.toast('El nombre no puede quedar vacío.'); return false; }
+            const pv = el.querySelector('#mcPasaporte');
+            if (pv) R.db.guardarPrefs({ pasaporteVence: pv.value || '' });
             actualizarPerfil({ nombre, apellido: el.querySelector('#mcApellido').value, nacionalidad: el.querySelector('#mcNac').value, alias: el.querySelector('#mcAlias').value })
               .then(() => {
                 R.db.guardarPersona(Object.assign(R.db.yo(), { nombre }));

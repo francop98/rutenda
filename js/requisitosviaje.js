@@ -140,6 +140,30 @@ R.requisitos = (function () {
   }
 
   /** Bloque HTML con los requisitos del viaje (guía y documentos). */
+  /**
+   * ¿Te alcanza el pasaporte para este viaje?
+   * { nivel: 'falta'|'vencido'|'justo'|'ok', texto } o null si el viaje no pide pasaporte.
+   */
+  function pasaporte(v) {
+    const r = analizar(v);
+    if (!r.necesitaPasaporte || !v.fechaInicio) return null;
+    const vence = (R.db.prefs() || {}).pasaporteVence;
+    const U = R.util;
+    if (!vence) return { nivel: 'falta', texto: 'Este viaje pide pasaporte. Cargá cuándo vence (☰ → Mis datos) y te aviso si no te alcanza.' };
+    const fin = v.fechaFin || v.fechaInicio;
+    if (vence < fin) return { nivel: 'vencido', texto: `Tu pasaporte vence el ${U.fmtFecha(vence)}, ${vence < v.fechaInicio ? 'antes de que salgas' : 'durante el viaje'}. Renovalo antes de viajar.` };
+    if (vence < U.sumarDias(fin, 182)) return { nivel: 'justo', texto: `Tu pasaporte vence el ${U.fmtFecha(vence)}: menos de 6 meses después de volver. Muchos países (y algunas aerolíneas) piden 3 a 6 meses de vigencia: revisá el requisito del destino y, si no te alcanza, renovalo.` };
+    return { nivel: 'ok', texto: `Pasaporte vigente hasta el ${U.fmtFecha(vence)}. Te alcanza.` };
+  }
+  function avisoPasaporteHTML(v) {
+    const p = pasaporte(v);
+    if (!p || p.nivel === 'ok') return '';
+    const icono = { falta: '📘', vencido: '⛔', justo: '⚠️' }[p.nivel];
+    return `<div class="aviso-pasaporte aviso-${p.nivel}"><p>${icono} ${R.util.esc(p.texto)}</p>
+      ${p.nivel === 'falta' ? '<button type="button" class="btn btn-suave btn-chico" data-a="cargarPasaporte">Cargar el vencimiento</button>'
+        : '<a class="btn btn-suave btn-chico" href="https://www.argentina.gob.ar/interior/pasaporte" target="_blank" rel="noopener">Cómo renovarlo →</a>'}</div>`;
+  }
+
   function tarjeta(v, opciones) {
     const op = opciones || {};
     const esc = R.util.esc;
@@ -172,5 +196,5 @@ R.requisitos = (function () {
     ['PE', 'Perú'], ['CO', 'Colombia'], ['VE', 'Venezuela'], ['MX', 'México'], ['ES', 'España'], ['IT', 'Italia'], ['OT', 'Otra']
   ];
 
-  return { analizar, tarjeta, NIVELES, NACIONALIDADES, nacionalidad };
+  return { analizar, tarjeta, pasaporte, avisoPasaporteHTML, NIVELES, NACIONALIDADES, nacionalidad };
 })();

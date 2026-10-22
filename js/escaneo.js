@@ -77,6 +77,20 @@ R.escaneo = (function () {
     return datos;
   }
 
+  /** Lee una reserva a partir de texto (por ejemplo, un mail compartido). */
+  async function analizarTexto(texto, pista) {
+    if (!disponible()) throw new Error('Leer reservas funciona con tu cuenta en la nube y con conexión.');
+    const token = await R.nube.auth().currentUser.getIdToken();
+    const r = await fetch('/api/escanear-reserva', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ pista: pista || '', texto: String(texto || '').slice(0, 15000) })
+    });
+    const datos = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(datos.error || 'No se pudo leer el texto.');
+    return datos;
+  }
+
   /** Lee un ticket o factura: { comercio, total, moneda, fecha, categoria }. */
   async function leerTicket(archivo) {
     if (!disponible()) throw new Error('Leer tickets funciona con tu cuenta en la nube y con conexión.');
@@ -178,5 +192,5 @@ R.escaneo = (function () {
     input.click();
   }
 
-  return { leerTicket, disponible, analizar, aFormulario, elegirPaso, escanearYAbrir };
+  return { leerTicket, disponible, analizar, analizarTexto, aFormulario, elegirPaso, escanearYAbrir };
 })();

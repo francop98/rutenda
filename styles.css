@@ -2132,3 +2132,135 @@ button.menu-item:hover, label.menu-item:hover { background: var(--arena-2); }
 .portada-contenido h1, .portada-contenido .portada-meta { padding-right: 52px; }
 .lista-sugerencias li { padding-top: 3px; padding-bottom: 3px; }
 .bloque-interno .btn, .bloque-interno .acciones-fila { margin-top: 8px; }
+
+/* ---------- v19.1 · "Salís el" más grande y aviso de noches ---------- */
+.cr-salida { align-items: flex-end; }
+.cr-salida .cr-hora-sola { flex: 1 1 230px; }
+.cr-salida .cr-hora-sola small { font-size: .95rem; font-weight: 700; color: var(--tinta); }
+.cr-salida .cr-hora-sola input { min-height: 54px; padding: 13px 14px; font-size: 1.12rem; font-weight: 600; border-radius: 12px; border-width: 1.5px; }
+.cr-salida .cr-hora-sola input::-webkit-calendar-picker-indicator { width: 22px; height: 22px; cursor: pointer; }
+.cr-noches-tip { flex-basis: 100%; display: block; margin-top: 2px; padding: 8px 10px; border-radius: 10px; background: var(--sol-claro); color: var(--tinta-suave); font-size: .82rem; line-height: 1.4; }
+
+/* ---------- v19.1 · Itinerario desde la barra de abajo ---------- */
+.itin-global-cab { display: grid; gap: 10px; margin: 18px 0 6px; }
+.itin-global-viajes { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 4px; scrollbar-width: thin; }
+.itin-global-viaje, .itin-global-ir { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--tinta); }
+.itin-global-viaje { flex: none; padding: 8px 12px; border-radius: 14px; border: 1.5px solid var(--linea); background: var(--papel); max-width: 220px; }
+.itin-global-viaje span:last-child { display: grid; min-width: 0; }
+.itin-global-viaje strong { font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.itin-global-viaje small { font-size: .74rem; color: var(--tinta-suave); }
+.itin-global-viaje.activo { border-color: var(--mar); background: var(--mar-claro); }
+.itin-global-viaje .punto, .itin-global-ir .punto { flex: none; width: 12px; height: 12px; border-radius: 50%; }
+.itin-global-ir { padding: 12px 14px; border-radius: var(--radio-chico); background: var(--papel); border: 1px solid var(--linea); }
+.itin-global-ir > span:nth-child(2) { display: grid; flex: 1; min-width: 0; }
+.itin-global-ir strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.itin-global-ir small { color: var(--tinta-suave); font-size: .8rem; }
+.itin-global-ir b { flex: none; font-size: .82rem; color: var(--mar-oscuro); }
+
+/* ---------- v19.1 · "Cargar" más liviano (sin el círculo flotante) ---------- */
+.nav-inferior .nav-cargar { color: var(--g-gasto); }
+.nav-cargar-boton { width: 46px; height: 30px; margin-top: 0; border-radius: 10px; border: 0; box-shadow: none; background: var(--g-icono-gasto); color: var(--g-gasto); }
+.nav-inferior .nav-cargar-boton svg { width: 22px; height: 22px; stroke-width: 2; }
+.nav-inferior .nav-cargar { gap: 2px; padding-top: 5px; }
+.itin-global-link { justify-self: end; margin-top: -4px; font-size: .86rem; font-weight: 600; color: var(--mar-oscuro); text-decoration: none; }
+
+/* ---------- v20 · Aviso de lluvia con planes al aire libre ---------- */
+.dia-alerta { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin: 6px 0 8px; padding: 9px 12px; border-radius: 12px; background: color-mix(in srgb, #4A7FB5 14%, var(--papel)); border: 1px solid color-mix(in srgb, #4A7FB5 30%, transparent); font-size: .86rem; }
+.dia-alerta p { margin: 0; flex: 1 1 200px; }
+.dia-alerta .btn-texto-mini { flex: none; }
+
+/* ---------- v20 · Aviso del pasaporte ---------- */
+.aviso-pasaporte { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; padding: 12px 14px; border-radius: var(--radio-chico); background: var(--sol-claro); border: 1px solid color-mix(in srgb, var(--sol) 40%, transparent); }
+.aviso-pasaporte p { margin: 0; flex: 1 1 220px; font-size: .9rem; }
+.aviso-pasaporte.aviso-vencido { background: var(--alerta-claro); border-color: color-mix(in srgb, var(--alerta) 40%, transparent); }
+.aviso-pasaporte.aviso-falta { background: var(--arena-2); border-color: var(--linea); }
+
+/* ---------- v20 · Reservas por mail y lo compartido ---------- */
+.aviso-bandeja { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 16px; padding: 14px 16px; border-radius: var(--radio); border: 1px solid color-mix(in srgb, var(--mar) 35%, transparent); background: var(--mar-claro); color: var(--tinta); font: inherit; text-align: left; cursor: pointer; }
+.ab-icono { font-size: 1.6rem; }
+.ab-texto { flex: 1; min-width: 0; display: grid; }
+.ab-texto small { color: var(--tinta-suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aviso-bandeja b { flex: none; color: var(--mar-oscuro); font-size: .88rem; }
+.bandeja { display: grid; gap: 14px; }
+.bandeja-lista { display: grid; gap: 12px; }
+.bandeja-item { display: grid; gap: 10px; padding: 14px; border-radius: var(--radio-chico); border: 1px solid var(--linea); background: var(--papel); }
+.bi-cab { display: grid; grid-template-columns: 36px 1fr; gap: 10px; align-items: start; }
+.bi-icono { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--arena-2); font-size: 1.2rem; }
+.bi-texto { display: grid; gap: 2px; min-width: 0; }
+.bi-texto strong { overflow-wrap: anywhere; }
+.bi-texto small { color: var(--tinta-suave); }
+.bi-adj { font-size: .78rem; overflow-wrap: anywhere; }
+.bi-acciones { justify-content: flex-end; margin: 0; }
+.bandeja-ayuda { padding: 14px; border-radius: var(--radio-chico); background: var(--arena-2); display: grid; gap: 6px; justify-items: start; }
+.bandeja-ayuda p { margin: 0; }
+.bandeja-ayuda a { overflow-wrap: anywhere; }
+.compartido { display: grid; gap: 12px; }
+.compartido-lista { margin: 0; padding: 10px 14px; border-radius: 12px; background: var(--arena-2); list-style: none; display: grid; gap: 4px; overflow-wrap: anywhere; }
+.compartido-lista small { color: var(--tinta-tenue); }
+.compartido-acciones { display: grid; gap: 8px; margin-top: 4px; }
+
+/* ---------- v20 · Preguntale a Rutenda ---------- */
+.barra-preguntar { display: flex; align-items: center; gap: 12px; width: 100%; margin: 14px 0; padding: 13px 16px; border-radius: var(--radio); border: 1px dashed color-mix(in srgb, var(--oro) 70%, transparent); background: color-mix(in srgb, var(--oro) 10%, var(--papel)); color: var(--tinta); font: inherit; text-align: left; cursor: pointer; }
+.barra-preguntar > span:first-child { font-size: 1.4rem; }
+.barra-preguntar > span:nth-child(2) { flex: 1; display: grid; min-width: 0; }
+.barra-preguntar small { color: var(--tinta-suave); }
+.barra-preguntar b { flex: none; font-size: .86rem; color: var(--mar-oscuro); }
+.chat { display: flex; flex-direction: column; gap: 8px; min-height: 160px; max-height: 46vh; overflow-y: auto; padding: 4px 2px 8px; }
+.chat-vacio { color: var(--tinta-suave); margin: auto 0; text-align: center; }
+.msg { max-width: 88%; padding: 10px 13px; border-radius: 16px; line-height: 1.45; font-size: .93rem; overflow-wrap: anywhere; }
+.msg p { margin: 0 0 6px; } .msg p:last-child { margin: 0; }
+.msg ul { margin: 4px 0; padding-left: 18px; }
+.msg-yo { align-self: flex-end; background: var(--mar); color: var(--sobre-mar); border-bottom-right-radius: 5px; }
+.msg-rutenda { align-self: flex-start; background: var(--arena-2); border-bottom-left-radius: 5px; }
+.msg-pensando { display: flex; gap: 4px; }
+.msg-pensando span { width: 7px; height: 7px; border-radius: 50%; background: var(--tinta-tenue); animation: latir 1s infinite ease-in-out; }
+.msg-pensando span:nth-child(2) { animation-delay: .15s; } .msg-pensando span:nth-child(3) { animation-delay: .3s; }
+.chat-sugerencias { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 10px; }
+.chat-sugerencias .chip-op { flex: none; }
+.chat-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.chat-form input { min-width: 0; }
+
+/* ---------- v20 · Qué hacer si… ---------- */
+.que-hacer-si > summary small { display: block; margin-top: 2px; color: var(--tinta-tenue); font-size: .82rem; }
+.qhs-guia { border-top: 1px solid var(--linea); }
+.qhs-guia:first-child { border-top: 0; }
+.qhs-guia > summary { display: flex; align-items: center; gap: 10px; padding: 12px 2px; font-weight: 600; cursor: pointer; list-style: none; }
+.qhs-guia > summary::-webkit-details-marker { display: none; }
+.qhs-guia > summary::after { content: '›'; margin-left: auto; color: var(--tinta-tenue); transition: transform .15s; font-size: 1.2rem; }
+.qhs-guia[open] > summary::after { transform: rotate(90deg); }
+.qhs-guia ol { margin: 0 0 12px; padding-left: 22px; display: grid; gap: 6px; font-size: .92rem; }
+.qhs-guia a { font-weight: 600; }
+.hoy-algo-mal { display: block; margin: 10px auto 0; }
+
+/* ---------- v20 · Cierre del viaje ---------- */
+.cierre-viaje { margin-top: 16px; padding: 18px; border-radius: var(--radio); background: var(--papel); border: 1px solid var(--linea); box-shadow: var(--sombra); display: grid; gap: 10px; }
+.ci-cab { display: flex; align-items: center; gap: 12px; }
+.ci-bandera { font-size: 1.8rem; }
+.ci-cab small { display: block; color: var(--tinta-suave); font-size: .8rem; }
+.ci-cab strong { font-family: var(--fuente-titulo); font-size: 1.3rem; }
+.cierre-viaje > p { margin: 0; }
+.ci-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ci-lista li { display: grid; grid-template-columns: 26px 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--arena-2); }
+.ci-texto { font-size: .9rem; min-width: 0; }
+.guia-simple .cierre-viaje { margin: 0 0 16px; }
+
+/* ---------- v20 · Esta semana ---------- */
+.destacado .dp-semana { grid-column: 1 / -1; }
+.dp-semana { margin-top: 12px; padding: 14px 16px; border-radius: var(--radio); background: var(--papel); border: 1px solid var(--linea); display: grid; gap: 6px; }
+.dps-cab { display: flex; align-items: center; gap: 8px; }
+.dps-fila { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--linea); }
+.dps-texto { min-width: 0; font-size: .9rem; }
+.dps-texto small { display: block; color: var(--tinta-suave); font-size: .78rem; }
+.dps-fila.atrasado .dps-texto small { color: var(--alerta); font-weight: 600; }
+.dps-mas { justify-self: end; font-size: .84rem; font-weight: 600; color: var(--mar-oscuro); text-decoration: none; }
+
+/* ---------- v20 · Mi año viajero ---------- */
+.anio { display: grid; gap: 14px; }
+.anio-anios { display: flex; gap: 6px; flex-wrap: wrap; }
+.anio-grilla { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.anio-cifra { display: grid; gap: 2px; padding: 14px 10px; border-radius: 14px; background: var(--arena-2); text-align: center; }
+.anio-cifra strong { font-family: var(--fuente-titulo); font-size: 1.9rem; line-height: 1.05; color: var(--mar-oscuro); }
+.anio-cifra small { color: var(--tinta-suave); font-size: .78rem; }
+.anio-linea { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: .92rem; }
+.anio-pais { padding: 4px 10px; border-radius: 999px; background: var(--arena-2); font-size: .86rem; }
+@media (max-width: 420px) { .anio-grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

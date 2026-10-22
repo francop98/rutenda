@@ -749,6 +749,7 @@ R.viajes = (function () {
       ops.push(['editar', '✏️', 'Editar destinos, fechas y opciones']);
       if (estadoViaje(v) !== 'pasado') ops.push(['cambio', '🔄', 'Cambiaron los planes']);
     }
+    if (R.preguntar && R.db.modo() === 'nube') ops.push(['preguntar', '✨', 'Preguntale a Rutenda']);
     ops.push(['viajeros', '👥', 'Viajeros']);
     ops.push(['ruta', '🗺️', 'Ver la ruta en Google Maps']);
     if (estadoViaje(v) === 'en_curso') ops.push(['guia', '🧭', 'Guía de organización']);
@@ -765,6 +766,7 @@ R.viajes = (function () {
       U.cerrarModal();
       if (op === 'editar') abrirAsistente(v);
       else if (op === 'cambio') R.vistaGuia.cambioDePlanes(v);
+      else if (op === 'preguntar') R.preguntar.abrir(v);
       else if (op === 'ruta') R.gmaps.abrirRutaViaje(v);
       else if (op === 'viajeros') location.hash = `#viaje/${v.id}/viajeros`;
       else if (op === 'guia') location.hash = `#viaje/${v.id}/guia`;

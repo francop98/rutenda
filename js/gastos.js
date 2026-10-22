@@ -690,6 +690,8 @@ R.gastos = (function () {
   /** Cargar un gasto desde cualquier pantalla (por ejemplo, la de Hoy). */
   function nuevo(v) { editar(v, null, 'gasto'); }
   function nuevoIngreso(v) { editar(v, null, 'ingreso'); }
+  /** Elegir qué se ve en Gastos (movimientos, cuentas o resumen) antes de abrirlo. */
+  function verVista(x) { if (['movimientos', 'cuentas', 'resumen'].includes(x)) vistaGastos = x; }
 
-  return { CATEGORIAS, categorias, render, nuevo, nuevoIngreso, saldos, transferencias, totales, montoBase, partes, parteDe, personaTieneMovimientos };
+  return { CATEGORIAS, categorias, render, nuevo, nuevoIngreso, verVista, saldos, transferencias, totales, montoBase, partes, parteDe, personaTieneMovimientos };
 })();

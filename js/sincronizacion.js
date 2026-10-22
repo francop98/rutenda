@@ -430,6 +430,13 @@ R.nube = (function () {
     try { return await storage.ref(rutaArchivo(viajeId, id)).getDownloadURL(); } catch (e) { return null; }
   }
   async function borrarArchivo(viajeId, id) { if (storage) await storage.ref(rutaArchivo(viajeId, id)).delete(); }
+  /** Archivos guardados por el servidor en otra carpeta (por ejemplo, la bandeja de mails). */
+  async function bajarRuta(ruta) {
+    if (!storage) return null;
+    try { const url = await storage.ref(ruta).getDownloadURL(); const r = await fetch(url); return r.ok ? await r.blob() : null; } catch (e) { return null; }
+  }
+  async function borrarRuta(ruta) { try { if (storage) await storage.ref(ruta).delete(); } catch (e) { /* ya no estaba */ } }
+  function miUid() { return uid; }
 
   /* ---------------------------------------------------------
      Notificaciones push
@@ -455,7 +462,7 @@ R.nube = (function () {
     disponible, iniciarApp, iniciar, detener, programar, enviarTodo, eliminarViaje, salirDelViaje,
     guardarPerfil, actualizarPerfil, crearInvitacion, desactivarInvitacion, leerInvitacion, unirse, cambiarRol, quitarMiembro,
     guardarFamilia, apagarFamilia, leerFamilia,
-    subirArchivo, bajarArchivo, urlArchivo, borrarArchivo, guardarSuscripcion, borrarSuscripcion, borrarSuscripciones,
+    subirArchivo, bajarArchivo, urlArchivo, borrarArchivo, bajarRuta, borrarRuta, miUid, guardarSuscripcion, borrarSuscripcion, borrarSuscripciones,
     auth: () => { iniciarApp(); return auth; }, db: () => { iniciarApp(); return db; }
   };
 })();
