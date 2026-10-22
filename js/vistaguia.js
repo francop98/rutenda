@@ -333,7 +333,7 @@ R.vistaGuia = (function () {
           </div>` : ''}
         ${['d_destino', 'd_fechas', 'd_participantes'].includes(t.id) ? '<button type="button" class="btn btn-suave btn-chico boton-editar-viaje" data-a="editarViaje">✎ Editar destinos, fechas y viajeros</button>' : ''}
         ${t.base === 's_valija' ? '<button type="button" class="btn btn-primario btn-chico boton-editar-viaje" data-a="abrirValija">🧳 Abrir el armador de valija</button>' : ''}
-        ${['e_imperdibles', 'e_excursiones'].includes(t.base) ? '<button type="button" class="btn btn-primario btn-chico boton-editar-viaje" data-a="verIdeas">💡 Ver ideas para elegir</button>' : ''}
+        ${['e_imperdibles', 'e_excursiones'].includes(t.base) ? '<button type="button" class="btn btn-primario btn-chico boton-editar-viaje" data-a="verIdeas">📝 Abrir mi lista de qué hacer</button>' : ''}
         ${['doc_pasaporte', 'doc_visa', 'doc_requisitos', 'p_vacunas'].includes(t.base) ? R.requisitos.tarjeta(v) : ''}
         ${t.consejo ? `<div class="consejo"><strong>💡 Consejo</strong><p>${esc(t.consejo)}</p></div>` : ''}
         <label class="campo"><span>Notas</span><textarea id="tNota" rows="2" placeholder="Ej: a quién llamar, opciones que viste…">${esc(datos.nota || '')}</textarea></label>
@@ -356,7 +356,7 @@ R.vistaGuia = (function () {
     const bReact = el.querySelector('[data-a="reactivar"]');
     if (bReact) bReact.onclick = () => { R.motor.posponer(v, id, false); guardar(v); U.cerrarModal(); R.app.refrescar(); };
     const bIdeas = el.querySelector('[data-a="verIdeas"]');
-    if (bIdeas) bIdeas.onclick = () => { U.cerrarModal(); location.hash = `#viaje/${v.id}/itinerario`; setTimeout(() => { const d = document.querySelector('details[data-ideas]'); if (d) { d.open = true; d.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }, 250); };
+    if (bIdeas) bIdeas.onclick = () => { U.cerrarModal(); R.itinerario.irAQueHacer(v); };
     const bVal = el.querySelector('[data-a="abrirValija"]');
     if (bVal) bVal.onclick = () => { U.cerrarModal(); location.hash = `#viaje/${v.id}/valija`; };
     const bEdit = el.querySelector('[data-a="editarViaje"]');

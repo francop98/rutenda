@@ -71,6 +71,8 @@ R.db = (function () {
     v.tareas = v.tareas || {};
     v.tareasPropias = v.tareasPropias || [];
     v.votos = v.votos || {};
+    v.planes = v.planes || {};
+    if (v.ideas && R.ideas) R.ideas.migrar(v);
     v.itinerario = v.itinerario || [];
     v.documentos = v.documentos || [];
     v.movimientos = v.movimientos || [];

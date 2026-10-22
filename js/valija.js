@@ -144,6 +144,12 @@ R.valija = (function () {
               <button class="btn btn-primario" data-a="agregar">Agregar</button>
             </div>
             <p class="ayuda">${ida ? 'Queda solo en este viaje.' : 'Tocá cada cosa cuando la guardes. Si algo no vuelve (se terminó o lo regalaste), marcá "No vuelve".'}</p>
+            ${ida ? `
+              <div class="valija-mis-listas">
+                <span>O sumá una de tus listas:</span>
+                <div class="chips-listas">${listas.map(l => `<button type="button" class="chip-lista ${val.listas.includes(l.id) ? 'usada' : ''}" data-lista="${l.id}">${val.listas.includes(l.id) ? '✓' : '+'} ${esc(l.nombre)} <small>${l.items.length}</small></button>`).join('')}
+                  <button type="button" class="chip-lista chip-admin" data-a="adminListas">⚙️ ${listas.length ? 'Mis listas' : 'Crear una lista'}</button></div>
+              </div>` : ''}
           </div>
 
           ${grupos.length ? grupos.map(g => `
@@ -164,16 +170,6 @@ R.valija = (function () {
         </div>
 
         ${ida ? `<aside class="col-lateral">
-          <div class="bloque">
-            <h4>Mis listas</h4>
-            <p class="texto-suave">Se copian a este viaje sin cambiar la original.</p>
-            ${listas.length ? `<div class="listas-elegir">${listas.map(l => `
-              <button class="lista-op ${val.listas.includes(l.id) ? 'usada' : ''}" data-lista="${l.id}">
-                <span><strong>${esc(l.nombre)}</strong><small>${U.plural(l.items.length, 'cosa', 'cosas')}${val.listas.includes(l.id) ? ' · ya agregada' : ''}</small></span>
-                <span>${val.listas.includes(l.id) ? '↻' : '+'}</span>
-              </button>`).join('')}</div>` : '<p class="texto-suave">Todavía no creaste ninguna.</p>'}
-            <a href="#valijas" class="btn btn-suave btn-chico">Administrar mis listas</a>
-          </div>
           ${sug.length ? `
             <div class="bloque">
               <h4>Sugeridos para este viaje</h4>
@@ -225,6 +221,14 @@ R.valija = (function () {
       if (!val.listas.includes(l.id)) val.listas.push(l.id);
       guardarYRefrescar(n ? `Agregué ${U.plural(n, 'cosa', 'cosas')} de "${l.nombre}".` : `Todo lo de "${l.nombre}" ya estaba en la valija.`);
     });
+    const bAdmin = cont.querySelector('[data-a="adminListas"]');
+    if (bAdmin) bAdmin.onclick = () => {
+      // Administrar las listas sin salir de la valija
+      const { el } = U.modal({ titulo: 'Mis listas', subtitulo: 'Lo que llevás siempre. Las sumás a cualquier viaje con un toque.', ancho: true, cuerpo: '<div class="listas-en-valija"></div>', alCerrar: () => R.app.refrescar() });
+      const caja = el.querySelector('.listas-en-valija');
+      const pintarListas = () => renderMisListas(caja, pintarListas);
+      pintarListas();
+    };
     const armar = cont.querySelector('[data-a="armar"]');
     if (armar) armar.onclick = () => armarPasoAPaso(v, modo);
     cont.querySelectorAll('[data-ver-valija]').forEach(b => b.onclick = () => verValija(v, b.dataset.verValija, modo));
@@ -349,7 +353,8 @@ R.valija = (function () {
   }
 
   /* ---------- Pantalla "Mis listas" ---------- */
-  function renderMisListas(app) {
+  function renderMisListas(app, alCambiar) {
+    const refrescar = () => (alCambiar ? alCambiar() : R.app.refrescar());
     const listas = R.db.listasValija();
     app.innerHTML = `
       <section class="encabezado-simple">
@@ -381,11 +386,11 @@ R.valija = (function () {
           <p>Por ejemplo: "Playa", "Nieve", "Viaje de trabajo". Después las sumás a cualquier viaje con un toque.</p>
         </div>`}`;
 
-    const guardar = l => { R.db.guardarListaValija(l); R.app.refrescar(); };
+    const guardar = l => { R.db.guardarListaValija(l); refrescar(); };
     app.querySelector('[data-a="nueva"]').onclick = () => {
       const l = { id: U.id('lst'), nombre: 'Nueva lista', items: [] };
       R.db.guardarListaValija(l);
-      R.app.refrescar();
+      refrescar();
       setTimeout(() => { const i = document.querySelector(`[data-renombrar="${l.id}"]`); if (i) { i.focus(); i.select(); } }, 30);
     };
     app.querySelectorAll('[data-renombrar]').forEach(x => x.onchange = () => {
@@ -398,7 +403,7 @@ R.valija = (function () {
       const l = R.db.listasValija().find(y => y.id === x.dataset.eliminar);
       if (!await U.confirmar(`¿Eliminar la lista "${l.nombre}"? Los viajes donde ya la usaste no cambian.`, { textoSi: 'Eliminar', peligro: true })) return;
       R.db.eliminarListaValija(l.id);
-      R.app.refrescar();
+      refrescar();
     });
     app.querySelectorAll('[data-quitar]').forEach(x => x.onclick = () => {
       const [lid, iid] = x.dataset.quitar.split('|');

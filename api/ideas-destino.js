@@ -2,7 +2,8 @@
    Ideas de qué hacer en un destino.
    Mezcla fuentes y las resume con IA en una lista corta:
    - Wikivoyage (secciones "Ver" y "Hacer"; libre, sin clave)
-   - OpenTripMap (atractivos cercanos; opcional, OPENTRIPMAP_KEY)
+   - OpenStreetMap (atractivos reales cercanos; gratis, sin clave)
+   - OpenTripMap (opcional, solo si hay OPENTRIPMAP_KEY)
    - IA (Groq) que ordena, resume y marca qué conviene reservar
    Se guarda por destino y mes para no volver a consultar.
    Variables: GROQ_API_KEY, opcional GROQ_MODEL y OPENTRIPMAP_KEY.
@@ -49,7 +50,40 @@ async function wikivoyage(nombre) {
   return null;
 }
 
-/** Nombres de atractivos cercanos (OpenTripMap), si hay clave. */
+/**
+ * Atractivos reales cerca del destino desde OpenStreetMap (Overpass): gratis y sin clave.
+ * Toma los que tienen nombre y artículo en Wikipedia (suelen ser los más conocidos).
+ */
+async function openStreetMap(lat, lon) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
+  const consulta = `[out:json][timeout:12];
+(
+  nwr(around:25000,${lat},${lon})["tourism"~"attraction|viewpoint|museum|theme_park|zoo|gallery"]["name"];
+  nwr(around:25000,${lat},${lon})["natural"~"peak|waterfall|beach|glacier"]["name"]["wikipedia"];
+  nwr(around:25000,${lat},${lon})["historic"~"monument|castle|ruins"]["name"]["wikipedia"];
+);
+out tags 80;`;
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 9000);
+  try {
+    const r = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST', signal: ctrl.signal,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Rutenda/1.0 (organizador de viajes)' },
+      body: 'data=' + encodeURIComponent(consulta)
+    });
+    if (!r.ok) return [];
+    const d = await r.json();
+    const vistos = new Set();
+    return (d.elements || [])
+      .map(e => e.tags || {})
+      .sort((a, b) => (b.wikipedia ? 1 : 0) - (a.wikipedia ? 1 : 0))
+      .map(x => x['name:es'] || x.name)
+      .filter(n => n && !vistos.has(n.toLowerCase()) && vistos.add(n.toLowerCase()))
+      .slice(0, 40);
+  } catch (e) { return []; } finally { clearTimeout(t); }
+}
+
+/** Nombres de atractivos cercanos (OpenTripMap), si hay clave (opcional). */
 async function openTripMap(lat, lon) {
   const clave = process.env.OPENTRIPMAP_KEY;
   if (!clave || lat == null || lon == null) return [];
@@ -76,7 +110,7 @@ async function pedirIdeas(destino, mes, extra, fuentes) {
     extra.noches ? `Se quedan ${extra.noches} noches.` : '',
     extra.menores ? 'Viajan con chicos.' : '',
     fuentes.wiki ? `\nInformación de Wikivoyage:\n${fuentes.wiki.texto}` : '',
-    fuentes.lugares.length ? `\nAtractivos cercanos (OpenTripMap): ${fuentes.lugares.join(', ')}` : ''
+    fuentes.lugares.length ? `\nAtractivos reales cercanos (OpenStreetMap): ${fuentes.lugares.join(', ')}` : ''
   ].filter(Boolean).join('\n');
   const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
@@ -142,12 +176,14 @@ module.exports = async (req, res) => {
   } catch (e) { /* si falla el contador, seguimos */ }
 
   try {
-    const [wiki, lugares] = await Promise.all([wikivoyage(destino.nombre), openTripMap(destino.lat, destino.lon)]);
+    const [wiki, osm, otm] = await Promise.all([wikivoyage(destino.nombre), openStreetMap(destino.lat, destino.lon), openTripMap(destino.lat, destino.lon)]);
+    const lugares = Array.from(new Set(osm.concat(otm))).slice(0, 50);
     const ideas = await pedirIdeas(destino, mes, extra, { wiki, lugares });
     if (!ideas.length) return res.status(502).json({ error: 'No encontré ideas para este destino.' });
     const fuentes = [];
     if (wiki) fuentes.push({ nombre: 'Wikivoyage', url: wiki.url });
-    if (lugares.length) fuentes.push({ nombre: 'OpenTripMap', url: 'https://opentripmap.com' });
+    if (osm.length) fuentes.push({ nombre: 'OpenStreetMap', url: 'https://www.openstreetmap.org/copyright' });
+    if (otm.length) fuentes.push({ nombre: 'OpenTripMap', url: 'https://opentripmap.com' });
     const resultado = { destino: destino.nombre, mes, ideas, fuentes, creado: new Date().toISOString() };
     ref.set(resultado).catch(() => {});
     return res.status(200).json(resultado);

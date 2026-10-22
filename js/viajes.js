@@ -155,6 +155,7 @@ R.viajes = (function () {
     b.resuelto = {};
     b.paqueteIncluye = ['vuelos', 'alojamiento'];
     b.resueltoIds = [];
+    b.resueltosOtros = [];
 
     b.viajeros = editando
       ? existente.participantes.filter(id => id !== R.db.yoEn(existente)).map(id => R.db.persona(id)).filter(Boolean).map(p => ({ id: p.id, nombre: p.nombre }))
@@ -257,17 +258,79 @@ R.viajes = (function () {
           <button type="button" class="btn btn-suave btn-chico" data-a="masDestino">+ Otro destino</button>
           <button type="button" class="btn btn-suave btn-chico" data-a="masEscapada">+ Escapada (ida y vuelta en el día)</button>
         </div>
-        ${(() => {
-          const ultimo = b.destinos.filter(d => d.nombre && !d.soloDia).filter(d => normal(d.nombre) !== normal(b.origen && b.origen.nombre)).slice(-1)[0];
+        <div id="bloqueVuelta">${htmlVuelta()}</div>
+        <div id="avisoInter"></div>
+        <label class="campo"><span>Nombre del viaje <small>(opcional)</small></span><input id="aNombre" value="${esc(b.nombre)}" placeholder="Ej: Vacaciones de invierno"></label>`;
+    }
+
+    /** Destinos donde dormís, en orden. */
+    const conAlojB = () => b.destinos.filter(d => d.nombre && !d.soloDia && normal(d.nombre) !== normal(b.origen && b.origen.nombre));
+
+    /**
+     * Volver pasando por una ciudad anterior (por ejemplo: Bahía → Buenos Aires → Iguazú,
+     * y la vuelta Iguazú → Buenos Aires → Bahía) sin cargarla dos veces.
+     * Si no lo elegiste, se deduce por distancia: si el primer destino queda mucho más cerca
+     * de tu casa que el último, seguramente es tu ciudad de conexión.
+     */
+    function vueltaPorSugerida() {
+      const ds = conAlojB();
+      if (ds.length < 2 || !b.origen || b.origen.lat == null) return '';
+      const primero = ds[0], ultimo = ds[ds.length - 1];
+      if (primero.lat == null || ultimo.lat == null) return '';
+      const d1 = R.resumen ? R.resumen.km(b.origen, primero) : 0, d2 = R.resumen ? R.resumen.km(b.origen, ultimo) : 0;
+      return d1 && d2 && d1 < d2 * 0.5 ? primero.id : '';
+    }
+    function vueltaPor() {
+      if (b.perfil.soloIda) return null;
+      const ds = conAlojB();
+      if (ds.length < 2) return null;
+      const id = b.perfil.vueltaPor === undefined ? vueltaPorSugerida() : b.perfil.vueltaPor;
+      return ds.slice(0, -1).find(d => d.id === id) || null;
+    }
+    function aplicarVueltaPor() {
+      const vuelta = (b.recorrido || []).find(t => t.tipo === 'vuelta');
+      const por = vueltaPor();
+      const nombre = por ? por.nombre : '';
+      if (vuelta && b.vueltaPorAplicada && normal(b.vueltaPorAplicada) !== normal(nombre)) {
+        const i = vuelta.segmentos.findIndex(s => normal(s.hasta.nombre) === normal(b.vueltaPorAplicada));
+        if (i >= 0 && i < vuelta.segmentos.length - 1) R.recorrido.unir(vuelta, i);
+      }
+      if (vuelta && por && !vuelta.segmentos.some(s => normal(s.hasta.nombre) === normal(nombre))) {
+        R.recorrido.dividir(vuelta, vuelta.segmentos.length - 1, por);
+      }
+      b.vueltaPorAplicada = vuelta && por ? nombre : '';
+    }
+
+    function htmlVuelta() {
+          const ds = conAlojB();
+          const ultimo = ds.slice(-1)[0];
+          const por = vueltaPor();
+          const origen = b.origen && b.origen.nombre ? b.origen.nombre : 'tu ciudad';
           return `<div class="campo campo-vuelta"><span>¿Volvés?</span>
           <div class="segmentado">
             <button type="button" data-vuelta="si" class="${!b.perfil.soloIda ? 'activo' : ''}">Ida y vuelta</button>
             <button type="button" data-vuelta="no" class="${b.perfil.soloIda ? 'activo' : ''}">Solo ida</button>
           </div>
-          <small class="ayuda">${b.perfil.soloIda ? 'No armo la vuelta.' : ultimo && b.origen && b.origen.nombre ? `La vuelta se arma sola: de ${esc(ultimo.nombre)} a ${esc(b.origen.nombre)}. No hace falta cargar tu ciudad como destino.` : 'La vuelta se arma sola desde el último destino hasta tu ciudad.'}</small></div>`;
-        })()}
-        <div id="avisoInter"></div>
-        <label class="campo"><span>Nombre del viaje <small>(opcional)</small></span><input id="aNombre" value="${esc(b.nombre)}" placeholder="Ej: Vacaciones de invierno"></label>`;
+          ${!b.perfil.soloIda && ds.length >= 2 ? `
+            <span class="vuelta-por-titulo">¿Por dónde volvés?</span>
+            <div class="checks-grilla">
+              <label class="chip-check ${!por ? 'activo' : ''}"><input type="radio" name="vueltaPor" data-vuelta-por="" ${!por ? 'checked' : ''}> Directo a ${esc(origen)}</label>
+              ${ds.slice(0, -1).map(d => `<label class="chip-check ${por && por.id === d.id ? 'activo' : ''}"><input type="radio" name="vueltaPor" data-vuelta-por="${d.id}" ${por && por.id === d.id ? 'checked' : ''}> Por ${esc(d.nombre)}</label>`).join('')}
+            </div>` : ''}
+          <small class="ayuda">${b.perfil.soloIda ? 'No armo la vuelta.' : ultimo ? `La vuelta se arma sola: ${esc(ultimo.nombre)}${por ? ' → ' + esc(por.nombre) : ''} → ${esc(origen)}. No hace falta cargar ninguna ciudad dos veces.` : 'La vuelta se arma sola desde el último destino hasta tu ciudad.'}</small></div>`;
+    }
+    /** Repinta "¿Volvés? / ¿Por dónde volvés?" cuando cambian los destinos (sin perder lo escrito). */
+    function refrescarVuelta() {
+      const caja = cont.querySelector('#bloqueVuelta');
+      if (!caja) return;
+      camposLugar.destinos.forEach((c, i) => { if (c && b.destinos[i]) Object.assign(b.destinos[i], c.obtener()); });
+      if (camposLugar.origen) b.origen = camposLugar.origen.obtener();
+      caja.innerHTML = htmlVuelta();
+      enlazarVuelta();
+    }
+    function enlazarVuelta() {
+      cont.querySelectorAll('[data-vuelta]').forEach(x => x.onclick = () => { leerPaso(); b.perfil.soloIda = x.dataset.vuelta === 'no'; refrescarVuelta(); });
+      cont.querySelectorAll('[data-vuelta-por]').forEach(x => x.onchange = () => { leerPaso(); b.perfil.vueltaPor = x.dataset.vueltaPor; refrescarVuelta(); });
     }
 
     function htmlCronograma() {
@@ -277,6 +340,7 @@ R.viajes = (function () {
         if (b.conexionAplicada && normal(b.conexionAplicada) !== normal(nueva)) R.recorrido.quitarConexion(b.recorrido, { nombre: b.conexionAplicada });
         if (nueva) R.recorrido.aplicarConexion(b.recorrido, b.conexion);
         b.conexionAplicada = nueva;
+        aplicarVueltaPor();
         return `
         <h4 class="titulo-paso">¿Cuándo salís y cuántas noches?</h4>
         <p class="ayuda">En qué viajás, cuándo salís y cuántas noches. El resto se calcula solo.</p>
@@ -324,12 +388,14 @@ R.viajes = (function () {
         ${(() => {
           // Pocas opciones simples: una por tipo ("Pasajes", "Alojamiento"…). Si un tipo tiene varios, se puede afinar.
           const grupos = gruposResueltos(opciones);
-          if (!grupos.length) return '';
           return `<div class="campo"><span>${b.resuelto.paquete ? 'Fuera del paquete, ¿tenés algo más?' : 'O por tu cuenta:'}</span>
             <div class="checks-grilla">${grupos.map(g => {
               const marcados = g.items.filter(o => b.resueltoIds.includes(o.id)).length;
               return `<label class="chip-check ${marcados ? 'activo' : ''}"><input type="checkbox" data-resuelto-grupo="${g.clave}" ${marcados ? 'checked' : ''}> ${g.icono} ${esc(g.nombre)}</label>`;
-            }).join('')}</div>
+            }).join('')}
+              ${b.resueltosOtros.map((x, i) => `<span class="chip-check activo">✓ ${esc(x)} <button type="button" class="chip-quitar" data-quitar-otro="${i}" aria-label="Quitar">×</button></span>`).join('')}
+              <button type="button" class="chip-check chip-otro" data-a="otroResuelto">+ Otro</button></div>
+            <div class="fila-agregar oculto" id="filaOtroResuelto"><input id="aOtroResuelto" placeholder="Ej: entradas del recital"><button type="button" class="btn btn-suave" data-a="agregarOtroResuelto">Agregar</button></div>
             ${grupos.filter(g => g.items.length > 1 && g.items.some(o => b.resueltoIds.includes(o.id))).map(g => `
               <div class="resuelto-detalle"><small>${esc(g.nombre)}: destildá lo que todavía no tengas</small>
                 <div class="checks-grilla">${g.items.map(o => `<label class="chip-check chip-chico ${b.resueltoIds.includes(o.id) ? 'activo' : ''}"><input type="checkbox" data-resuelto-id="${o.id}" ${b.resueltoIds.includes(o.id) ? 'checked' : ''}> ${esc(o.corto)}</label>`).join('')}</div>
@@ -427,16 +493,16 @@ R.viajes = (function () {
             ? `<p class="aviso-suave">🌎 Salís del país: ${det.paises.map(p => `${R.lugares.bandera(p.codigoPais)} ${esc(p.pais)}`).join(', ')}. Vamos a sumar documentación y seguro a la guía.</p>` : '';
         };
         const usadas = R.lugares.recientes();
-        camposLugar.origen = cont.querySelector('#lugarOrigen') ? R.lugares.campo(cont.querySelector('#lugarOrigen'), { valor: b.origen, placeholder: 'Tu ciudad de salida', alCambiar: avisar, sugeridos: usadas }) : null;
+        camposLugar.origen = cont.querySelector('#lugarOrigen') ? R.lugares.campo(cont.querySelector('#lugarOrigen'), { valor: b.origen, placeholder: 'Tu ciudad de salida', alCambiar: () => { avisar(); refrescarVuelta(); }, sugeridos: usadas }) : null;
         const bOrigen = cont.querySelector('[data-a="cambiarOrigen"]');
         if (bOrigen) bOrigen.onclick = () => { leerPaso(); b.cambiarOrigen = true; pintar(); const i = cont.querySelector('#lugarOrigen .lugar-input'); if (i) { i.focus(); i.select(); } };
         camposLugar.destinos = b.destinos.map((d, i) => R.lugares.campo(cont.querySelector(`[data-lugar-destino="${i}"]`), {
           valor: d, placeholder: d.soloDia ? 'Lugar que visitás en el día' : 'Ej: Roma, Cusco, Nueva York',
           sugeridos: usadas.filter(u => normal(u.nombre) !== normal(b.origen && b.origen.nombre)),
-          alCambiar: () => { avisar(); }
+          alCambiar: () => { avisar(); refrescarVuelta(); }
         }));
         avisar();
-        cont.querySelectorAll('[data-vuelta]').forEach(x => x.onclick = () => { leerPaso(); b.perfil.soloIda = x.dataset.vuelta === 'no'; pintar(); });
+        enlazarVuelta();
         cont.querySelector('[data-a="masDestino"]').onclick = () => { leerPaso(); b.destinos.push(nuevoDestino(false)); pintar(); };
         cont.querySelector('[data-a="masEscapada"]').onclick = () => { leerPaso(); b.destinos.push(nuevoDestino(true)); pintar(); };
         cont.querySelectorAll('[data-quitar-destino]').forEach(x => x.onclick = () => { leerPaso(); b.destinos.splice(Number(x.dataset.quitarDestino), 1); pintar(); });
@@ -459,6 +525,14 @@ R.viajes = (function () {
       if (n === 'Lo resuelto') {
         cont.querySelectorAll('[data-resuelto], [data-incluye]').forEach(x => x.onchange = () => { leerPaso(); pintar(); });
         cont.querySelectorAll('[data-resuelto-id]').forEach(x => x.onchange = () => { leerPaso(); pintar(); });
+        const bOtro = cont.querySelector('[data-a="otroResuelto"]');
+        if (bOtro) bOtro.onclick = () => { cont.querySelector('#filaOtroResuelto').classList.remove('oculto'); cont.querySelector('#aOtroResuelto').focus(); };
+        const agregarOtro = () => { const x = cont.querySelector('#aOtroResuelto'); const t = x.value.trim(); if (!t) return; leerPaso(); b.resueltosOtros.push(t); pintar(); };
+        const bAgOtro = cont.querySelector('[data-a="agregarOtroResuelto"]');
+        if (bAgOtro) bAgOtro.onclick = agregarOtro;
+        const inOtro = cont.querySelector('#aOtroResuelto');
+        if (inOtro) inOtro.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); agregarOtro(); } };
+        cont.querySelectorAll('[data-quitar-otro]').forEach(x => x.onclick = () => { leerPaso(); b.resueltosOtros.splice(Number(x.dataset.quitarOtro), 1); pintar(); });
         const dx = cont.querySelector('details[data-extras]');
         if (dx) dx.addEventListener('toggle', () => { b.extrasAbierto = dx.open; });
         cont.querySelectorAll('[data-resuelto-grupo]').forEach(x => x.onchange = () => {
@@ -550,6 +624,12 @@ R.viajes = (function () {
       b.extrasManuales.forEach(t => v.tareasPropias.push({
         id: U.id('pro'), titulo: t, fase: 'salida', impacto: 3, desc: 'Lo agregaste al armar el viaje.', dependeDe: []
       }));
+      // Lo que ya tenías resuelto por tu cuenta ("Otro"): queda como paso hecho
+      (b.resueltosOtros || []).forEach(t => {
+        const id = U.id('pro');
+        v.tareasPropias.push({ id, titulo: t, fase: 'experiencias', impacto: 2, desc: 'Lo tenías resuelto al armar el viaje.', dependeDe: [] });
+        v.tareas[id] = { estado: 'hecha', fechaHecha: new Date().toISOString() };
+      });
     }
 
     function finalizar() {
@@ -719,7 +799,6 @@ R.viajes = (function () {
         </div>
       </section>
       ${estadoViaje(v) === 'pasado' && !v.ejemplo ? `<div class="aviso-vuelta"><span>🎉 <strong>¡Volviste!</strong> Mirá cómo fue el viaje.</span><button class="btn btn-primario btn-chico" data-a="verResumen">Ver resumen</button></div>` : ''}
-      ${v.ejemplo ? `<div class="aviso-ejemplo"><span>🧪 <strong>Viaje de ejemplo.</strong> Tocá todo lo que quieras: no pasa nada.</span><button class="btn btn-suave btn-chico" data-a="borrarEjemplo">Borrar ejemplo</button></div>` : ''}
       <nav class="pestanas" role="tablist">
         ${PESTANAS.filter(p => !p.oculta && (!p.soloViajando || viajando) && !(viajando && p.id === 'guia' && pestana !== 'guia')).map(p => `<a role="tab" href="#viaje/${v.id}/${p.id}" class="pestana ${p.id === pestana ? 'activa' : ''}"><span>${p.icono}</span>${p.nombre}</a>`).join('')}
       </nav>

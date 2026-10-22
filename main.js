@@ -100,6 +100,7 @@
     window.scrollTo(0, 0);
     R.migracion.ofrecer();
     if (R.recordatorios) { R.recordatorios.actualizar(); R.recordatorios.revisar(); }
+    if (R.tour) R.tour.siCorresponde();
     // Pasajes y reservas de los viajes cercanos, guardados para usarlos sin señal
     setTimeout(() => R.db.precargarArchivos().catch(() => {}), 4000);
   }
@@ -193,7 +194,7 @@
           <h1>¿A dónde vamos?</h1>
           <p class="hero-frase">${esc(U.frase())}</p>
           <button class="btn btn-primario btn-grande" data-a="nuevo">+ Planificar un viaje</button>
-          <button class="btn btn-texto hero-ejemplo" data-a="ejemplo">o mirá un viaje de ejemplo →</button>
+          <button class="btn btn-texto hero-ejemplo" data-a="tour">¿Primera vez? Mirá cómo funciona →</button>
         </div>
       </section>`}
 
@@ -221,8 +222,8 @@
         </section>` : viajes.length > 1 ? `<p class="ir-viajes"><a href="#viajes" class="btn btn-texto btn-chico">Ver todos mis viajes (${viajes.length}) →</a></p>` : ''}`;
 
     app.querySelectorAll('[data-a="nuevo"]').forEach(b => b.onclick = () => R.viajes.abrirAsistente());
-    const bEjemplo = app.querySelector('[data-a="ejemplo"]');
-    if (bEjemplo) bEjemplo.onclick = () => { const v = R.viajes.crearEjemplo(); location.hash = `#viaje/${v.id}/guia`; };
+    const bTour = app.querySelector('[data-a="tour"]');
+    if (bTour) bTour.onclick = () => R.tour.iniciar();
     const bInst = app.querySelector('[data-a="instalar"]');
     if (bInst) bInst.onclick = instalar;
     const bOcultar = app.querySelector('[data-a="ocultarInstalar"]');

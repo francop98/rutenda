@@ -83,6 +83,9 @@ R.itinerario = (function () {
       items.push({ hora: e.hora, icono: tipo(e.tipo).icono, clase: 'ev-propio', titulo: e.titulo, sub: [e.lugar && '📍 ' + e.lugar, e.confirmacion && 'Cód. ' + e.confirmacion, e.notas].filter(Boolean).join(' · '), evento: e.id, origen: e.origen, docs: [] });
     });
 
+    // Lo que decidiste hacer ese día (desde "Qué hacer")
+    if (R.ideas) R.ideas.delDia(v, fecha).forEach(p => items.push({ hora: p.hora, icono: R.ideas.ICONOS[p.tipo] || '📍', clase: 'ev-plan', titulo: p.titulo, sub: [p.zona && '📍 ' + p.zona, p.reserva && '🎟️ con reserva', p.nota].filter(Boolean).join(' · '), plan: p.destId + '|' + p.id, docs: [] }));
+
     items.sort((a, b) => (a.hora || '99:99').localeCompare(b.hora || '99:99'));
 
     // Dónde amanecés y dónde dormís
@@ -109,70 +112,89 @@ R.itinerario = (function () {
   /* ---------------------------------------------------------
      Render
      --------------------------------------------------------- */
+  let subvista = (() => { try { return localStorage.getItem('rutenda_sub_itinerario') || 'dias'; } catch (e) { return 'dias'; } })();
+
   function render(v, cont) {
+    if (R.ideas) R.ideas.migrar(v);
     const dias = diasDelViaje(v);
     const avisos = C().validar(v).filter(a => a.nivel !== 'info' || /Faltan|Falta/.test(a.texto));
     const hoy = U.hoyISO();
     const fuera = (v.itinerario || []).filter(e => !(e.origen || '').startsWith('t_segmento__') && (!e.fecha || !dias.includes(e.fecha)));
+    const sinDia = R.ideas ? R.ideas.sinDia(v) : [];
+    const nQue = R.ideas ? R.ideas.cuenta(v) : 0;
+    if (!['dias', 'que'].includes(subvista)) subvista = 'dias';
 
     cont.innerHTML = `
-      <div class="bloque-cab cab-seccion">
-        <div>
+      <div class="itin-cab">
+        <div class="itin-titulo">
           <h2 class="titulo-seccion">Itinerario</h2>
           <p class="texto-suave">${dias.length ? U.plural(dias.length, 'día', 'días') + ' de viaje' : 'Cargá las fechas y te armo los días.'}</p>
         </div>
-        <div class="acciones-fila">
-          <button class="btn btn-suave btn-chico solo-org" data-a="cronograma">📅 Fechas y traslados</button>
-          <button class="btn btn-primario btn-chico solo-org" data-a="nuevo">+ Actividad</button>
+        <div class="itin-acciones">
+          <button class="itin-accion" data-a="pdf"><span>📄</span>PDF</button>
+          <button class="itin-accion" data-a="compartir"><span>↗</span>Compartir</button>
+          <button class="itin-accion" data-a="ics"><span>📆</span>Calendario</button>
+          <button class="itin-accion" data-a="mapa"><span>🗺️</span>Mapa</button>
         </div>
       </div>
 
+      <div class="segmentado segmentado-itin" role="tablist">
+        <button type="button" data-subvista="dias" class="${subvista === 'dias' ? 'activo' : ''}">🗓️ Días</button>
+        <button type="button" data-subvista="que" class="${subvista === 'que' ? 'activo' : ''}">📝 Qué hacer${nQue ? ` <i class="punto-aviso">${nQue}</i>` : ''}</button>
+      </div>
+
+      ${subvista === 'que' ? `<div class="vista-que">${R.ideas ? R.ideas.vistaHTML(v) : ''}</div>` : `
       ${avisos.length ? `<div class="cr-avisos bloque">${avisos.map(a => `<p class="cr-aviso cr-${a.nivel}">${a.nivel === 'error' ? '⛔' : a.nivel === 'aviso' ? '⚠️' : 'ℹ️'} ${esc(a.texto)}</p>`).join('')}
-        <button class="btn btn-texto btn-chico solo-org" data-a="cronograma2">Corregir en el cronograma →</button></div>` : ''}
-
-      ${R.ideas ? R.ideas.seccionHTML(v) : ''}
-
-      <details class="bloque plegable">
-        <summary><h3 class="bloque-titulo">🧭 Resumen de traslados</h3></summary>
-        ${R.cronogramaEditor.resumenHTML(v)}
-      </details>
-
-      <details class="bloque plegable" data-mapa>
-        <summary><h3 class="bloque-titulo">🗺️ Mapa del recorrido</h3></summary>
-        <div class="mapa-cont"></div>
-      </details>
-
+        <button class="btn btn-texto btn-chico solo-org" data-a="cronograma2">Corregir las fechas →</button></div>` : ''}
+      <div class="acciones-fila itin-crear solo-org">
+        <button class="btn btn-primario btn-chico" data-a="nuevo">+ Actividad</button>
+        <button class="btn btn-suave btn-chico" data-a="cronograma">📅 Fechas y traslados</button>
+      </div>
       ${dias.length ? `<div class="linea-tiempo">${agruparDias(v, dias, hoy)}</div>` : ''}
-      ${fuera.length ? `<section class="dia fuera"><header class="dia-cab"><div><strong>Para hacer, sin día asignado</strong><small>Tocá cada una para elegirle día y hora</small></div></header>${fuera.map(e => itemHTML({ hora: e.hora, icono: tipo(e.tipo).icono, titulo: e.titulo, sub: [e.fecha ? U.fmtFecha(e.fecha, 'corto') : '', e.lugar].filter(Boolean).join(' · '), evento: e.id, docs: [] })).join('')}</section>` : ''}
-      ${!dias.length && !fuera.length ? `
+      ${fuera.length || sinDia.length ? `<section class="dia fuera"><header class="dia-cab"><div><strong>Para hacer, sin día</strong><small>Tocá cada una para elegirle el día</small></div></header>
+        ${sinDia.map(p => itemHTML({ hora: p.hora, icono: (R.ideas.ICONOS[p.tipo] || '📍'), titulo: p.titulo, sub: [p.zona, p.nota].filter(Boolean).join(' · '), plan: p.destId + '|' + p.id, docs: [] })).join('')}
+        ${fuera.map(e => itemHTML({ hora: e.hora, icono: tipo(e.tipo).icono, titulo: e.titulo, sub: [e.fecha ? U.fmtFecha(e.fecha, 'corto') : '', e.lugar].filter(Boolean).join(' · '), evento: e.id, docs: [] })).join('')}</section>` : ''}
+      ${!dias.length && !fuera.length && !sinDia.length ? `
         <div class="vacio vacio-chico">
           <div class="vacio-icono">🗓️</div>
           <p>Cargá cuándo salís y cuántas noches te quedás en cada lugar, y acá aparece cada día.</p>
           <button class="btn btn-primario solo-org" data-a="cronograma3">Cargar las fechas</button>
-        </div>` : ''}
-      <div class="itinerario-pie acciones-fila">
-        <button class="btn btn-suave btn-chico" data-a="compartir">↗ Compartir</button>
-        <button class="btn btn-suave btn-chico" data-a="pdf">📄 PDF</button>
-        <button class="btn btn-suave btn-chico" data-a="ics">📆 Al calendario</button>
-      </div>`;
+        </div>` : ''}`}`;
 
+    cont.querySelectorAll('[data-subvista]').forEach(b => b.onclick = () => {
+      subvista = b.dataset.subvista;
+      try { localStorage.setItem('rutenda_sub_itinerario', subvista); } catch (e) { /* nada */ }
+      render(v, cont);
+    });
     cont.querySelectorAll('[data-a^="cronograma"]').forEach(b => b.onclick = () => editarCronograma(v));
-    cont.querySelector('[data-a="nuevo"]').onclick = () => editar(v);
+    const bNuevo = cont.querySelector('[data-a="nuevo"]');
+    if (bNuevo) bNuevo.onclick = () => editar(v);
     cont.querySelector('[data-a="compartir"]').onclick = () => compartir(v);
     cont.querySelector('[data-a="pdf"]').onclick = () => R.itinerarioPdf.descargar(v);
     cont.querySelector('[data-a="ics"]').onclick = () => descargarICS(v);
+    cont.querySelector('[data-a="mapa"]').onclick = () => {
+      const { el } = U.modal({ titulo: 'Mapa del recorrido', ancho: true, cuerpo: '<div class="mapa-cont"></div>' });
+      R.mapa.mostrar(el.querySelector('.mapa-cont'), v);
+    };
     cont.querySelectorAll('[data-agregar]').forEach(b => b.onclick = () => editar(v, null, b.dataset.agregar));
     cont.querySelectorAll('[data-evento]').forEach(b => b.onclick = () => editar(v, b.dataset.evento));
+    cont.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const [d, id] = b.dataset.plan.split('|'); R.ideas.editar(v, d, id, () => render(v, cont)); });
     cont.querySelectorAll('[data-doc]').forEach(b => b.onclick = e => { e.stopPropagation(); R.documentos.abrir(v.documentos.find(d => d.id === b.dataset.doc), v); });
-    const det = cont.querySelector('[data-mapa]');
-    det.addEventListener('toggle', () => { if (det.open && !det.dataset.cargado) { det.dataset.cargado = '1'; R.mapa.mostrar(det.querySelector('.mapa-cont'), v); } });
-    if (R.ideas) R.ideas.enlazarSeccion(v, cont);
-    cargarClima(v, cont);
+    if (subvista === 'que' && R.ideas) R.ideas.enlazar(v, cont, () => render(v, cont));
+    else cargarClima(v, cont);
+  }
+
+  /** Abre el itinerario directo en "Qué hacer". */
+  function irAQueHacer(v) {
+    subvista = 'que';
+    try { localStorage.setItem('rutenda_sub_itinerario', 'que'); } catch (e) { /* nada */ }
+    location.hash = `#viaje/${v.id}/itinerario`;
+    R.app.refrescar();
   }
 
   function itemHTML(it) {
     return `
-      <article class="evento ${it.clase || ''}" ${it.evento ? `data-evento="${it.evento}"` : ''}>
+      <article class="evento ${it.clase || ''}" ${it.evento ? `data-evento="${it.evento}"` : ''} ${it.plan ? `data-plan="${it.plan}"` : ''}>
         <span class="ev-hora">${esc(it.hora || '—')}</span>
         <span class="ev-icono">${it.icono}</span>
         <div class="ev-texto">
@@ -577,6 +599,7 @@ R.itinerario = (function () {
     const bAct = cont.querySelector('[data-a="actividad"]');
     if (bAct) bAct.onclick = () => editar(v, null, hoy);
     cont.querySelectorAll('[data-tarea-hoy]').forEach(b => b.onclick = () => R.vistaGuia.abrirTarea(v, b.dataset.tareaHoy));
+    cont.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const [d, id] = b.dataset.plan.split('|'); R.ideas.editar(v, d, id, () => renderHoy(v, cont)); });
     cont.querySelectorAll('[data-evento]').forEach(b => b.onclick = () => editar(v, b.dataset.evento));
     cont.querySelectorAll('[data-doc]').forEach(b => b.onclick = e => { e.stopPropagation(); R.documentos.abrir(v.documentos.find(x => x.id === b.dataset.doc), v); });
     const e = C().estadias(v).find(x => x.desde <= hoy && hoy <= x.hasta);
@@ -597,5 +620,5 @@ R.itinerario = (function () {
     });
   }
 
-  return { TIPOS, render, renderHoy, editar, editarCronograma, diaDe, diasDelViaje, hoyHTML, enlazarHoy, textoItinerario, generarICS, compartir };
+  return { TIPOS, render, renderHoy, irAQueHacer, editar, editarCronograma, diaDe, diasDelViaje, hoyHTML, enlazarHoy, textoItinerario, generarICS, compartir };
 })();

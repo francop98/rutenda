@@ -23,6 +23,7 @@ R.cronogramaEditor = (function () {
     let avisoEspejo = false;
     let campoParada = null;
     const conHorarios = new Set();  // traslados con horarios a la vista
+    const editandoNoches = new Set();  // estadías con el campo de noches abierto
     if (b.moverJunto == null) b.moverJunto = true;
 
     const ctxViaje = () => ({ recorrido: b.recorrido, destinos: b.destinos, tareas: op.tareas || {}, fechaInicio: '', fechaFin: '' });
@@ -116,6 +117,7 @@ R.cronogramaEditor = (function () {
             <label class="cr-hora-sola"><small>Salís el</small><input type="date" data-cr-f="${clave}|sale|fecha" value="${esc(s.sale.fecha)}" ${previa ? `min="${previa}" data-sugerir="${previa}"` : ''}></label>
             ${abierto ? '' : `<button type="button" class="btn-texto-mini" data-cr-horarios="${s.id}">+ Horarios</button>`}
           </div>
+          ${!abierto && nocturno ? `<p class="cr-nota">🌙 Viajás de noche: llegás el ${U.fmtFecha(s.llega.fecha, 'dia')}</p>` : ''}
           ${abierto ? `
           <div class="cr-horarios">
             <div class="cr-hora"><small>Hora de salida</small><input type="time" data-cr-f="${clave}|sale|hora" value="${esc(s.sale.hora)}"></div>
@@ -131,7 +133,20 @@ R.cronogramaEditor = (function () {
 
     function paradaHTML(t, ti, s, si) {
       const sig = t.segmentos[si + 1];
-      const noches = s.noche && C().fechaLlega(s) && sig.sale.fecha ? U.diasEntre(C().fechaLlega(s), sig.sale.fecha) : null;
+      // Si las fechas ya lo dicen, no pregunto: llegar y salir el mismo día = seguís viaje
+      const llega = C().fechaLlega(s);
+      const deducido = !b.sinFechas && llega && sig.sale.fecha;
+      if (deducido) s.noche = sig.sale.fecha > llega;
+      const noches = s.noche && llega && sig.sale.fecha ? U.diasEntre(llega, sig.sale.fecha) : null;
+      if (deducido) return `
+        <div class="cr-parada">
+          <span class="cr-punto">📍</span>
+          <div>
+            <strong>${esc(s.hasta.nombre)}</strong>
+            <small class="cr-deducido">${s.noche ? `🛏️ Hacés ${U.plural(noches, 'noche', 'noches')} acá (llegás el ${U.fmtFecha(llega, 'dia')} y seguís el ${U.fmtFecha(sig.sale.fecha, 'dia')})` : '🔁 Seguís viaje el mismo día'}</small>
+            <button type="button" class="btn-texto-mini" data-cr-unir="${ti}|${si}">Quitar esta conexión</button>
+          </div>
+        </div>`;
       return `
         <div class="cr-parada">
           <span class="cr-punto">📍</span>
@@ -174,11 +189,16 @@ R.cronogramaEditor = (function () {
                 <button type="button" data-cr-depaso="${e.id}|si">No, es de paso</button>
               </span></div>` : ''}
             ${!b.recorrido[ti + 1] ? `<small>${e.desde ? 'Llegás el ' + U.fmtFecha(e.desde, 'dia') + ' · ' : ''}Solo ida: acá termina el recorrido.</small>` : b.sinFechas ? '<small>Las noches se calculan cuando cargues las fechas.</small>' : `
+            ${e.desde && e.hasta && e.noches > 0 && !editandoNoches.has(ti) ? `
+            <div class="cr-noches-listo">
+              <span>🛏️ <strong>${U.plural(e.noches, 'noche', 'noches')}</strong> · del ${U.fmtFecha(e.desde, 'dia')} al ${U.fmtFecha(e.hasta, 'dia')}</span>
+              <button type="button" class="btn-texto-mini" data-cr-editar-noches="${ti}">Cambiar</button>
+            </div>` : `
             <div class="cr-noches">
-              <span>${e.desde ? 'Llegás el ' + U.fmtFecha(e.desde, 'dia') : 'Llegada a definir'}</span>
-              <label class="cr-noches-campo"><input type="number" inputmode="numeric" min="0" max="365" data-cr-noches-input="${ti}" value="${e.noches != null ? e.noches : ''}" placeholder="—" ${!e.desde ? 'disabled' : ''} aria-label="Cantidad de noches"> <span>noches</span></label>
-              <span>${e.hasta ? 'Te vas el ' + U.fmtFecha(e.hasta, 'dia') : (e.desde ? 'Escribí las noches o la fecha de salida' : '')}</span>
-            </div>`}
+              <span>${e.desde ? 'Llegás el ' + U.fmtFecha(e.desde, 'dia') + '. ¿Cuántas noches te quedás?' : 'Cargá cuándo salís y te calculo la llegada'}</span>
+              <label class="cr-noches-campo"><input type="number" inputmode="numeric" min="0" max="365" data-cr-noches-input="${ti}" value="${e.noches != null && e.hasta ? e.noches : ''}" placeholder="—" ${!e.desde ? 'disabled' : ''} aria-label="Cantidad de noches"> <span>noches</span></label>
+              ${e.hasta ? `<span>Te vas el ${U.fmtFecha(e.hasta, 'dia')}</span>` : ''}
+            </div>`}`}
             ${escapadas.map(d => `
               <div class="cr-escapada">☀️ Escapada a <strong>${esc(d.nombre)}</strong>
                 <select data-cr-escapada="${d.id}">
@@ -308,7 +328,9 @@ R.cronogramaEditor = (function () {
           });
         }
       }
+      q('[data-cr-editar-noches]').forEach(x => x.onclick = () => { editandoNoches.add(Number(x.dataset.crEditarNoches)); pintar(); const i = cont.querySelector(`[data-cr-noches-input="${x.dataset.crEditarNoches}"]`); if (i) { i.focus(); i.select(); } });
       q('[data-cr-noches-input]').forEach(x => x.onchange = () => {
+        editandoNoches.delete(Number(x.dataset.crNochesInput));
         const n = Math.max(0, Math.min(365, parseInt(x.value, 10)));
         if (isNaN(n)) return;
         fijarNoches(Number(x.dataset.crNochesInput), n);
