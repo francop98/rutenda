@@ -44,7 +44,7 @@ R.auth = (function () {
     const uid = localStorage.getItem(CLAVE_SESION);
     if (!uid) return null;
     const u = Object.values(leerUsuarios()).find(x => x.uid === uid);
-    return u ? { uid: u.uid, nombre: u.nombre, apellido: u.apellido, email: u.email, nacionalidad: u.nacionalidad || 'AR', creado: u.creado, verificado: true, local: true } : null;
+    return u ? { uid: u.uid, nombre: u.nombre, apellido: u.apellido, email: u.email, nacionalidad: u.nacionalidad || 'AR', alias: u.alias || '', creado: u.creado, verificado: true, local: true } : null;
   }
 
   /* ---------------------------------------------------------
@@ -54,6 +54,10 @@ R.auth = (function () {
   function iniciar() {
     if (!enNube()) { actual = usuarioLocal(); return Promise.resolve(actual); }
     const auth = R.nube.auth();
+    // Vuelta de "Ingresar con Google" por redirección
+    let volvioDeGoogle = false;
+    try { volvioDeGoogle = sessionStorage.getItem('rutenda_google') === '1'; sessionStorage.removeItem('rutenda_google'); } catch (e) { /* nada */ }
+    if (volvioDeGoogle) auth.getRedirectResult().then(r => { if (r && r.user) perfilGoogle(r.user); }).catch(e => { errorPendiente = traducir(e).message; });
     return new Promise(resolver => {
       let primera = true;
       auth.onAuthStateChanged(async fu => {
@@ -64,6 +68,7 @@ R.auth = (function () {
     });
   }
   function alCambiarUsuario(fn) { oyente = fn; }
+  let errorPendiente = '';
 
   async function desdeFirebase(fu) {
     let perfil = {};
@@ -74,9 +79,12 @@ R.auth = (function () {
     const [nombre, ...resto] = (fu.displayName || '').split(' ');
     return {
       uid: fu.uid, email: fu.email, verificado: fu.emailVerified,
+      conClave: (fu.providerData || []).some(p => p && p.providerId === 'password'),
+      conGoogle: (fu.providerData || []).some(p => p && p.providerId === 'google.com'),
       nombre: perfil.nombre || nombre || (fu.email || '').split('@')[0],
       apellido: perfil.apellido != null ? perfil.apellido : resto.join(' '),
       nacionalidad: perfil.nacionalidad || 'AR',
+      alias: perfil.alias || '',
       creado: perfil.creado || (fu.metadata && fu.metadata.creationTime ? new Date(fu.metadata.creationTime).toISOString() : new Date().toISOString())
     };
   }
@@ -143,6 +151,38 @@ R.auth = (function () {
     return actual;
   }
 
+  /* ---------- Ingresar con Google ---------- */
+  /** Asegura que exista el perfil en la nube (la primera vez que entrás con Google). */
+  async function perfilGoogle(fu) {
+    const ref = R.nube.db().collection('usuarios').doc(fu.uid);
+    try {
+      const s = await ref.get();
+      if (!s.exists) {
+        const [nombre, ...resto] = (fu.displayName || '').split(' ');
+        await ref.set({ nombre: nombre || (fu.email || '').split('@')[0], apellido: resto.join(' '), nacionalidad: 'AR', email: normalizarEmail(fu.email), creado: new Date().toISOString() }, { merge: true });
+      }
+    } catch (e) { /* se completa la próxima vez */ }
+  }
+  async function ingresarConGoogle() {
+    if (!enNube()) throw new Error('Para entrar con Google, Rutenda tiene que estar conectado a la nube.');
+    const proveedor = new firebase.auth.GoogleAuthProvider();
+    proveedor.setCustomParameters({ prompt: 'select_account' });
+    try {
+      const cred = await R.nube.auth().signInWithPopup(proveedor);
+      await perfilGoogle(cred.user);
+      actual = await desdeFirebase(cred.user);
+      return actual;
+    } catch (e) {
+      // Si el navegador no deja abrir la ventanita (por ejemplo, la app instalada), se va y vuelve
+      if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/web-storage-unsupported'].includes(e && e.code)) {
+        try { sessionStorage.setItem('rutenda_google', '1'); } catch (x) { /* nada */ }
+        await R.nube.auth().signInWithRedirect(proveedor);
+        return null;
+      }
+      throw traducir(e);
+    }
+  }
+
   async function salir() {
     if (enNube()) {
       try { await R.nube.enviarTodo(); } catch (e) { /* se sincroniza la próxima vez */ }
@@ -173,20 +213,21 @@ R.auth = (function () {
     return actual ? actual.verificado : false;
   }
 
-  async function actualizarPerfil({ nombre, apellido, nacionalidad }) {
+  async function actualizarPerfil({ nombre, apellido, nacionalidad, alias }) {
     if (!actual) return;
     actual.nombre = nombre.trim();
     actual.apellido = (apellido || '').trim();
     if (nacionalidad) actual.nacionalidad = nacionalidad;
+    if (alias != null) actual.alias = String(alias).trim().slice(0, 60);
     if (enNube()) {
       const fu = R.nube.auth().currentUser;
       if (fu) await fu.updateProfile({ displayName: `${actual.nombre} ${actual.apellido}`.trim() });
-      await R.nube.actualizarPerfil({ nombre: actual.nombre, apellido: actual.apellido, nacionalidad: actual.nacionalidad });
+      await R.nube.actualizarPerfil({ nombre: actual.nombre, apellido: actual.apellido, nacionalidad: actual.nacionalidad, alias: actual.alias || '' });
       return;
     }
     const usuarios = leerUsuarios();
     const u = usuarios[actual.email];
-    Object.assign(u, { nombre: actual.nombre, apellido: actual.apellido, nacionalidad: actual.nacionalidad });
+    Object.assign(u, { nombre: actual.nombre, apellido: actual.apellido, nacionalidad: actual.nacionalidad, alias: actual.alias || '' });
     guardarUsuarios(usuarios);
   }
 
@@ -221,7 +262,12 @@ R.auth = (function () {
       'auth/invalid-login-credentials': 'Mail o contraseña incorrectos.',
       'auth/too-many-requests': 'Demasiados intentos. Esperá unos minutos y probá de nuevo.',
       'auth/network-request-failed': 'No hay conexión. Revisá internet y probá de nuevo.',
-      'auth/requires-recent-login': 'Por seguridad, volvé a ingresar y repetí el cambio.'
+      'auth/requires-recent-login': 'Por seguridad, volvé a ingresar y repetí el cambio.',
+      'auth/popup-closed-by-user': 'Cerraste la ventana de Google antes de terminar.',
+      'auth/cancelled-popup-request': 'Cerraste la ventana de Google antes de terminar.',
+      'auth/operation-not-allowed': 'El ingreso con Google todavía no está habilitado.',
+      'auth/unauthorized-domain': 'Este sitio todavía no está autorizado para entrar con Google.',
+      'auth/account-exists-with-different-credential': 'Ya tenés una cuenta con ese mail: ingresá con tu contraseña.'
     }[c];
     return new Error(msj || (e && e.message) || 'Algo salió mal. Probá de nuevo.');
   }
@@ -249,6 +295,12 @@ R.auth = (function () {
               <button type="button" data-modo="ingresar" class="${modo === 'ingresar' ? 'activo' : ''}">Ingresar</button>
               <button type="button" data-modo="registro" class="${modo === 'registro' ? 'activo' : ''}">Crear cuenta</button>
             </div>
+            ${enNube() ? `
+              <button type="button" class="btn btn-google btn-grande btn-bloque" data-a="google">
+                <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.9 6.1C12.5 13.6 17.8 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.7 6c4.5-4.2 6.9-10.3 6.9-17.7z"/><path fill="#FBBC05" d="M10.6 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.1C1 16.6 0 20.2 0 24s1 7.4 2.7 10.7l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.7-6c-2.2 1.5-5 2.3-8.2 2.3-6.2 0-11.5-4.1-13.4-9.8l-7.9 6.1C6.6 42.6 14.6 48 24 48z"/></svg>
+                Continuar con Google
+              </button>
+              <p class="acceso-o"><span>o con tu mail</span></p>` : ''}
             <form id="formAcceso" novalidate>
               ${modo === 'registro' ? `
                 <h2>Creá tu cuenta</h2>
@@ -273,6 +325,21 @@ R.auth = (function () {
         </section>`;
 
       app.querySelectorAll('[data-modo]').forEach(b => b.onclick = () => { modo = b.dataset.modo; pintar(); });
+      const bG = app.querySelector('[data-a="google"]');
+      if (errorPendiente) { app.querySelector('#acError').textContent = errorPendiente; errorPendiente = ''; }
+      if (bG) bG.onclick = async () => {
+        const error = app.querySelector('#acError');
+        error.textContent = '';
+        bG.disabled = true;
+        try {
+          await recordarme(app.querySelector('#acRecordar').checked, recordado().email);
+          const u = await ingresarConGoogle();
+          if (u) await alEntrar(u);
+        } catch (err) {
+          error.textContent = err.message;
+          bG.disabled = false;
+        }
+      };
       U.enlazarClaves(app);
       const olvide = app.querySelector('[data-a="olvide"]');
       if (olvide) olvide.onclick = () => abrirRecuperar(app.querySelector('#acEmail').value);
@@ -346,19 +413,21 @@ R.auth = (function () {
         </div>
         <label class="campo"><span>Nacionalidad de tu documento</span><select id="mcNac">${R.requisitos.NACIONALIDADES.map(([c, n]) => `<option value="${c}" ${c === u.nacionalidad ? 'selected' : ''}>${n}</option>`).join('')}</select>
           <small class="ayuda">Con esto Rutenda sabe qué documentación y visas te piden en cada destino.</small></label>
+        <label class="campo"><span>Alias o CBU para cobrar <small>(opcional)</small></span><input id="mcAlias" value="${esc(u.alias || '')}" placeholder="Ej: mi.alias.mp" autocomplete="off">
+          <small class="ayuda">Va en el mensaje cuando le pedís a alguien que te pague su parte.</small></label>
         <div class="bloque-interno">
           <strong>🔔 Recordatorios</strong>
           <p class="texto-suave">${push === 'activo' ? 'Activados en este dispositivo.' : push === 'bloqueado' ? 'El navegador bloqueó las notificaciones: habilitalas en los ajustes del sitio.' : push === 'no' ? 'Este navegador no permite notificaciones (en iPhone, instalá la app primero).' : 'Te avisamos del check-in, lo que se acerca y el día a día del viaje.'}</p>
           ${push === 'disponible' ? '<button type="button" class="btn btn-suave btn-chico" data-a="push">Activar recordatorios</button>' : ''}
           ${push === 'activo' ? '<button type="button" class="btn btn-texto btn-chico" data-a="pushNo">Desactivar en este dispositivo</button>' : ''}
         </div>
-        <details class="detalle-plegable">
+        ${u.conClave === false ? `<p class="ayuda">${u.conGoogle ? '🔐 Entrás con tu cuenta de Google.' : ''}</p>` : `<details class="detalle-plegable">
           <summary>Cambiar contraseña</summary>
           <div class="grilla-2">
             ${U.campoClave('mcClave', 'Contraseña actual', 'current-password')}
             ${U.campoClave('mcNueva', 'Nueva contraseña', 'new-password')}
           </div>
-        </details>
+        </details>`}
         ${R.app.puedeInstalar() ? '<button type="button" class="btn btn-suave btn-bloque" data-a="instalarApp">📲 Instalar Rutenda como app</button>' : ''}
         <p class="ayuda version-app">Rutenda · versión ${R.VERSION}</p>
         <p class="ayuda">Cuenta creada el ${U.fmtFecha(String(u.creado).slice(0, 10))}. ${enNube() ? 'Tus datos se guardan en la nube y se sincronizan en tus dispositivos.' : 'Modo local: tus datos se guardan en este dispositivo.'}</p>`,
@@ -380,10 +449,11 @@ R.auth = (function () {
           texto: 'Guardar', clase: 'btn-primario', onClick: el => {
             const nombre = el.querySelector('#mcNombre').value.trim();
             if (!nombre) { U.toast('El nombre no puede quedar vacío.'); return false; }
-            actualizarPerfil({ nombre, apellido: el.querySelector('#mcApellido').value, nacionalidad: el.querySelector('#mcNac').value })
+            actualizarPerfil({ nombre, apellido: el.querySelector('#mcApellido').value, nacionalidad: el.querySelector('#mcNac').value, alias: el.querySelector('#mcAlias').value })
               .then(() => {
                 R.db.guardarPersona(Object.assign(R.db.yo(), { nombre }));
-                const clave = el.querySelector('#mcClave').value, nueva = el.querySelector('#mcNueva').value;
+                const vc = id => { const x = el.querySelector(id); return x ? x.value : ''; };
+                const clave = vc('#mcClave'), nueva = vc('#mcNueva');
                 if (clave || nueva) return cambiarClave(clave, nueva).then(() => U.toast('Datos y contraseña actualizados.'));
                 U.toast('Datos actualizados.');
               })

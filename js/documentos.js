@@ -17,6 +17,7 @@ R.documentos = (function () {
     { id: 'seguro', nombre: 'Seguros', icono: '🛡️', tarea: 'p_seguro' },
     { id: 'salud', nombre: 'Salud', icono: '💉', tarea: 'p_vacunas' },
     { id: 'excursion', nombre: 'Excursiones y entradas', icono: '🎟️', tarea: 'e_excursiones' },
+    { id: 'ticket', nombre: 'Tickets de gastos', icono: '🧾', tarea: '' },
     { id: 'otro', nombre: 'Otros', icono: '📎', tarea: '' }
   ];
 

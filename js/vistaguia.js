@@ -63,6 +63,7 @@ R.vistaGuia = (function () {
           <button class="btn btn-primario btn-chico" data-a="verPlan">Ver en orden</button>
         </div>` : ''}
 
+      ${R.salida ? R.salida.tarjetaHTML(v) : ''}
       <h3 class="guia-seccion">Ahora</h3>
       ${top ? tarjetaProximo(v, top) : tarjetaSinProximo(v, prog, pendientes.length)}
       ${ahora.length > 1 ? `<div class="lista-siguientes lista-ahora">${ahora.slice(1).map(t => filaPaso(v, t)).join('')}</div>` : ''}
@@ -106,6 +107,7 @@ R.vistaGuia = (function () {
         </div>`)}
       </div>`;
 
+    if (R.salida) R.salida.enlazar(cont, v);
     cont.querySelectorAll('details[data-plegable]').forEach(d => d.addEventListener('toggle', () => { plegado[d.dataset.plegable] = d.open; }));
     cont.querySelectorAll('[data-tarea]').forEach(x => x.addEventListener('click', e => {
       // Los botones de adentro (Listo, Más tarde, etc.) no abren el detalle
@@ -235,7 +237,7 @@ R.vistaGuia = (function () {
     const pendientes = f.tareas.filter(t => !t.resuelta).length;
     const ordenadas = f.tareas.slice().sort((a, b) => (a.resuelta - b.resuelta) || (b.orden - a.orden));
     return `
-      <details class="fase ${completa ? 'completa' : ''}" ${!completa && pendientes ? 'open' : ''}>
+      <details class="fase ${completa ? 'completa' : ''}" data-plegable="fase_${f.fase.id}" ${plegado['fase_' + f.fase.id] ? 'open' : ''}>
         <summary>
           <span class="fase-icono">${f.fase.icono}</span>
           <span class="fase-nombre"><strong>${esc(f.fase.nombre)}</strong><small>${esc(f.fase.desc || '')}</small></span>
@@ -331,6 +333,7 @@ R.vistaGuia = (function () {
           </div>` : ''}
         ${['d_destino', 'd_fechas', 'd_participantes'].includes(t.id) ? '<button type="button" class="btn btn-suave btn-chico boton-editar-viaje" data-a="editarViaje">✎ Editar destinos, fechas y viajeros</button>' : ''}
         ${t.base === 's_valija' ? '<button type="button" class="btn btn-primario btn-chico boton-editar-viaje" data-a="abrirValija">🧳 Abrir el armador de valija</button>' : ''}
+        ${['e_imperdibles', 'e_excursiones'].includes(t.base) ? '<button type="button" class="btn btn-primario btn-chico boton-editar-viaje" data-a="verIdeas">💡 Ver ideas para elegir</button>' : ''}
         ${['doc_pasaporte', 'doc_visa', 'doc_requisitos', 'p_vacunas'].includes(t.base) ? R.requisitos.tarjeta(v) : ''}
         ${t.consejo ? `<div class="consejo"><strong>💡 Consejo</strong><p>${esc(t.consejo)}</p></div>` : ''}
         <label class="campo"><span>Notas</span><textarea id="tNota" rows="2" placeholder="Ej: a quién llamar, opciones que viste…">${esc(datos.nota || '')}</textarea></label>
@@ -352,6 +355,8 @@ R.vistaGuia = (function () {
     if (bForm) bForm.onclick = () => R.formularios.abrir(v, id);
     const bReact = el.querySelector('[data-a="reactivar"]');
     if (bReact) bReact.onclick = () => { R.motor.posponer(v, id, false); guardar(v); U.cerrarModal(); R.app.refrescar(); };
+    const bIdeas = el.querySelector('[data-a="verIdeas"]');
+    if (bIdeas) bIdeas.onclick = () => { U.cerrarModal(); location.hash = `#viaje/${v.id}/itinerario`; setTimeout(() => { const d = document.querySelector('details[data-ideas]'); if (d) { d.open = true; d.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }, 250); };
     const bVal = el.querySelector('[data-a="abrirValija"]');
     if (bVal) bVal.onclick = () => { U.cerrarModal(); location.hash = `#viaje/${v.id}/valija`; };
     const bEdit = el.querySelector('[data-a="editarViaje"]');

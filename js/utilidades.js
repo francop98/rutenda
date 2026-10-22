@@ -5,7 +5,7 @@
 window.R = window.R || {};
 
 /** Versión de la app (cambios chicos: 10.1, 10.2…; cambios grandes: 11, 12…). Igual que VERSION en sw.js. */
-window.R.VERSION = '13';
+window.R.VERSION = '16';
 
 R.util = (function () {
   const pad = n => String(n).padStart(2, '0');

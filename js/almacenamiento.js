@@ -70,6 +70,7 @@ R.db = (function () {
 
     v.tareas = v.tareas || {};
     v.tareasPropias = v.tareasPropias || [];
+    v.votos = v.votos || {};
     v.itinerario = v.itinerario || [];
     v.documentos = v.documentos || [];
     v.movimientos = v.movimientos || [];
@@ -82,7 +83,7 @@ R.db = (function () {
       delete v.valija;
     }
     if (R.recorrido) {
-      if (!Array.isArray(v.recorrido)) v.recorrido = R.recorrido.construir(v.origen, v.destinos, [], v.perfil.transporte);
+      if (!Array.isArray(v.recorrido)) v.recorrido = R.recorrido.construir(v.origen, v.destinos, [], v.perfil.transporte, { soloIda: !!v.perfil.soloIda });
       v.recorrido.forEach(t => (t.segmentos || []).forEach(R.recorrido.normalizarSegmento));
       if (v.recorrido.length) {
         v.perfil.transporte = R.recorrido.medioPrincipal(v.recorrido);
@@ -315,6 +316,28 @@ R.db = (function () {
     }
     return blob || null;
   }
+  /** ¿El archivo ya está guardado en este dispositivo (sirve sin conexión)? */
+  async function archivoDisponible(id) {
+    try { return !!(await local.obtener(id)); } catch (e) { return false; }
+  }
+  /**
+   * Baja a este dispositivo los archivos de los viajes próximos o en curso,
+   * para tener pasajes y reservas aunque no haya señal.
+   */
+  async function precargarArchivos() {
+    if (modo !== 'nube' || (typeof navigator !== 'undefined' && navigator.onLine === false)) return 0;
+    const hoy = R.util.hoyISO(), limite = R.util.sumarDias(hoy, 30);
+    let bajados = 0;
+    for (const v of viajes()) {
+      const cerca = v.fechaInicio && v.fechaInicio <= limite && (!v.fechaFin || v.fechaFin >= hoy);
+      if (!cerca) continue;
+      for (const d of (v.documentos || [])) {
+        if (!d.archivoId || await archivoDisponible(d.archivoId)) continue;
+        try { if (await obtenerArchivo(d.archivoId, v.id)) bajados++; } catch (e) { /* se reintenta la próxima vez */ }
+      }
+    }
+    return bajados;
+  }
   async function eliminarArchivo(id, viajeId) {
     try { await local.borrar(id); } catch (e) { /* ya no estaba */ }
     if (modo === 'nube' && viajeId) { try { await R.nube.borrarArchivo(viajeId, id); } catch (e) { /* ya no estaba */ } }
@@ -325,6 +348,6 @@ R.db = (function () {
     modo: () => modo, uid: () => uid, rol, puedeOrganizar, esDueno,
     personas, persona, yo, yoEn, yoEnViaje, guardarPersona, crearPersona, eliminarPersona,
     prefs, guardarPrefs, exportar, importar, listasValija, guardarListaValija, eliminarListaValija,
-    guardarArchivo, obtenerArchivo, eliminarArchivo, archivoLocal: local, PREFIJO, reemplazarId
+    guardarArchivo, obtenerArchivo, eliminarArchivo, archivoDisponible, precargarArchivos, archivoLocal: local, PREFIJO, reemplazarId
   };
 })();

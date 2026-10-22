@@ -1,6 +1,7 @@
 {
   "functions": {
     "api/escanear-reserva.js": { "maxDuration": 30 },
+    "api/ideas-destino.js": { "maxDuration": 30 },
     "api/enviar-recordatorios.js": { "maxDuration": 60 }
   },
   "crons": [

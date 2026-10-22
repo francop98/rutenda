@@ -37,7 +37,7 @@
       const v = R.db.viaje(id);
       if (!v) { location.hash = '#inicio'; return; }
       document.title = `${v.nombre || v.destino} · Rutenda`;
-      R.viajes.renderViaje(app, v, pestana || 'guia');
+      R.viajes.renderViaje(app, v, pestana || '');
     } else if (vista === 'valijas') {
       document.title = 'Mis listas de valija · Rutenda';
       R.valija.renderMisListas(app);
@@ -100,7 +100,26 @@
     window.scrollTo(0, 0);
     R.migracion.ofrecer();
     if (R.recordatorios) { R.recordatorios.actualizar(); R.recordatorios.revisar(); }
+    // Pasajes y reservas de los viajes cercanos, guardados para usarlos sin señal
+    setTimeout(() => R.db.precargarArchivos().catch(() => {}), 4000);
   }
+
+  /* ---------- Sin conexión ---------- */
+  function avisoConexion() {
+    const sin = navigator.onLine === false;
+    document.body.classList.toggle('sin-conexion', sin);
+    let barra = document.getElementById('barraSinConexion');
+    if (sin && !barra) {
+      barra = document.createElement('div');
+      barra.id = 'barraSinConexion';
+      barra.className = 'barra-sin-conexion';
+      barra.textContent = 'Sin conexión · ves lo último guardado. Lo que cargues se sube cuando vuelva la señal.';
+      document.body.prepend(barra);
+    } else if (!sin && barra) barra.remove();
+  }
+  window.addEventListener('offline', avisoConexion);
+  window.addEventListener('online', () => { avisoConexion(); if (R.auth.usuarioActual()) R.db.precargarArchivos().catch(() => {}); });
+  avisoConexion();
 
   /* ---------- App instalable ---------- */
   let eventoInstalar = null;
@@ -174,6 +193,7 @@
           <h1>¿A dónde vamos?</h1>
           <p class="hero-frase">${esc(U.frase())}</p>
           <button class="btn btn-primario btn-grande" data-a="nuevo">+ Planificar un viaje</button>
+          <button class="btn btn-texto hero-ejemplo" data-a="ejemplo">o mirá un viaje de ejemplo →</button>
         </div>
       </section>`}
 
@@ -190,6 +210,7 @@
       ${enCurso.map(v => R.itinerario.hoyHTML(v)).join('')}
 
       ${destacado ? destacadoHTML(destacado) : ''}
+      ${destacado && R.salida ? R.salida.tarjetaHTML(destacado) : ''}
 
       ${!hayViajes ? comoFunciona() : ''}
 
@@ -200,6 +221,8 @@
         </section>` : viajes.length > 1 ? `<p class="ir-viajes"><a href="#viajes" class="btn btn-texto btn-chico">Ver todos mis viajes (${viajes.length}) →</a></p>` : ''}`;
 
     app.querySelectorAll('[data-a="nuevo"]').forEach(b => b.onclick = () => R.viajes.abrirAsistente());
+    const bEjemplo = app.querySelector('[data-a="ejemplo"]');
+    if (bEjemplo) bEjemplo.onclick = () => { const v = R.viajes.crearEjemplo(); location.hash = `#viaje/${v.id}/guia`; };
     const bInst = app.querySelector('[data-a="instalar"]');
     if (bInst) bInst.onclick = instalar;
     const bOcultar = app.querySelector('[data-a="ocultarInstalar"]');
@@ -212,6 +235,7 @@
       setTimeout(() => R.vistaGuia.abrirTarea(v, sig.dataset.siguiente), 200);
     };
     enCurso.forEach(v => R.itinerario.enlazarHoy(app, v));
+    if (destacado && R.salida) R.salida.enlazar(app, destacado);
     if (R.recordatorios) R.recordatorios.enlazarAvisos(app);
   }
 
@@ -220,7 +244,7 @@
     const prog = R.motor.progreso(v);
     const est = R.viajes.estadoViaje(v);
     return `
-      <a class="fila-viaje" href="#viaje/${v.id}/guia">
+      <a class="fila-viaje" href="#viaje/${v.id}">
         <span class="fv-portada" style="background:${R.paisaje.fondo(v)}">${R.paisaje.TEMAS[R.paisaje.tema(v)].icono}</span>
         <span class="fv-texto">
           <strong>${esc(v.nombre || (v.destinos || []).filter(d => !d.soloDia).map(d => d.nombre).join(' → ') || v.destino)}</strong>
@@ -260,6 +284,7 @@
           <p class="texto-suave">${viajes.length ? U.plural(viajes.length, 'viaje', 'viajes') : 'Todavía no cargaste viajes.'}</p>
         </div>
         <div class="acciones-fila">
+          ${viajes.some(v => !v.ejemplo) ? '<button class="btn btn-texto btn-chico" data-a="mapaViajes">🗺️ Mapa</button>' : ''}
           <a class="btn btn-texto btn-chico" href="#personas">👥 Compañeros</a>
           <button class="btn btn-primario btn-chico" data-a="nuevo">+ Nuevo viaje</button>
         </div>
@@ -290,6 +315,11 @@
       </footer>`;
 
     app.querySelectorAll('[data-a="nuevo"]').forEach(b => b.onclick = () => R.viajes.abrirAsistente());
+    const bMapa = app.querySelector('[data-a="mapaViajes"]');
+    if (bMapa) bMapa.onclick = () => {
+      const { el } = U.modal({ titulo: 'Tus viajes en el mapa', subtitulo: '🟢 Próximos · 🟡 Ya fuiste', ancho: true, cuerpo: '<div id="mapaTodos"></div>' });
+      R.mapa.mostrarTodos(el.querySelector('#mapaTodos'), R.db.viajes());
+    };
     app.querySelectorAll('[data-filtro-viajes]').forEach(b => b.onclick = () => { filtroViajes = b.dataset.filtroViajes; renderMisViajes(); });
     app.querySelector('[data-a="exportar"]').onclick = exportar;
     app.querySelector('#importar').onchange = importar;
@@ -306,7 +336,7 @@
       <section class="destacado">
         <article class="destacado-portada" style="background:${R.paisaje.fondo(v)}">
           ${U.paisaje(v)}
-          <a class="dp-enlace" href="#viaje/${v.id}/guia" aria-label="Abrir ${esc(v.nombre || v.destino || 'el viaje')}"></a>
+          <a class="dp-enlace" href="#viaje/${v.id}" aria-label="Abrir ${esc(v.nombre || v.destino || 'el viaje')}"></a>
           <div class="dp-arriba">
             <span class="etiqueta-clara">${viajando ? 'Viajando ahora' : 'Tu próximo viaje'}</span>
             <strong class="destacado-cuenta">${esc(R.viajes.cuentaRegresiva(v))}</strong>

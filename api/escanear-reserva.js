@@ -27,6 +27,11 @@ Devolvé SOLO un objeto JSON con esta forma (omití lo que no figure, no invente
 }
 Cada vuelo o servicio es un tramo distinto (si hay escala, son dos tramos). Las horas son locales, como figuran en el documento. Fechas siempre AAAA-MM-DD.`;
 
+const INSTRUCCIONES_TICKET = `Leés tickets, facturas y comprobantes de compra (restaurantes, supermercados, taxis, entradas, comercios).
+Devolvé SOLO un objeto JSON (omití lo que no figure, no inventes):
+{ "comercio": "nombre del local", "total": 0, "moneda": "ARS|USD|EUR|BRL|CLP|UYU|…", "fecha": "AAAA-MM-DD", "categoria": "comida" | "transporte" | "actividades" | "compras" | "alojamiento" | "otros" }
+"total" es el importe final pagado (con impuestos y propina si figura), como número sin separadores de miles.`;
+
 function limpiarJSON(texto) {
   const s = String(texto || '').replace(/<think>[\s\S]*?<\/think>/g, '');
   const i = s.indexOf('{'), f = s.lastIndexOf('}');
@@ -77,7 +82,7 @@ module.exports = async (req, res) => {
         temperature: 0.1,
         max_completion_tokens: 2000,
         response_format: { type: 'json_object' },
-        messages: [{ role: 'system', content: INSTRUCCIONES }, { role: 'user', content: contenido }]
+        messages: [{ role: 'system', content: body.modo === 'ticket' ? INSTRUCCIONES_TICKET : INSTRUCCIONES }, { role: 'user', content: body.modo === 'ticket' && imagen ? [{ type: 'text', text: 'Leé este ticket y devolvé el JSON.' }, { type: 'image_url', image_url: { url: imagen } }] : contenido }]
       })
     });
     const datos = await r.json().catch(() => ({}));

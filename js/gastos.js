@@ -249,6 +249,14 @@ R.gastos = (function () {
         </div>`}`;
   }
 
+  /** Mensaje listo para mandar por WhatsApp pidiendo la parte de alguien. */
+  function mensajeCobro(v, x) {
+    const u = R.auth.usuarioActual() || {};
+    const nombreViaje = v.nombre || (v.destinos || []).filter(d => !d.soloDia).map(d => d.nombre).join(' → ') || 'el viaje';
+    return `¡Hola ${nombre(x.de)}! Para quedar a mano con ${nombreViaje}: me debés ${U.fmtMoneda(x.monto, v.monedaBase)}.` +
+      (u.alias ? `\nMi alias: ${u.alias}` : '') + '\n¡Gracias! (Cuentas de Rutenda)';
+  }
+
   function cuentasHTML(v, s, tr) {
     if (v.participantes.length < 2) return '<div class="bloque"><p class="texto-suave">Viajás solo/a: no hay cuentas para dividir.</p></div>';
     const pagado = {};
@@ -261,7 +269,10 @@ R.gastos = (function () {
           <div class="transfer">
             <span class="tr-quien">${U.avatar(R.db.persona(x.de), 28)} <strong>${esc(nombre(x.de))}</strong> <span class="tr-flecha">le paga a</span> ${U.avatar(R.db.persona(x.para), 28)} <strong>${esc(nombre(x.para))}</strong></span>
             <span class="transfer-monto">${U.fmtMoneda(x.monto, v.monedaBase)}</span>
-            <button class="btn btn-suave btn-chico" data-saldar="${i}">Ya pagó ✓</button>
+            <span class="transfer-acciones">
+              ${x.para === R.db.yoEn(v) ? `<a class="btn btn-suave btn-chico" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(mensajeCobro(v, x))}">📲 Pedir por WhatsApp</a>` : ''}
+              <button class="btn btn-suave btn-chico" data-saldar="${i}">Ya pagó ✓</button>
+            </span>
           </div>`).join('')}</div>` : `<p class="texto-suave">${v.movimientos.length ? 'Todos están a mano. 🙌' : 'Cuando haya gastos, acá ves quién le debe a quién.'}</p>`}
       </div>
       <div class="bloque">
@@ -470,6 +481,7 @@ R.gastos = (function () {
           <button type="button" data-tipo="gasto" class="${esGasto ? 'activo' : ''}">Gasto</button>
           <button type="button" data-tipo="ingreso" class="${!esGasto ? 'activo' : ''}">Ingreso / reintegro</button>
         </div>
+        ${!existente && esGasto && R.escaneo && R.escaneo.disponible() ? `<label class="btn btn-suave btn-bloque boton-ticket">📷 Sacar foto al ticket<input type="file" accept="image/*,application/pdf" capture="environment" id="mTicket" hidden></label>` : ''}
         <div class="grilla-monto grilla-monto-arriba">
           <label class="campo campo-monto"><span>Monto *</span><input id="mMonto" inputmode="decimal" value="${esc(m.monto)}" placeholder="0"></label>
           <label class="campo"><span>Moneda</span><select id="mMoneda">${U.opcionesMoneda(m.moneda)}</select></label>
@@ -568,6 +580,31 @@ R.gastos = (function () {
       };
       f.querySelectorAll('[data-pctde]').forEach(x => x.oninput = recalcular);
       f.querySelectorAll('[data-modo]').forEach(b => b.onclick = () => { leer(); m.division.modo = b.dataset.modo; pintar(); });
+      const ticket = f.querySelector('#mTicket');
+      if (ticket) ticket.onchange = async () => {
+        const archivo = ticket.files && ticket.files[0];
+        if (!archivo) return;
+        const etiqueta = ticket.closest('label');
+        etiqueta.classList.add('cargando');
+        etiqueta.firstChild.textContent = '✨ Leyendo el ticket… ';
+        try {
+          const r = await R.escaneo.leerTicket(archivo);
+          leer();
+          if (Number(r.total) > 0) m.monto = String(r.total);
+          const mon = String(r.moneda || '').toUpperCase();
+          if (U.MONEDAS && U.MONEDAS.some(x => (x.codigo || x) === mon)) m.moneda = mon;
+          if (r.comercio) m.concepto = String(r.comercio).slice(0, 60);
+          if (/^\d{4}-\d{2}-\d{2}$/.test(r.fecha || '')) m.fecha = r.fecha;
+          if (r.categoria && categorias().some(c => c.id === r.categoria)) m.categoria = r.categoria;
+          m.ticket = archivo;
+          pintar();
+          U.toast('Listo: revisá los datos y guardá.');
+        } catch (e) {
+          U.toast(e.message);
+          etiqueta.classList.remove('cargando');
+          etiqueta.firstChild.textContent = '📷 Sacar foto al ticket';
+        }
+      };
       const moneda = f.querySelector('#mMoneda');
       moneda.onchange = () => { leer(); pintar(); };
       f.querySelectorAll('[data-entre]').forEach(x => x.onchange = () => {
@@ -619,6 +656,12 @@ R.gastos = (function () {
     if (m.tipo === 'ingreso') delete m.categoria;
     else m.categoria = m.categoria || 'otros';
 
+    const ticket = m.ticket;
+    delete m.ticket;
+    if (ticket) {
+      // La foto del ticket queda en Documentos, por si la necesitás después
+      R.documentos.guardarArchivos(v, [ticket], { categoria: 'ticket' }).then(() => R.db.guardarViaje(v)).catch(() => {});
+    }
     if (existente) {
       v.movimientos = v.movimientos.map(x => x.id === existente.id ? Object.assign({}, m, { id: existente.id }) : x);
     } else {
@@ -643,5 +686,8 @@ R.gastos = (function () {
     U.toast('Movimiento eliminado.');
   }
 
-  return { CATEGORIAS, categorias, render, saldos, transferencias, totales, montoBase, partes, parteDe, personaTieneMovimientos };
+  /** Cargar un gasto desde cualquier pantalla (por ejemplo, la de Hoy). */
+  function nuevo(v) { editar(v, null, 'gasto'); }
+
+  return { CATEGORIAS, categorias, render, nuevo, saldos, transferencias, totales, montoBase, partes, parteDe, personaTieneMovimientos };
 })();

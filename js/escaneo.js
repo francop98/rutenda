@@ -77,6 +77,22 @@ R.escaneo = (function () {
     return datos;
   }
 
+  /** Lee un ticket o factura: { comercio, total, moneda, fecha, categoria }. */
+  async function leerTicket(archivo) {
+    if (!disponible()) throw new Error('Leer tickets funciona con tu cuenta en la nube y con conexión.');
+    const esPdf = archivo.type === 'application/pdf' || /\.pdf$/i.test(archivo.name || '');
+    const contenido = esPdf ? await prepararPdf(archivo) : { imagen: await imagenADataURL(archivo, 1400) };
+    const token = await R.nube.auth().currentUser.getIdToken();
+    const r = await fetch('/api/escanear-reserva', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify(Object.assign({ modo: 'ticket' }, contenido))
+    });
+    const datos = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(datos.error || 'No se pudo leer el ticket.');
+    return datos;
+  }
+
   /* ---------- Llevar lo leído a cada formulario ---------- */
   const t = x => (x || '').toString().trim();
   function aFormulario(base, r) {
@@ -162,5 +178,5 @@ R.escaneo = (function () {
     input.click();
   }
 
-  return { disponible, analizar, aFormulario, elegirPaso, escanearYAbrir };
+  return { leerTicket, disponible, analizar, aFormulario, elegirPaso, escanearYAbrir };
 })();

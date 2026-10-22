@@ -79,6 +79,12 @@ R.paisaje = (function () {
     if (contiene(n, LISTAS.nieve)) return 'nieve';
     if (contiene(n, LISTAS.lagosNieve)) return esInvierno(fecha, d.lat) ? 'nieve' : 'lagos';
     for (const id of ['desierto', 'selva', 'playa', 'lagos', 'montana', 'ciudad']) if (contiene(n, LISTAS[id])) return id;
+    // Pistas en el nombre del lugar
+    if (/\b(cataratas?|cascadas?|salto|saltos|falls|cachoeira)\b/.test(t)) return 'selva';
+    if (/\b(playa|playas|praia|beach|mar de|mar del|balneario|costa)\b/.test(t)) return 'playa';
+    if (/\b(lago|lagos|laguna|lake)\b/.test(t)) return 'lagos';
+    if (/\b(sierra|sierras|cerro|monte|valle)\b/.test(t)) return 'montana';
+    if (/\b(desierto|salar|salinas|quebrada)\b/.test(t)) return 'desierto';
     const pais = (d.codigoPais || '').toUpperCase();
     for (const id of Object.keys(PAISES)) if (PAISES[id].includes(pais)) return id;
     if (d.elevacion != null && d.elevacion >= 2200) return esInvierno(fecha, d.lat) && Math.abs(d.lat || 0) > 30 ? 'nieve' : 'montana';
@@ -94,7 +100,6 @@ R.paisaje = (function () {
   /** Devuelve el id del estilo del viaje (playa, montana, nieve, lagos, selva, desierto, ciudad o campo). */
   function tema(v) {
     if (!v) return 'campo';
-    if (v.perfil && v.perfil.portada && TEMAS[v.perfil.portada]) return v.perfil.portada;
     const dests = (v.destinos || []).filter(d => d && d.nombre && !d.dePaso);
     const ordenados = dests.filter(d => !d.soloDia).concat(dests.filter(d => d.soloDia));
     for (const d of ordenados) { const t = temaDeLugar(d, v.fechaInicio); if (t) return t; }

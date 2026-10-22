@@ -77,5 +77,38 @@ R.mapa = (function () {
     setTimeout(() => mapa.invalidateSize(), 200);
   }
 
-  return { mostrar, puntos };
+  /** Mapa con todos tus viajes: un punto por lugar donde estuviste o vas a estar. */
+  async function mostrarTodos(cont, viajes) {
+    cont.innerHTML = '<div class="mapa-cargando">Cargando mapa…</div>';
+    let L;
+    try { L = await cargarLeaflet(); } catch (e) {
+      cont.innerHTML = '<p class="texto-suave">No se pudo cargar el mapa (¿sin conexión?).</p>';
+      return 0;
+    }
+    const hoy = R.util.hoyISO();
+    const lugares = new Map();
+    viajes.filter(v => !v.ejemplo).forEach(v => (v.destinos || []).forEach(d => {
+      if (d.lat == null || d.lon == null) return;
+      const k = Math.round(d.lat * 50) + '|' + Math.round(d.lon * 50);
+      const pasado = v.fechaFin && v.fechaFin < hoy;
+      const x = lugares.get(k) || { lat: d.lat, lon: d.lon, nombre: d.nombre, viajes: [], pasado: true };
+      x.viajes.push(`<a href="#viaje/${v.id}">${R.util.esc(v.nombre || d.nombre)}</a> <small>${R.util.esc(v.fechaInicio ? R.util.fmtFecha(v.fechaInicio, 'corto') : 'sin fecha')}</small>`);
+      if (!pasado) x.pasado = false;
+      lugares.set(k, x);
+    }));
+    const pts = Array.from(lugares.values());
+    if (!pts.length) { cont.innerHTML = '<p class="texto-suave">Cuando cargues destinos, los vas a ver acá.</p>'; return 0; }
+    cont.innerHTML = '<div class="mapa-lienzo mapa-grande"></div>';
+    const mapa = L.map(cont.querySelector('.mapa-lienzo'), { scrollWheelZoom: true, worldCopyJump: true });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(mapa);
+    pts.forEach(p => L.circleMarker([p.lat, p.lon], { radius: 9, color: '#fff', weight: 2, fillColor: p.pasado ? '#B08A43' : '#1F3A36', fillOpacity: 1 })
+      .addTo(mapa).bindPopup(`<strong>${R.util.esc(p.nombre)}</strong><br>${p.viajes.join('<br>')}`));
+    mapa.fitBounds(L.latLngBounds(pts.map(p => [p.lat, p.lon])), { padding: [30, 30], maxZoom: 6 });
+    setTimeout(() => mapa.invalidateSize(), 250);
+    return pts.length;
+  }
+
+  return { mostrar, mostrarTodos, puntos };
 })();

@@ -173,7 +173,7 @@ R.cronogramaEditor = (function () {
                 <button type="button" data-cr-noches-set="${ti}|1">Sí, sumo una noche</button>
                 <button type="button" data-cr-depaso="${e.id}|si">No, es de paso</button>
               </span></div>` : ''}
-            ${b.sinFechas ? '<small>Las noches se calculan cuando cargues las fechas.</small>' : `
+            ${!b.recorrido[ti + 1] ? `<small>${e.desde ? 'Llegás el ' + U.fmtFecha(e.desde, 'dia') + ' · ' : ''}Solo ida: acá termina el recorrido.</small>` : b.sinFechas ? '<small>Las noches se calculan cuando cargues las fechas.</small>' : `
             <div class="cr-noches">
               <span>${e.desde ? 'Llegás el ' + U.fmtFecha(e.desde, 'dia') : 'Llegada a definir'}</span>
               <label class="cr-noches-campo"><input type="number" inputmode="numeric" min="0" max="365" data-cr-noches-input="${ti}" value="${e.noches != null ? e.noches : ''}" placeholder="—" ${!e.desde ? 'disabled' : ''} aria-label="Cantidad de noches"> <span>noches</span></label>

@@ -91,6 +91,13 @@ service cloud.firestore {
         allow write: if esMiembro()
           && (esOrganizador() || viaje(viajeId).personas[personaId].uid == yo());
       }
+
+      // Votos de ideas: cada persona marca lo que le gusta (o un organizador)
+      match /votos/{personaId} {
+        allow read: if esMiembro();
+        allow write: if esMiembro()
+          && (esOrganizador() || viaje(viajeId).personas[personaId].uid == yo());
+      }
     }
   }
 }

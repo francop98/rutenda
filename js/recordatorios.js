@@ -20,7 +20,7 @@ R.recordatorios = (function () {
   function delViaje(v) {
     const r = [];
     const hoy = U.hoyISO();
-    if (!v.fechaInicio || (v.fechaFin && v.fechaFin < hoy)) return r;
+    if (v.ejemplo || !v.fechaInicio || (v.fechaFin && v.fechaFin < hoy)) return r;
     const url = id => `#viaje/${v.id}/${id || 'guia'}`;
     const nombre = v.nombre || v.destino || 'tu viaje';
     const agregar = (fecha, id, titulo, cuerpo, pestana) => {

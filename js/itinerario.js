@@ -130,7 +130,9 @@ R.itinerario = (function () {
       ${avisos.length ? `<div class="cr-avisos bloque">${avisos.map(a => `<p class="cr-aviso cr-${a.nivel}">${a.nivel === 'error' ? '⛔' : a.nivel === 'aviso' ? '⚠️' : 'ℹ️'} ${esc(a.texto)}</p>`).join('')}
         <button class="btn btn-texto btn-chico solo-org" data-a="cronograma2">Corregir en el cronograma →</button></div>` : ''}
 
-      <details class="bloque plegable" ${dias.length ? '' : 'open'}>
+      ${R.ideas ? R.ideas.seccionHTML(v) : ''}
+
+      <details class="bloque plegable">
         <summary><h3 class="bloque-titulo">🧭 Resumen de traslados</h3></summary>
         ${R.cronogramaEditor.resumenHTML(v)}
       </details>
@@ -141,7 +143,7 @@ R.itinerario = (function () {
       </details>
 
       ${dias.length ? `<div class="linea-tiempo">${agruparDias(v, dias, hoy)}</div>` : ''}
-      ${fuera.length ? `<section class="dia fuera"><header class="dia-cab"><div><strong>Sin fecha o fuera del viaje</strong></div></header>${fuera.map(e => itemHTML({ hora: e.hora, icono: tipo(e.tipo).icono, titulo: e.titulo, sub: [e.fecha ? U.fmtFecha(e.fecha, 'corto') : '', e.lugar].filter(Boolean).join(' · '), evento: e.id, docs: [] })).join('')}</section>` : ''}
+      ${fuera.length ? `<section class="dia fuera"><header class="dia-cab"><div><strong>Para hacer, sin día asignado</strong><small>Tocá cada una para elegirle día y hora</small></div></header>${fuera.map(e => itemHTML({ hora: e.hora, icono: tipo(e.tipo).icono, titulo: e.titulo, sub: [e.fecha ? U.fmtFecha(e.fecha, 'corto') : '', e.lugar].filter(Boolean).join(' · '), evento: e.id, docs: [] })).join('')}</section>` : ''}
       ${!dias.length && !fuera.length ? `
         <div class="vacio vacio-chico">
           <div class="vacio-icono">🗓️</div>
@@ -164,6 +166,7 @@ R.itinerario = (function () {
     cont.querySelectorAll('[data-doc]').forEach(b => b.onclick = e => { e.stopPropagation(); R.documentos.abrir(v.documentos.find(d => d.id === b.dataset.doc), v); });
     const det = cont.querySelector('[data-mapa]');
     det.addEventListener('toggle', () => { if (det.open && !det.dataset.cargado) { det.dataset.cargado = '1'; R.mapa.mostrar(det.querySelector('.mapa-cont'), v); } });
+    if (R.ideas) R.ideas.enlazarSeccion(v, cont);
     cargarClima(v, cont);
   }
 
@@ -507,6 +510,83 @@ R.itinerario = (function () {
       </section>`;
   }
 
+  /* ---------------------------------------------------------
+     Pestaña "Hoy": lo útil del día mientras viajás
+     --------------------------------------------------------- */
+  function renderHoy(v, cont) {
+    const hoy = U.hoyISO();
+    const dias = diasDelViaje(v);
+    const d = diaDe(v, hoy);
+    const ultimo = v.fechaFin === hoy;
+    const manana = !ultimo && v.fechaFin ? diaDe(v, U.sumarDias(hoy, 1)) : null;
+    const gastoHoy = v.movimientos.filter(m => m.fecha === hoy).reduce((a, m) => a + (m.tipo === 'gasto' ? R.gastos.montoBase(v, m) : m.tipo === 'ingreso' ? -R.gastos.montoBase(v, m) : 0), 0);
+    // Lo de la guía que conviene hacer hoy (por ejemplo, el check-in que se habilitó)
+    const paraHoy = R.motor.analizar(v).filter(t => !t.resuelta && !t.esperaVentana && !t.rec && t.fechaLimite && t.fechaLimite >= hoy && t.fechaLimite <= U.sumarDias(hoy, 1)).slice(0, 3);
+    const dm = d.dormis;
+    cont.innerHTML = `
+      <div class="hoy-vista">
+        <section class="hoy-cab">
+          <div>
+            <span class="etiqueta">Día ${d.numero} de ${dias.length}</span>
+            <h2>${d.lugarNombre ? esc(d.lugarNombre) : 'Hoy'}</h2>
+            <small>${U.fmtFecha(hoy, 'largo')}</small>
+          </div>
+          <span class="dia-clima hoy-clima" data-clima-dia="${hoy}"></span>
+        </section>
+
+        ${R.salida ? R.salida.tarjetaHTML(v) : ''}
+        ${paraHoy.length ? `
+          <section class="bloque hoy-pendiente">
+            <h3 class="bloque-titulo">Para hacer hoy</h3>
+            ${paraHoy.map(t => `<button class="fila-siguiente" data-tarea-hoy="${t.id}"><span class="num">${R.guia.fase(t.fase).icono}</span><span class="fs-texto"><strong>${esc(t.titulo)}</strong></span></button>`).join('')}
+          </section>` : ''}
+
+        <section class="bloque">
+          <h3 class="bloque-titulo">Hoy</h3>
+          ${d.amaneces && d.amaneces !== 'Amanecés en ' + d.lugarNombre ? `<p class="dia-linea">🌅 ${esc(d.amaneces)}</p>` : ''}
+          ${d.items.length ? d.items.map(itemHTML).join('') : '<p class="dia-libre">Día libre ☀️ Disfrutalo.</p>'}
+          <button class="btn btn-texto btn-chico solo-org" data-a="actividad">+ Agregar algo a hoy</button>
+        </section>
+
+        ${dm ? `
+          <section class="bloque hoy-dormis ${dm.falta ? 'falta' : ''}">
+            <h3 class="bloque-titulo">Esta noche dormís en</h3>
+            <p><strong>${esc(dm.texto)}</strong></p>
+            ${dm.direccion ? `<a class="btn btn-suave btn-chico" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dm.direccion)}" target="_blank" rel="noopener">📍 Cómo llegar</a>` : ''}
+          </section>` : ''}
+
+        <section class="bloque hoy-gastos">
+          <div><small>Gastado hoy</small><strong>${U.fmtMoneda(gastoHoy, v.monedaBase)}</strong></div>
+          <button class="btn btn-primario" data-a="gasto">− Cargar gasto</button>
+        </section>
+
+        ${ultimo ? `
+          <section class="bloque">
+            <h3 class="bloque-titulo">🏠 Hoy volvés</h3>
+            <p class="texto-suave">Revisá que no quede nada en el alojamiento.</p>
+            <a class="btn btn-suave btn-chico" href="#viaje/${v.id}/valija">🧳 Valija de vuelta</a>
+          </section>` : manana ? `
+          <section class="bloque hoy-manana">
+            <h3 class="bloque-titulo">Mañana${manana.lugarNombre && manana.lugarNombre !== d.lugarNombre ? ' · ' + esc(manana.lugarNombre) : ''}</h3>
+            ${manana.items.length ? manana.items.slice(0, 3).map(itemHTML).join('') : '<p class="dia-libre">Día libre ☀️</p>'}
+          </section>` : ''}
+      </div>`;
+
+    cont.querySelector('[data-a="gasto"]').onclick = () => R.gastos.nuevo(v);
+    if (R.salida) R.salida.enlazar(cont, v);
+    const bAct = cont.querySelector('[data-a="actividad"]');
+    if (bAct) bAct.onclick = () => editar(v, null, hoy);
+    cont.querySelectorAll('[data-tarea-hoy]').forEach(b => b.onclick = () => R.vistaGuia.abrirTarea(v, b.dataset.tareaHoy));
+    cont.querySelectorAll('[data-evento]').forEach(b => b.onclick = () => editar(v, b.dataset.evento));
+    cont.querySelectorAll('[data-doc]').forEach(b => b.onclick = e => { e.stopPropagation(); R.documentos.abrir(v.documentos.find(x => x.id === b.dataset.doc), v); });
+    const e = C().estadias(v).find(x => x.desde <= hoy && hoy <= x.hasta);
+    if (e && e.lugar && e.lugar.lat != null) R.clima.obtener(e.lugar.lat, e.lugar.lon, e.desde, e.hasta).then(datos => {
+      const x = datos && datos.dias.find(y => y.fecha === hoy);
+      const caja = cont.querySelector('.hoy-clima');
+      if (x && caja) caja.innerHTML = `${R.clima.icono(x.codigo, x.lluvia)} ${x.max}°<small>${x.min}°</small>`;
+    }).catch(() => {});
+  }
+
   function enlazarHoy(cont, v) {
     cont.querySelectorAll('.modo-viaje [data-doc]').forEach(b => b.onclick = () => R.documentos.abrir(v.documentos.find(d => d.id === b.dataset.doc), v));
     const e = C().estadias(v).find(x => x.desde <= U.hoyISO() && U.hoyISO() <= x.hasta);
@@ -517,5 +597,5 @@ R.itinerario = (function () {
     });
   }
 
-  return { TIPOS, render, editar, editarCronograma, diaDe, diasDelViaje, hoyHTML, enlazarHoy, textoItinerario, generarICS, compartir };
+  return { TIPOS, render, renderHoy, editar, editarCronograma, diaDe, diasDelViaje, hoyHTML, enlazarHoy, textoItinerario, generarICS, compartir };
 })();

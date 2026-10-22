@@ -62,8 +62,14 @@ R.recorrido = (function () {
    * Arma (o actualiza) los tramos a partir del origen y los destinos con alojamiento,
    * conservando lo cargado en tramos con los mismos extremos.
    */
-  function construir(origen, destinos, previo, medioDefecto) {
+  /**
+   * opciones: { soloIda } — sin tramo de vuelta.
+   * Si el último destino es tu misma ciudad de salida, se toma como la vuelta (no se duplica).
+   */
+  function construir(origen, destinos, previo, medioDefecto, opciones) {
+    const op = opciones || {};
     const lista = (destinos || []).filter(d => d.nombre && !d.soloDia);
+    while (lista.length > 1 && origen && origen.nombre && normal(lista[lista.length - 1].nombre) === normal(origen.nombre)) lista.pop();
     const anterior = (previo || []).map(t => Object.assign({}, t, { segmentos: (t.segmentos || []).map(normalizarSegmento) }));
     const m = medioDefecto || 'avion';
     const hayOrigen = origen && origen.nombre;
@@ -71,7 +77,7 @@ R.recorrido = (function () {
     const pares = [];
     if (hayOrigen) pares.push(['ida', origen, lista[0]]);
     for (let i = 1; i < lista.length; i++) pares.push(['entre', lista[i - 1], lista[i]]);
-    if (hayOrigen) pares.push(['vuelta', lista[lista.length - 1], origen]);
+    if (hayOrigen && !op.soloIda) pares.push(['vuelta', lista[lista.length - 1], origen]);
 
     return pares.map(([tipo, desde, hasta]) => {
       const nD = normal(desde.nombre), nH = normal(hasta.nombre);

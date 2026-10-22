@@ -15,7 +15,7 @@ window.R = window.R || {};
 
 R.nube = (function () {
   const SUBS = ['movimientos', 'documentos'];
-  const SOLO_LOCAL = ['movimientos', 'documentos', 'valijas'];
+  const SOLO_LOCAL = ['movimientos', 'documentos', 'valijas', 'votos'];
   const PROTEGIDOS = ['owner', 'miembros', 'roles', 'codigoUnion'];
   let app = null, db = null, auth = null, storage = null;
   let uid = null;
@@ -91,7 +91,7 @@ R.nube = (function () {
   }
 
   function registro(id) {
-    if (!porViaje[id]) porViaje[id] = { unsubs: [], ultimo: { principal: null, movimientos: {}, documentos: {}, valijas: {} }, timer: null, nuevo: false, pendiente: false };
+    if (!porViaje[id]) porViaje[id] = { unsubs: [], ultimo: { principal: null, movimientos: {}, documentos: {}, valijas: {}, votos: {} }, timer: null, nuevo: false, pendiente: false };
     return porViaje[id];
   }
 
@@ -103,7 +103,7 @@ R.nube = (function () {
     if (propio && v) return;                       // eco de un cambio nuestro
     if (p.pendiente && v) { p.saltado = true; return; }   // hay cambios nuestros por enviar: no pisarlos
     if (!v) {
-      v = { id, movimientos: [], documentos: [], valijas: {} };
+      v = { id, movimientos: [], documentos: [], valijas: {}, votos: {} };
       lista.push(v);
       escucharSubcolecciones(id);
     }
@@ -140,6 +140,17 @@ R.nube = (function () {
       p.ultimo.valijas = {};
       Object.keys(mapa).forEach(k => { p.ultimo.valijas[k] = JSON.stringify(mapa[k]); });
       v.valijas = Object.assign({}, p.pendiente ? v.valijas : {}, mapa);
+      cb.alViajes();
+    }, () => { /* sin permiso */ }));
+    // Votos de ideas: cada viajero tiene los suyos
+    p.unsubs.push(ref.collection('votos').onSnapshot(snap => {
+      const v = cb.lista().find(x => x.id === id);
+      if (!v || snap.metadata.hasPendingWrites) return;
+      const mapa = {};
+      snap.docs.forEach(d => { mapa[d.id] = d.data(); });
+      p.ultimo.votos = {};
+      Object.keys(mapa).forEach(k => { p.ultimo.votos[k] = JSON.stringify(mapa[k]); });
+      v.votos = Object.assign({}, p.pendiente ? v.votos : {}, mapa);
       cb.alViajes();
     }, () => { /* sin permiso */ }));
   }
@@ -252,6 +263,14 @@ R.nube = (function () {
       lote.set(ref.collection('valijas').doc(pid), limpio(v.valijas[pid]));
       p.ultimo.valijas[pid] = json; operaciones++;
     });
+    // 4) Votos de ideas (cada uno los suyos)
+    Object.keys(v.votos || {}).forEach(pid => {
+      const json = JSON.stringify(limpio(v.votos[pid]));
+      if (p.ultimo.votos[pid] === json) return;
+      if (!organiza && !mias.has(pid)) return;
+      lote.set(ref.collection('votos').doc(pid), limpio(v.votos[pid]));
+      p.ultimo.votos[pid] = json; operaciones++;
+    });
     if (operaciones) await lote.commit();
     p.pendiente = false;
     // Si mientras tanto llegó un cambio de otra persona, traerlo ahora
@@ -265,7 +284,7 @@ R.nube = (function () {
   async function eliminarViaje(v) {
     const ref = db.collection('viajes').doc(v.id);
     soltar(v.id);
-    for (const col of SUBS.concat(['valijas'])) {
+    for (const col of SUBS.concat(['valijas', 'votos'])) {
       const snap = await ref.collection(col).get();
       const lote = db.batch();
       snap.docs.forEach(d => lote.delete(d.ref));
