@@ -96,7 +96,7 @@ R.itinerario = (function () {
     });
 
     // Lo que decidiste hacer ese día (desde "Qué hacer")
-    if (R.ideas) R.ideas.delDia(v, fecha).forEach(p => items.push({ hora: p.hora, icono: R.ideas.ICONOS[p.tipo] || '📍', clase: 'ev-plan', titulo: p.titulo, sub: [p.zona && '📍 ' + p.zona, p.reserva && '🎟️ con reserva', p.nota].filter(Boolean).join(' · '), plan: p.destId + '|' + p.id, aire: esAireLibre(p.tipo, p.titulo + ' ' + (p.lugar || '')), docs: [], lugar: conCiudad(p.lugar || p.titulo, ((v.destinos || []).find(x => x.id === p.destId) || {}).nombre || ciudad) }));
+    if (R.ideas) R.ideas.delDia(v, fecha).forEach(p => items.push({ hora: p.hora, icono: R.ideas.ICONOS[p.tipo] || '📍', clase: 'ev-plan', titulo: p.titulo, sub: [p.zona && '📍 ' + p.zona, p.reservado ? `✓ reservado${p.codigo ? ' · ' + p.codigo : ''}` : p.reserva ? '🎟️ falta reservar' : '', p.nota].filter(Boolean).join(' · '), plan: p.destId + '|' + p.id, aire: esAireLibre(p.tipo, p.titulo + ' ' + (p.lugar || '')), docs: R.ideas.docsDe ? R.ideas.docsDe(v, p.id) : [], lugar: conCiudad(p.lugar || p.titulo, ((v.destinos || []).find(x => x.id === p.destId) || {}).nombre || ciudad) }));
 
     items.sort((a, b) => (a.hora || '99:99').localeCompare(b.hora || '99:99'));
 
@@ -127,7 +127,6 @@ R.itinerario = (function () {
   /* ---------------------------------------------------------
      Render
      --------------------------------------------------------- */
-  let subvista = (() => { try { return localStorage.getItem('rutenda_sub_itinerario') || 'dias'; } catch (e) { return 'dias'; } })();
 
   function render(v, cont) {
     if (R.ideas) R.ideas.migrar(v);
@@ -136,8 +135,6 @@ R.itinerario = (function () {
     const hoy = U.hoyISO();
     const fuera = (v.itinerario || []).filter(e => !(e.origen || '').startsWith('t_segmento__') && (!e.fecha || !dias.includes(e.fecha)));
     const sinDia = R.ideas ? R.ideas.sinDia(v) : [];
-    const nQue = R.ideas ? R.ideas.cuenta(v) : 0;
-    if (!['dias', 'que'].includes(subvista)) subvista = 'dias';
 
     cont.innerHTML = `
       <div class="itin-cab">
@@ -153,12 +150,6 @@ R.itinerario = (function () {
         </div>
       </div>
 
-      <div class="segmentado segmentado-itin" role="tablist">
-        <button type="button" data-subvista="dias" class="${subvista === 'dias' ? 'activo' : ''}">🗓️ Días</button>
-        <button type="button" data-subvista="que" class="${subvista === 'que' ? 'activo' : ''}">📝 Qué hacer${nQue ? ` <i class="punto-aviso">${nQue}</i>` : ''}</button>
-      </div>
-
-      ${subvista === 'que' ? `<div class="vista-que">${R.ideas ? R.ideas.vistaHTML(v) : ''}</div>` : `
       ${avisos.length ? `<div class="cr-avisos bloque">${avisos.map(a => `<p class="cr-aviso cr-${a.nivel}">${a.nivel === 'error' ? '⛔' : a.nivel === 'aviso' ? '⚠️' : 'ℹ️'} ${esc(a.texto)}</p>`).join('')}
         <button class="btn btn-texto btn-chico solo-org" data-a="cronograma2">Corregir las fechas →</button></div>` : ''}
       <div class="acciones-fila itin-crear solo-org">
@@ -174,13 +165,9 @@ R.itinerario = (function () {
           <div class="vacio-icono">🗓️</div>
           <p>Cargá las fechas y acá aparece cada día del viaje.</p>
           <button class="btn btn-primario solo-org" data-a="cronograma3">Cargar las fechas</button>
-        </div>` : ''}`}`;
+        </div>` : ''}
+      ${R.ideas && R.ideas.cuenta(v) === 0 && dias.length ? `<p class="itin-que"><a href="#viaje/${v.id}/quehacer">🎟️ ¿Excursiones o lugares para visitar? Anotalos en Qué hacer →</a></p>` : ''}`;
 
-    cont.querySelectorAll('[data-subvista]').forEach(b => b.onclick = () => {
-      subvista = b.dataset.subvista;
-      try { localStorage.setItem('rutenda_sub_itinerario', subvista); } catch (e) { /* nada */ }
-      render(v, cont);
-    });
     cont.querySelectorAll('[data-a^="cronograma"]').forEach(b => b.onclick = () => editarCronograma(v));
     const bNuevo = cont.querySelector('[data-a="nuevo"]');
     if (bNuevo) bNuevo.onclick = () => editar(v);
@@ -198,17 +185,12 @@ R.itinerario = (function () {
     cont.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const [d, id] = b.dataset.plan.split('|'); R.ideas.editar(v, d, id, () => render(v, cont)); });
     cont.querySelectorAll('[data-doc]').forEach(b => b.onclick = e => { e.stopPropagation(); R.documentos.abrir(v.documentos.find(d => d.id === b.dataset.doc), v); });
     if (R.ordenar) R.ordenar.enlazar(cont, v);
-    if (subvista === 'que' && R.ideas) R.ideas.enlazar(v, cont, () => render(v, cont));
-    else { cargarClima(v, cont); cargarFeriados(v, cont); }
+    cargarClima(v, cont); cargarFeriados(v, cont);
   }
 
-  /** Abre el itinerario directo en "Qué hacer". */
+  /** Abre la sección "Qué hacer" del viaje. */
   function irAQueHacer(v) {
-    subvista = 'que';
-    try { localStorage.setItem('rutenda_sub_itinerario', 'que'); } catch (e) { /* nada */ }
-    // Desde la pestaña Itinerario de abajo, se queda ahí
-    if (!/^#itinerario/.test(location.hash)) location.hash = `#viaje/${v.id}/itinerario`;
-    R.app.refrescar();
+    location.hash = `#viaje/${v.id}/quehacer`;
   }
 
   function itemHTML(it) {

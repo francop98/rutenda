@@ -50,6 +50,7 @@ R.viajes = (function () {
     { id: 'hoy', nombre: 'Hoy', icono: '☀️', soloViajando: true },
     { id: 'guia', nombre: 'Guía', icono: '🧭' },
     { id: 'itinerario', nombre: 'Itinerario', icono: '🗓️' },
+    { id: 'quehacer', nombre: 'Qué hacer', icono: '🎟️' },
     { id: 'gastos', nombre: 'Gastos', icono: '💸' },
     { id: 'valija', nombre: 'Valija', icono: '🧳' },
     { id: 'documentos', nombre: 'Docs', icono: '📁' },
@@ -129,8 +130,9 @@ R.viajes = (function () {
     return ultimo && ultimo.origen && ultimo.origen.nombre ? Object.assign({}, ultimo.origen) : { nombre: '' };
   }
 
-  function abrirAsistente(existente) {
+  function abrirAsistente(existente, opciones) {
     const editando = !!existente;
+    const opA = opciones || {};
     const yo = R.db.yo();
     const nuevoDestino = soloDia => ({ id: U.id('dst'), nombre: '', region: '', pais: '', codigoPais: '', noches: '', soloDia: !!soloDia, fecha: '' });
     const b = existente ? JSON.parse(JSON.stringify({
@@ -146,6 +148,8 @@ R.viajes = (function () {
       presupuesto: '', monedaBase: R.db.prefs().monedaBase || 'ARS'
     };
     if (!b.destinos.length) b.destinos.push(nuevoDestino(false));
+    // Arrancar con fechas elegidas desde el inicio (un finde largo)
+    b.fechasPreset = !editando && opA.fechas && opA.fechas.desde ? opA.fechas : null;
     b.sinFechas = editando ? !b.fechaInicio : false;
     // Conexión previa (si el viaje ya tenía una ciudad de conexión en la ida)
     const conexionPrevia = editando ? R.recorrido.conexionDe(b.recorrido) : null;
@@ -234,6 +238,7 @@ R.viajes = (function () {
 
     function htmlDestinos() {
       return `
+        ${b.fechasPreset ? `<div class="aviso-leido">🎉 Del ${esc(U.fmtFecha(b.fechasPreset.desde, 'dia'))} al ${esc(U.fmtFecha(b.fechasPreset.hasta, 'dia'))}${b.fechasPreset.motivo ? ` (${esc(b.fechasPreset.motivo)})` : ''}: ya te dejo esas fechas en el cronograma.</div>` : ''}
         <h4 class="titulo-paso">¿Desde dónde salís?</h4>
         ${b.origen && b.origen.nombre && b.origen.codigoPais && !b.cambiarOrigen ? `
           <div class="origen-fijo">
@@ -333,6 +338,27 @@ R.viajes = (function () {
       cont.querySelectorAll('[data-vuelta-por]').forEach(x => x.onchange = () => { leerPaso(); b.perfil.vueltaPor = x.dataset.vueltaPor; refrescarVuelta(); });
     }
 
+    /** Pone las fechas del finde largo elegido en el inicio (una sola vez). */
+    function aplicarFechasPreset() {
+      const f = b.fechasPreset;
+      if (!f) return;
+      const tramos = b.recorrido || [];
+      const primero = tramos[0] && tramos[0].segmentos[0];
+      if (!primero) return;
+      b.fechasPreset = null;
+      const conNoches = b.destinos.filter(d => d.nombre && !d.soloDia);
+      if (conNoches.length === 1 && !Number(conNoches[0].noches) && f.hasta > f.desde) {
+        conNoches[0].noches = U.diasEntre(f.desde, f.hasta);
+        b.recorrido = R.recorrido.construir(b.origen, b.destinos, b.recorrido, 'avion', { soloIda: !!b.perfil.soloIda });
+        aplicarVueltaPor();
+      }
+      const p0 = b.recorrido[0].segmentos[0];
+      if (!p0.sale.fecha) p0.sale.fecha = f.desde;
+      const vuelta = b.recorrido.find(t => t.tipo === 'vuelta');
+      if (vuelta && vuelta.segmentos[0] && !vuelta.segmentos[0].sale.fecha) vuelta.segmentos[0].sale.fecha = f.hasta;
+      b.sinFechas = false;
+    }
+
     function htmlCronograma() {
       {
         b.recorrido = R.recorrido.construir(b.origen, b.destinos, b.recorrido, 'avion', { soloIda: !!b.perfil.soloIda });
@@ -341,9 +367,10 @@ R.viajes = (function () {
         if (nueva) R.recorrido.aplicarConexion(b.recorrido, b.conexion);
         b.conexionAplicada = nueva;
         aplicarVueltaPor();
+        aplicarFechasPreset();
         return `
-        <h4 class="titulo-paso">¿Cuándo salís y cuántas noches?</h4>
-        <p class="ayuda">En qué viajás, cuándo salís y cuántas noches. El resto se calcula solo.</p>
+        <h4 class="titulo-paso">¿Cuándo salís y cuándo volvés?</h4>
+        <p class="ayuda">Poné en qué viajás, la fecha de ida y la de vuelta: las noches se calculan solas.</p>
         <div id="editorCronograma"></div>`;
       }
     }
@@ -567,7 +594,7 @@ R.viajes = (function () {
     function gruposResueltos(opciones) {
       const NOMBRES = {
         t_segmento: ['✈️', 'Pasajes'], a_reserva: ['🏡', 'Alojamiento'], p_seguro: ['🛡️', 'Seguro'], mv_auto: ['🚗', 'Auto'],
-        mv_traslado: ['🚕', 'Traslados'], e_excursiones: ['🌄', 'Excursiones'], doc_pasaporte: ['🛂', 'Pasaporte'], doc_visa: ['🛂', 'Visa o permiso'],
+        mv_traslado: ['🚕', 'Traslados'], doc_pasaporte: ['🛂', 'Pasaporte'], doc_visa: ['🛂', 'Visa o permiso'],
         p_vacunas: ['💉', 'Vacunas'], doc_dni: ['🪪', 'DNI al día']
       };
       const mapa = new Map();
@@ -588,7 +615,7 @@ R.viajes = (function () {
       recalcularTramos(temp);
       const incluye = b.resuelto.paquete ? b.paqueteIncluye : [];
       // Lo que tiene ventana (como el check-in) no se puede tener resuelto de antemano
-      return R.motor.lista(temp).filter(t => !t.rec && !t.ventanaDias && t.fase !== 'definir' && t.base !== 'pq_paquete' && !R.formularios.incluidoEnPaquete(t, incluye));
+      return R.motor.lista(temp).filter(t => (!t.rec || t.id === 'p_seguro') && !t.ventanaDias && t.fase !== 'definir' && t.base !== 'pq_paquete' && !R.formularios.incluidoEnPaquete(t, incluye));
     }
 
     /** Convierte los viajeros del asistente en personas guardadas (sin duplicar). */
@@ -831,6 +858,7 @@ R.viajes = (function () {
     if (pestana === 'hoy') R.itinerario.renderHoy(v, cont);
     else if (pestana === 'guia') R.vistaGuia.render(v, cont);
     else if (pestana === 'itinerario') R.itinerario.render(v, cont);
+    else if (pestana === 'quehacer') R.ideas.render(v, cont);
     else if (pestana === 'documentos') R.documentos.render(v, cont);
     else if (pestana === 'viajeros') R.participantes.renderViajeros(v, cont);
     else if (pestana === 'gastos') R.gastos.render(v, cont);

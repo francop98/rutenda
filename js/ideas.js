@@ -26,6 +26,7 @@ R.ideas = (function () {
   function migrar(v) {
     v.planes = v.planes || {};
     v.sugerencias = v.sugerencias || {};
+    migrarExcursiones(v);
     if (!v.ideas) return;
     Object.entries(v.ideas).forEach(([destId, g]) => {
       if (!g || !Array.isArray(g.ideas)) return;
@@ -42,7 +43,31 @@ R.ideas = (function () {
     delete v.ideas;
   }
 
+  /**
+   * Las excursiones ya no son un paso de la guía: lo que estaba cargado en
+   * "Reservar excursiones" pasa a Qué hacer como reservado, y los pasos
+   * "Reservar: …" que se creaban en la guía se sacan (ahora están en "Por reservar").
+   */
+  function migrarExcursiones(v) {
+    v.tareasPropias = (v.tareasPropias || []).filter(t => !String(t.origen || '').startsWith('plan_'));
+    const t = (v.tareas || {}).e_excursiones;
+    if (!t || v.excursionesMigradas) return;
+    const est = R.recorrido.estadias(v);
+    ((t.datos && t.datos.excursiones) || []).filter(x => x && x.nombre).forEach(x => {
+      const e = (x.fecha && est.find(y => y.desde <= x.fecha && x.fecha <= y.hasta)) || est[0];
+      const destId = e ? e.id : ((v.destinos || [])[0] || {}).id;
+      if (!destId) return;
+      (v.planes[destId] = v.planes[destId] || []).push(nuevoPlan({ titulo: x.nombre, tipo: 'excursion', estado: 'va', reserva: true, reservado: true, fecha: x.fecha || '', hora: x.hora || '', lugar: x.encuentro || '', codigo: x.codigo || '', origen: 'guia' }));
+    });
+    v.itinerario = (v.itinerario || []).filter(e => e.origen !== 'e_excursiones');
+    v.excursionesMigradas = true;
+  }
+
   const planesDe = (v, destId) => ((v.planes || {})[destId] || []);
+  /** Lo que va y hay que reservar (todavía no reservado) / lo ya reservado. */
+  function porReservar(v) { return todos(v).filter(p => p.estado === 'va' && p.reserva && !p.reservado); }
+  function reservadas(v) { return todos(v).filter(p => p.estado !== 'descarto' && p.reservado); }
+  const docsDe = (v, id) => (v.documentos || []).filter(d => d.tareaId === 'plan_' + id);
   function todos(v) { return Object.entries(v.planes || {}).flatMap(([destId, l]) => l.map(p => Object.assign({ destId }, p))); }
   /** Lo que "va" para un día (lo usa el itinerario). */
   function delDia(v, fecha) { return todos(v).filter(p => p.estado === 'va' && p.fecha === fecha); }
@@ -59,12 +84,9 @@ R.ideas = (function () {
   /* ---------------------------------------------------------
      Guardar cambios de un plan (y su paso "Reservar" en la guía)
      --------------------------------------------------------- */
+  /** Lo que hay que reservar ya no va a la guía: queda en "Por reservar" de Qué hacer. */
   function sincronizarReserva(v, destId, p) {
-    const origen = 'plan_' + p.id;
-    v.tareasPropias = (v.tareasPropias || []).filter(t => t.origen !== origen);
-    if (p.estado === 'va' && p.reserva) {
-      v.tareasPropias.push({ id: U.id('pro'), origen, titulo: `Reservar: ${p.titulo}`, fase: 'experiencias', impacto: 3, desc: `${p.nota || ''} Conviene reservarlo antes.`.trim(), dependeDe: [], fechaManual: p.fecha ? U.sumarDias(p.fecha, -7) : '' });
-    }
+    v.tareasPropias = (v.tareasPropias || []).filter(t => t.origen !== 'plan_' + p.id);
   }
   function guardarPlan(v, destId, p) {
     v.planes = v.planes || {};
@@ -80,7 +102,7 @@ R.ideas = (function () {
     R.db.guardarViaje(v);
   }
   function nuevoPlan(datos) {
-    return Object.assign({ id: U.id('pln'), titulo: '', nota: '', tipo: 'otro', zona: '', costo: '', duracion: '', reserva: false, lugar: '', estado: 'quiero', fecha: '', hora: '', origen: 'manual' }, datos);
+    return Object.assign({ id: U.id('pln'), titulo: '', nota: '', tipo: 'otro', zona: '', costo: '', duracion: '', reserva: false, reservado: false, codigo: '', lugar: '', estado: 'quiero', fecha: '', hora: '', origen: 'manual' }, datos);
   }
 
   /* ---------------------------------------------------------
@@ -160,7 +182,7 @@ R.ideas = (function () {
     const yo = R.db.yoEn(v);
     const quienes = grupo ? votantes(v, p.id) : [];
     const dias = diasDeEstadia(v, d.id);
-    const meta = [p.costo ? U.fmtMoneda(U.numero(p.costo), v.monedaBase) : '', p.duracion ? '⏱ ' + p.duracion : '', p.reserva ? '🎟️ Reservar' : ''].filter(Boolean);
+    const meta = [p.costo ? U.fmtMoneda(U.numero(p.costo), v.monedaBase) : '', p.duracion ? '⏱ ' + p.duracion : '', p.reservado ? `✓ Reservado${p.codigo ? ' · ' + p.codigo : ''}` : p.reserva ? '🎟️ Hay que reservar' : '', docsDe(v, p.id).length ? '📎 ' + docsDe(v, p.id).length : ''].filter(Boolean);
     return `
       <div class="plan plan-${p.estado}">
         <button type="button" class="plan-texto" data-plan-editar="${d.id}|${p.id}">
@@ -232,9 +254,11 @@ R.ideas = (function () {
   /* ---------------------------------------------------------
      Editar un plan
      --------------------------------------------------------- */
-  function editar(v, destId, id, alGuardar) {
+  function editar(v, destId, id, alGuardar, opciones) {
+    const op = opciones || {};
     const p = Object.assign({}, planesDe(v, destId).find(x => x.id === id));
     if (!p.id) return;
+    if (op.reservar) { p.reserva = true; p.reservado = true; if (p.estado !== 'va') p.estado = 'va'; }
     const dias = diasDeEstadia(v, destId);
     const zonas = Array.from(new Set(planesDe(v, destId).map(x => x.zona).filter(Boolean)));
     const org = R.db.puedeOrganizar(v);
@@ -247,10 +271,18 @@ R.ideas = (function () {
         Object.assign(p, {
           titulo: val('#plTitulo'), nota: val('#plNota'), zona: val('#plZona'), costo: val('#plCosto'), duracion: val('#plDuracion'),
           lugar: val('#plLugar'), reserva: el.querySelector('#plReserva').checked, tipo: el.querySelector('#plTipo').value,
-          fecha: el.querySelector('#plFecha') ? el.querySelector('#plFecha').value : p.fecha, hora: el.querySelector('#plHora') ? el.querySelector('#plHora').value : p.hora
+          fecha: el.querySelector('#plFecha') ? el.querySelector('#plFecha').value : p.fecha, hora: el.querySelector('#plHora') ? el.querySelector('#plHora').value : p.hora,
+          reservado: el.querySelector('#plReservado').checked, codigo: val('#plCodigo')
         });
+        if (p.reservado) { p.reserva = true; if (p.estado !== 'va') p.estado = 'va'; }
         if (p.fecha && p.estado !== 'va') p.estado = 'va';
         guardarPlan(v, destId, p);
+        const archivos = Array.from((el.querySelector('#plArchivos') || {}).files || []);
+        if (archivos.length) {
+          R.documentos.guardarArchivos(v, archivos, { categoria: 'excursion', tareaId: 'plan_' + p.id, nombre: archivos.length === 1 ? p.titulo : '' })
+            .then(() => { R.db.guardarViaje(v); if (alGuardar) alGuardar(); U.toast('Guardado, con el comprobante.'); })
+            .catch(e => U.toast(e.message || 'No pude guardar el archivo.'));
+        }
         if (alGuardar) alGuardar();
       }
     });
@@ -272,9 +304,104 @@ R.ideas = (function () {
           <label class="campo"><span>Hora</span><input type="time" id="plHora" value="${esc(p.hora)}" ${org ? '' : 'disabled'}></label>
         </div>` : ''}
         <label class="campo"><span>Dirección o lugar (para el mapa)</span><input id="plLugar" value="${esc(p.lugar)}" placeholder="Ej: Cerro Campanario" ${org ? '' : 'disabled'}></label>
-        <label class="check"><input type="checkbox" id="plReserva" ${p.reserva ? 'checked' : ''} ${org ? '' : 'disabled'}> Hay que reservar antes (lo sumo a la guía)</label>`,
+        <label class="check"><input type="checkbox" id="plReserva" ${p.reserva ? 'checked' : ''} ${org ? '' : 'disabled'}> Hay que reservar antes</label>
+        <div class="plan-reserva-datos">
+          <label class="check"><input type="checkbox" id="plReservado" ${p.reservado ? 'checked' : ''} ${org ? '' : 'disabled'}> ✓ Ya está reservado</label>
+          <label class="campo"><span>Código o empresa <small>(opcional)</small></span><input id="plCodigo" value="${esc(p.codigo || '')}" placeholder="Ej: Turisur · 48213" ${org ? '' : 'disabled'}></label>
+          ${docsDe(v, p.id).length ? `<div class="docs-mini">${docsDe(v, p.id).map(d => `<button type="button" class="doc-mini" data-plan-doc="${d.id}">${R.documentos.iconoDoc(d)} ${esc(d.nombre)}</button>`).join('')}</div>` : ''}
+          ${org ? `<label class="zona-archivo zona-archivo-chica"><input type="file" id="plArchivos" multiple accept="image/*,application/pdf"><span class="za-icono">📎</span><span>Sumar entrada, voucher o comprobante</span></label>` : ''}
+        </div>`,
+      alAbrir: el => {
+        el.querySelectorAll('[data-plan-doc]').forEach(b => b.onclick = () => R.documentos.abrir((v.documentos || []).find(d => d.id === b.dataset.planDoc), v));
+        const fa = el.querySelector('#plArchivos');
+        if (fa) fa.onchange = () => { const n = fa.files.length; fa.closest('.zona-archivo').querySelector('span:last-child').textContent = n ? `${n === 1 ? fa.files[0].name : n + ' archivos'} (se guarda al tocar Guardar)` : 'Sumar entrada, voucher o comprobante'; };
+        if (op.reservar) setTimeout(() => { const c = el.querySelector('#plCodigo'); if (c) c.focus(); }, 60);
+      },
       acciones
     });
+  }
+
+  /* ---------------------------------------------------------
+     Sección "Qué hacer" (pestaña propia del viaje)
+     --------------------------------------------------------- */
+  function nombreDest(v, destId) { return ((v.destinos || []).find(d => d.id === destId) || {}).nombre || ''; }
+  function filaReserva(v, p, hecho) {
+    const docs = docsDe(v, p.id);
+    return `
+      <div class="res-fila ${hecho ? 'res-hecha' : ''}">
+        <button type="button" class="res-texto" data-plan-editar="${p.destId}|${p.id}">
+          <span class="plan-icono">${ICONOS[p.tipo] || '🎟️'}</span>
+          <span><strong>${esc(p.titulo)}</strong><small>${esc([nombreDest(v, p.destId), p.fecha ? U.fmtFecha(p.fecha, 'dia') + (p.hora ? ' ' + p.hora : '') : 'sin día', hecho && p.codigo ? p.codigo : ''].filter(Boolean).join(' · '))}</small></span>
+        </button>
+        ${hecho ? (docs.length ? `<button type="button" class="btn btn-suave btn-chico" data-plan-doc="${docs[0].id}">📎 Ver</button>` : '')
+          : (R.db.puedeOrganizar(v) ? `<button type="button" class="btn btn-primario btn-chico" data-plan-reservar="${p.destId}|${p.id}">✓ Ya reservé</button>` : '')}
+      </div>`;
+  }
+  function seccionHTML(v) {
+    migrar(v);
+    const pend = U.ordenAlfa(porReservar(v), 'titulo');
+    const hechas = reservadas(v).sort((a, b) => (a.fecha || '9999').localeCompare(b.fecha || '9999'));
+    return `
+      <div class="bloque-cab cab-seccion">
+        <div>
+          <h2 class="titulo-seccion">Qué hacer</h2>
+          <p class="texto-suave">Excursiones, entradas, lugares y comidas. Anotá, decidí qué va y reservá lo que tiene cupo.</p>
+        </div>
+        ${R.db.puedeOrganizar(v) && R.escaneo ? '<button type="button" class="btn btn-suave btn-chico" data-a="pegarEntrada">📋 Sumar una reserva</button>' : ''}
+      </div>
+      ${pend.length ? `
+        <section class="bloque reservas-bloque">
+          <h3 class="bloque-titulo">🎟️ Por reservar <span class="contador">${pend.length}</span></h3>
+          <p class="texto-suave res-ayuda">Lo que marcaste que va y tiene cupo. Cuando lo reserves, tocá "Ya reservé" y guardá el código o la entrada.</p>
+          ${pend.map(p => filaReserva(v, p, false)).join('')}
+        </section>` : ''}
+      ${hechas.length ? `
+        <details class="bloque plegable reservas-bloque" ${pend.length ? '' : 'open'}>
+          <summary><span>✓ Reservado</span><span class="contador">${hechas.length}</span></summary>
+          <div class="plegable-cuerpo">${hechas.map(p => filaReserva(v, p, true)).join('')}</div>
+        </details>` : ''}
+      ${vistaHTML(v)}`;
+  }
+  function render(v, cont) {
+    cont.innerHTML = `<div class="vista-que">${seccionHTML(v)}</div>`;
+    const repintar = () => render(v, cont);
+    enlazar(v, cont, repintar);
+    cont.querySelectorAll('.reservas-bloque [data-plan-editar]').forEach(b => b.onclick = () => { const [d, id] = b.dataset.planEditar.split('|'); editar(v, d, id, repintar); });
+    cont.querySelectorAll('[data-plan-reservar]').forEach(b => b.onclick = () => { const [d, id] = b.dataset.planReservar.split('|'); editar(v, d, id, repintar, { reservar: true }); });
+    const pe = cont.querySelector('[data-a="pegarEntrada"]');
+    if (pe) pe.onclick = () => U.modal({
+      titulo: '🎟️ Sumar una reserva', subtitulo: 'Una excursión, una entrada o una mesa: Rutenda la deja como reservada.',
+      cuerpo: `<button type="button" class="btn btn-suave btn-bloque" data-r="pegar">📋 Pegar el mail de confirmación</button>
+        <button type="button" class="btn btn-suave btn-bloque" data-r="archivo">📄 Subir el PDF o una foto</button>`,
+      alAbrir: el => {
+        el.querySelector('[data-r="pegar"]').onclick = () => R.escaneo.pegarReserva(v);
+        el.querySelector('[data-r="archivo"]').onclick = () => { U.cerrarModal(); R.escaneo.escanearYAbrir(v); };
+      }
+    });
+    cont.querySelectorAll('.reservas-bloque [data-plan-doc]').forEach(b => b.onclick = () => R.documentos.abrir((v.documentos || []).find(d => d.id === b.dataset.planDoc), v));
+  }
+
+  /**
+   * Una reserva de excursión o entrada (leída de un PDF, un mail o pegada)
+   * se suma como "reservado" en Qué hacer, en el destino de esa fecha.
+   */
+  async function sumarReserva(v, r, archivo) {
+    migrar(v);
+    const est = R.recorrido.estadias(v);
+    const acts = (Array.isArray(r.actividades) && r.actividades.length ? r.actividades : [{ nombre: r.empresa || 'Excursión', fecha: '', hora: '', lugar: '' }]).filter(a => a && a.nombre);
+    const creados = [];
+    acts.forEach(a => {
+      const e = (a.fecha && est.find(y => y.desde <= a.fecha && a.fecha <= y.hasta)) || est[0];
+      const destId = e ? e.id : ((v.destinos || [])[0] || {}).id;
+      if (!destId) return;
+      const ya = planesDe(v, destId).find(x => U.alfa(x.titulo, a.nombre) === 0);
+      const p = Object.assign(ya || nuevoPlan({ tipo: 'excursion' }), { titulo: a.nombre, estado: 'va', reserva: true, reservado: true, fecha: a.fecha || (ya && ya.fecha) || '', hora: a.hora || (ya && ya.hora) || '', lugar: a.lugar || (ya && ya.lugar) || '', codigo: r.codigo || (ya && ya.codigo) || '' });
+      guardarPlan(v, destId, p);
+      creados.push(p);
+    });
+    if (archivo && creados.length) await R.documentos.guardarArchivos(v, [archivo], { categoria: 'excursion', tareaId: 'plan_' + creados[0].id });
+    R.db.guardarViaje(v);
+    return creados;
   }
 
   /* ---------------------------------------------------------
@@ -312,8 +439,9 @@ R.ideas = (function () {
         p.estado = estado;
         if (estado !== 'va') { p.fecha = ''; p.hora = ''; }
         guardarPlan(v, destId, p);
-        pintarDe(destId);
-        if (estado === 'va' && p.reserva) U.toast('Va. Lo sumé a la guía para reservarlo.');
+        // En la sección Qué hacer, si tiene reserva, también cambia "Por reservar"
+        if (p.reserva && cont.querySelector('.reservas-bloque, .vista-que') && repintar) { abiertos[destId] = true; repintar(); } else pintarDe(destId);
+        if (estado === 'va' && p.reserva && !p.reservado) U.toast('Va. Quedó en "Por reservar".');
       });
       raiz.querySelectorAll('[data-plan-dia]').forEach(s => s.onchange = () => {
         const [destId, id] = s.dataset.planDia.split('|');
@@ -373,5 +501,5 @@ R.ideas = (function () {
     cont.querySelectorAll('details[data-plan-dest]').forEach(enlazarBloque);
   }
 
-  return { migrar, vistaHTML, enlazar, delDia, sinDia, todos, cuenta, editar, votar, votantes, planesDe, guardarPlan, nuevoPlan, ICONOS };
+  return { migrar, vistaHTML, enlazar, render, seccionHTML, sumarReserva, porReservar, reservadas, docsDe, delDia, sinDia, todos, cuenta, editar, votar, votantes, planesDe, guardarPlan, nuevoPlan, ICONOS };
 })();

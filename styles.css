@@ -2333,3 +2333,52 @@ html[data-letra="enorme"] body { font-size: 19.4px; }
 .pres-consejos { padding: 12px 14px; border-radius: 12px; background: var(--sol-claro); font-size: .9rem; }
 .pres-consejos ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; }
 .pres-ayuda { margin-top: -4px; text-align: center; }
+
+/* =========================================================
+   Rutenda 22 — Qué hacer, cargar reservas sin IA, findes largos
+   ========================================================= */
+.vista-que .cab-seccion { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.reservas-bloque { margin-bottom: 14px; }
+.reservas-bloque .res-ayuda { font-size: .85rem; margin: 2px 0 10px; }
+.res-fila { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--linea); }
+.res-fila:first-of-type { border-top: 0; }
+.res-texto { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0; font: inherit; color: var(--tinta); text-align: left; cursor: pointer; }
+.res-texto > span:last-child { min-width: 0; display: grid; }
+.res-texto strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res-texto small { color: var(--tinta-suave); font-size: .8rem; }
+.res-hecha .plan-icono { opacity: .75; }
+.plan-reserva-datos { display: grid; gap: 8px; padding: 10px 12px; border-radius: var(--radio-chico); background: var(--mar-claro); margin-top: 6px; }
+.zona-archivo-chica { padding: 10px 12px; min-height: 0; flex-direction: row; gap: 8px; font-size: .86rem; }
+.zona-archivo-chica .za-icono { font-size: 1rem; }
+.itin-que { margin: 14px 0 0; font-size: .9rem; }
+
+/* Formularios: más datos, herramientas de carga y confirmar con un toque */
+.mas-datos { grid-column: 1 / -1; border-top: 1px dashed var(--linea); padding-top: 8px; }
+.mas-datos > summary { cursor: pointer; color: var(--mar); font-weight: 600; font-size: .88rem; list-style: none; padding: 4px 0; }
+.mas-datos > summary::-webkit-details-marker { display: none; }
+.mas-datos > summary::before { content: '＋ '; }
+.mas-datos[open] > summary::before { content: '－ '; }
+.mas-datos > summary small { color: var(--tinta-tenue); font-weight: 400; }
+.mas-datos > .form-grilla { margin-top: 8px; }
+.form-herramientas { display: grid; gap: 8px; margin-bottom: 12px; }
+.form-herramientas .btn-escanear { margin-bottom: 0; }
+.pegar-mail { border: 1px dashed var(--linea); border-radius: var(--radio-chico); padding: 8px 12px; }
+.pegar-mail > summary { cursor: pointer; font-weight: 600; font-size: .92rem; color: var(--tinta); }
+.pegar-mail[open] { display: grid; gap: 8px; }
+.pegar-mail textarea { width: 100%; font: inherit; font-size: .88rem; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--linea); background: var(--papel); color: var(--tinta); resize: vertical; }
+.pegar-mail .btn { justify-self: start; }
+.confirmar-leido { border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--papel); padding: 12px 14px; margin-bottom: 14px; }
+.confirmar-leido .cl-titulo { margin: 0 0 8px; font-weight: 600; }
+.confirmar-leido ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: .92rem; }
+.cargar-reserva { display: grid; gap: 8px; }
+.cargar-reserva .btn-texto { justify-self: start; }
+
+/* Inicio: próximos findes largos */
+.inicio-findes { margin: 18px 0; }
+.inicio-findes .if-ayuda { font-size: .85rem; margin: 2px 0 8px; }
+.inicio-findes .chip-finde { padding: 10px 14px; }
+.chip-finde.ocupado { opacity: .8; }
+.chip-finde .cf-ya { color: var(--mar); font-weight: 600; }
+/* Aviso de "leí esto": legible en modo oscuro */
+:root[data-tema="oscuro"] .aviso-leido { color: #f1d9a0; }
+@media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) .aviso-leido { color: #f1d9a0; } }

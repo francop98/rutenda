@@ -237,6 +237,8 @@
       ${destacado ? destacadoHTML(destacado) : ''}
       ${destacado && R.salida ? R.salida.tarjetaHTML(destacado) : ''}
 
+      ${R.feriados && !enCurso.length ? R.feriados.inicioHTML() : ''}
+
       ${!hayViajes ? comoFunciona() : ''}
 
       ${otrosProximos.length ? `
@@ -257,6 +259,7 @@
     if (R.recordatorios) R.recordatorios.enlazarAvisos(app);
     if (R.bandeja) R.bandeja.enlazarInicio(app);
     if (R.cierre) R.cierre.enlazar(app);
+    if (R.feriados) R.feriados.enlazarInicio(app);
   }
 
   /** Fila compacta de un viaje (inicio y listas). */

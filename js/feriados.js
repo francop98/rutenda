@@ -154,5 +154,37 @@ R.feriados = (function () {
     return f ? f.nombre : '';
   }
 
-  return { cargarAnio, entre, entreGuardado, findesLargos, proximos, delViaje, pintarAviso, deFecha, aplica, rango };
+  /* ---------- En el inicio: antes de planificar ---------- */
+  function inicioHTML() {
+    const origen = (R.db.prefs() || {}).ciudadOrigen;
+    return aplica(origen) ? '<section class="inicio-findes" data-findes hidden></section>' : '';
+  }
+  /** Llena la sección con los próximos findes largos. Tocar uno arranca un viaje con esas fechas. */
+  function enlazarInicio(cont) {
+    const caja = cont.querySelector('[data-findes]');
+    if (!caja) return;
+    proximos(4).then(lista => {
+      if (!caja.isConnected || !lista.length) return;
+      const viajes = R.db.viajes();
+      const ocupado = f => viajes.find(v => v.fechaInicio && v.fechaInicio <= f.hasta && (v.fechaFin || v.fechaInicio) >= f.desde);
+      caja.hidden = false;
+      caja.innerHTML = `
+        <div class="cab-seccion-chica"><h2 class="titulo-seccion">🎉 Próximos findes largos</h2></div>
+        <p class="texto-suave if-ayuda">Tocá uno y empezás a planificar con esas fechas.</p>
+        <div class="chips-findes">${lista.map(f => {
+          const v = ocupado(f);
+          return `<button type="button" class="chip-finde ${v ? 'ocupado' : ''}" data-finde="${f.desde}|${f.hasta}|${esc(f.motivo)}">
+            <strong>${esc(rango(f.desde, f.hasta))}</strong>
+            <small>${f.dias} días · ${esc(f.motivo)}</small>
+            ${v ? `<small class="cf-ya">✈️ Ya tenés ${esc(v.nombre || v.destino || 'un viaje')}</small>` : ''}
+          </button>`;
+        }).join('')}</div>`;
+      caja.querySelectorAll('[data-finde]').forEach(b => b.onclick = () => {
+        const [desde, hasta, motivo] = b.dataset.finde.split('|');
+        R.viajes.abrirAsistente(null, { fechas: { desde, hasta, motivo } });
+      });
+    }).catch(() => { /* sin conexión: no se muestra */ });
+  }
+
+  return { cargarAnio, entre, entreGuardado, findesLargos, proximos, delViaje, pintarAviso, deFecha, aplica, rango, inicioHTML, enlazarInicio };
 })();

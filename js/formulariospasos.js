@@ -34,18 +34,18 @@ R.formularios = (function () {
   function camposTramo(modo) {
     const m = MODOS[modo] || MODOS.avion;
     return [
-      { id: 'desde', tipo: 'texto', etiqueta: 'Desde', ancho: 'medio', rerender: modo === 'avion' },
-      { id: 'hasta', tipo: 'texto', etiqueta: 'Hasta', ancho: 'medio', rerender: modo === 'avion' },
+      { id: 'desde', tipo: 'texto', etiqueta: 'Desde', ancho: 'medio', rerender: modo === 'avion', extra: true },
+      { id: 'hasta', tipo: 'texto', etiqueta: 'Hasta', ancho: 'medio', rerender: modo === 'avion', extra: true },
       { id: 'desdeAeropuerto', tipo: 'aeropuerto', etiqueta: 'Aeropuerto de salida', ciudadDe: 'desde', ancho: 'medio', si: () => modo === 'avion' },
       { id: 'hastaAeropuerto', tipo: 'aeropuerto', etiqueta: 'Aeropuerto de llegada', ciudadDe: 'hasta', ancho: 'medio', si: () => modo === 'avion' },
-      { id: 'empresa', tipo: 'texto', etiqueta: m.empresa, ancho: 'medio' },
-      { id: 'numero', tipo: 'texto', etiqueta: m.numero, ancho: 'medio' },
+      { id: 'numero', tipo: 'texto', etiqueta: m.numero, ancho: 'medio', placeholder: modo === 'avion' ? 'Ej: AR1672' : '', mayusculas: modo === 'avion' },
+      { id: 'empresa', tipo: 'texto', etiqueta: m.empresa, ancho: 'medio', sugerir: modo === 'avion' ? 'aerolinea' : 'empresa' },
       { id: 'fechaSalida', tipo: 'fecha', etiqueta: 'Fecha de salida', ancho: 'medio' },
       { id: 'horaSalida', tipo: 'hora', etiqueta: 'Hora de salida', ancho: 'medio' },
-      { id: 'fechaLlegada', tipo: 'fecha', etiqueta: 'Fecha de llegada', ancho: 'medio' },
       { id: 'horaLlegada', tipo: 'hora', etiqueta: 'Hora de llegada', ancho: 'medio' },
-      { id: 'escalas', tipo: 'segmentado', etiqueta: '¿Directo o con escalas?', opciones: ['Directo', 'Con escalas'] },
-      { id: 'escalaEn', tipo: 'texto', etiqueta: 'Escala en (y cuánto dura)', placeholder: 'Ej: Santiago, 2 h', si: (d, item) => item.escalas === 'Con escalas' }
+      { id: 'fechaLlegada', tipo: 'fecha', etiqueta: 'Fecha de llegada', ancho: 'medio', extra: true, ayuda: 'Solo si llegás otro día.' },
+      { id: 'escalas', tipo: 'segmentado', etiqueta: '¿Directo o con escalas?', opciones: ['Directo', 'Con escalas'], extra: true },
+      { id: 'escalaEn', tipo: 'texto', etiqueta: 'Escala en (y cuánto dura)', placeholder: 'Ej: Santiago, 2 h', si: (d, item) => item.escalas === 'Con escalas', extra: true }
     ];
   }
 
@@ -54,14 +54,12 @@ R.formularios = (function () {
     pasos: (v, d, ctx) => {
       const modo = transporte.modo(v, d, ctx);
       return [
-        { titulo: 'El viaje', intro: 'Si es con escala o en varios servicios, agregá uno por cada vuelo o pasaje.', campos: [
-          { id: 'tramos', tipo: 'lista', etiquetaItem: (it, i) => it.sentido || `Tramo ${i + 1}`, textoAgregar: '+ Agregar otro vuelo / pasaje', nuevo: () => ({ escalas: 'Directo' }), subcampos: camposTramo(modo) }
-        ] },
-        { titulo: 'La reserva', campos: [
-          { id: 'codigo', tipo: 'texto', etiqueta: 'Código de reserva', ancho: 'medio' },
-          { id: 'equipaje', tipo: 'segmentado', etiqueta: 'Equipaje incluido', opciones: ['Solo de mano', 'Mano + bodega', 'Sin definir'], si: () => modo === 'avion' },
-          { id: 'asientos', tipo: 'texto', etiqueta: 'Asientos', placeholder: 'Ej: 12A y 12B', ancho: 'medio' },
-          { id: 'condiciones', tipo: 'textarea', etiqueta: 'Condiciones de cambio o cancelación', placeholder: 'Ej: cambio con cargo hasta 24 h antes' }
+        { titulo: 'El pasaje', campos: [
+          { id: 'codigo', tipo: 'texto', etiqueta: 'Código de reserva', ancho: 'medio', mayusculas: true },
+          { id: 'tramos', tipo: 'lista', etiquetaItem: (it, i) => it.sentido || `Tramo ${i + 1}`, textoAgregar: modo === 'avion' ? '+ Otro vuelo (si tenés escala)' : '+ Otro pasaje', nuevo: () => ({ escalas: 'Directo' }), subcampos: camposTramo(modo) },
+          { id: 'equipaje', tipo: 'segmentado', etiqueta: 'Equipaje incluido', opciones: ['Solo de mano', 'Mano + bodega', 'Sin definir'], si: () => modo === 'avion', extra: true },
+          { id: 'asientos', tipo: 'texto', etiqueta: 'Asientos', placeholder: 'Ej: 12A y 12B', ancho: 'medio', extra: true },
+          { id: 'condiciones', tipo: 'textarea', etiqueta: 'Condiciones de cambio o cancelación', placeholder: 'Ej: cambio con cargo hasta 24 h antes', extra: true }
         ] }
       ];
     },
@@ -131,19 +129,17 @@ R.formularios = (function () {
     a_reserva: {
       pasos: () => [
         { titulo: 'El lugar', campos: [
-          { id: 'nombre', tipo: 'texto', etiqueta: 'Nombre del alojamiento *', requerido: true },
-          { id: 'tipo', tipo: 'segmentado', etiqueta: 'Tipo', opciones: ['Hotel', 'Departamento', 'Casa', 'Cabaña', 'Hostel', 'Otro'] },
-          { id: 'direccion', tipo: 'texto', etiqueta: 'Dirección' },
-          { id: 'contacto', tipo: 'texto', etiqueta: 'Teléfono o mail de contacto' }
-        ] },
-        { titulo: 'La estadía', campos: [
+          { id: 'nombre', tipo: 'texto', etiqueta: 'Nombre del alojamiento *', requerido: true, sugerir: 'alojamiento' },
+          { id: 'direccion', tipo: 'texto', etiqueta: 'Dirección', ayuda: 'Para el "Cómo llegar" y el mapa.' },
           { id: 'checkinFecha', tipo: 'fecha', etiqueta: 'Check-in', ancho: 'medio' },
-          { id: 'checkinHora', tipo: 'hora', etiqueta: 'Hora de check-in', ancho: 'medio' },
           { id: 'checkoutFecha', tipo: 'fecha', etiqueta: 'Check-out', ancho: 'medio' },
-          { id: 'checkoutHora', tipo: 'hora', etiqueta: 'Hora de check-out', ancho: 'medio' },
           { id: 'codigo', tipo: 'texto', etiqueta: 'Código de reserva', ancho: 'medio' },
-          { id: 'cancelacionHasta', tipo: 'fecha', etiqueta: 'Cancelación gratis hasta', ancho: 'medio', ayuda: 'Te sirve si cambian los planes.' },
-          { id: 'desayuno', tipo: 'check', etiqueta: 'Incluye desayuno' }
+          { id: 'tipo', tipo: 'segmentado', etiqueta: 'Tipo', opciones: ['Hotel', 'Departamento', 'Casa', 'Cabaña', 'Hostel', 'Otro'], extra: true },
+          { id: 'checkinHora', tipo: 'hora', etiqueta: 'Hora de check-in', ancho: 'medio', extra: true },
+          { id: 'checkoutHora', tipo: 'hora', etiqueta: 'Hora de check-out', ancho: 'medio', extra: true },
+          { id: 'contacto', tipo: 'texto', etiqueta: 'Teléfono o mail de contacto', extra: true },
+          { id: 'cancelacionHasta', tipo: 'fecha', etiqueta: 'Cancelación gratis hasta', ancho: 'medio', ayuda: 'Te sirve si cambian los planes.', extra: true },
+          { id: 'desayuno', tipo: 'check', etiqueta: 'Incluye desayuno', extra: true }
         ] }
       ],
       inicial: (v, ctx) => {
@@ -163,12 +159,12 @@ R.formularios = (function () {
 
     p_seguro: {
       pasos: () => [{ titulo: 'La cobertura', campos: [
-        { id: 'compania', tipo: 'texto', etiqueta: 'Compañía *', requerido: true, ancho: 'medio' },
+        { id: 'compania', tipo: 'texto', etiqueta: 'Compañía *', requerido: true, ancho: 'medio', sugerir: 'seguro' },
         { id: 'poliza', tipo: 'texto', etiqueta: 'N° de voucher o póliza', ancho: 'medio' },
-        { id: 'telefono', tipo: 'texto', etiqueta: 'Teléfono de emergencias', placeholder: 'Ej: +54 11 …' },
-        { id: 'desde', tipo: 'fecha', etiqueta: 'Cubre desde', ancho: 'medio' },
-        { id: 'hasta', tipo: 'fecha', etiqueta: 'Cubre hasta', ancho: 'medio' },
-        { id: 'notas', tipo: 'textarea', etiqueta: 'Qué cubre / notas' }
+        { id: 'telefono', tipo: 'texto', etiqueta: 'Teléfono de emergencias', placeholder: 'Ej: +54 11 …', ayuda: 'Queda a un toque en 🆘 Emergencias.' },
+        { id: 'desde', tipo: 'fecha', etiqueta: 'Cubre desde', ancho: 'medio', extra: true },
+        { id: 'hasta', tipo: 'fecha', etiqueta: 'Cubre hasta', ancho: 'medio', extra: true },
+        { id: 'notas', tipo: 'textarea', etiqueta: 'Qué cubre / notas', extra: true }
       ] }],
       inicial: v => ({ desde: v.fechaInicio || '', hasta: v.fechaFin || '' }),
       costo: { categoria: 'seguros' },
@@ -180,16 +176,16 @@ R.formularios = (function () {
     mv_auto: {
       pasos: () => [
         { titulo: 'El alquiler', campos: [
-          { id: 'rentadora', tipo: 'texto', etiqueta: 'Rentadora *', requerido: true, ancho: 'medio' },
-          { id: 'vehiculo', tipo: 'texto', etiqueta: 'Categoría o modelo', ancho: 'medio' },
+          { id: 'rentadora', tipo: 'texto', etiqueta: 'Rentadora *', requerido: true, ancho: 'medio', sugerir: 'rentadora' },
           { id: 'codigo', tipo: 'texto', etiqueta: 'Código de reserva', ancho: 'medio' },
-          { id: 'seguro', tipo: 'check', etiqueta: 'Seguro incluido' }
+          { id: 'vehiculo', tipo: 'texto', etiqueta: 'Categoría o modelo', ancho: 'medio', extra: true },
+          { id: 'seguro', tipo: 'check', etiqueta: 'Seguro incluido', extra: true }
         ] },
         { titulo: 'Retiro y devolución', campos: [
-          { id: 'retiroLugar', tipo: 'texto', etiqueta: 'Lugar de retiro' },
+          { id: 'retiroLugar', tipo: 'texto', etiqueta: 'Lugar de retiro', placeholder: 'Ej: aeropuerto' },
           { id: 'retiroFecha', tipo: 'fecha', etiqueta: 'Fecha de retiro', ancho: 'medio' },
           { id: 'retiroHora', tipo: 'hora', etiqueta: 'Hora de retiro', ancho: 'medio' },
-          { id: 'devolucionLugar', tipo: 'texto', etiqueta: 'Lugar de devolución' },
+          { id: 'devolucionLugar', tipo: 'texto', etiqueta: 'Lugar de devolución', extra: true, ayuda: 'Si es distinto del retiro.' },
           { id: 'devolucionFecha', tipo: 'fecha', etiqueta: 'Fecha de devolución', ancho: 'medio' },
           { id: 'devolucionHora', tipo: 'hora', etiqueta: 'Hora de devolución', ancho: 'medio' }
         ] }
@@ -432,6 +428,70 @@ R.formularios = (function () {
   function tiene(t) { return !!def(t); }
 
   /* ---------------------------------------------------------
+     Lo que ya usaste antes (para sugerirlo al escribir)
+     --------------------------------------------------------- */
+  const CONOCIDOS = {
+    seguro: ['Assist Card', 'Universal Assistance', 'Coris', 'Travel Ace', 'Assist 365', 'Intermac', 'Allianz Travel'],
+    rentadora: ['Localiza', 'Hertz', 'Avis', 'Budget', 'Europcar', 'Sixt', 'Alamo', 'Enterprise']
+  };
+  function recordados(tipo) {
+    const set = new Map();
+    const sumar = x => { const t = String(x || '').trim(); if (t.length > 1 && !set.has(t.toLowerCase())) set.set(t.toLowerCase(), t); };
+    (R.db.viajes() || []).forEach(v => Object.values(v.tareas || {}).forEach(t => {
+      const d = t && t.datos; if (!d) return;
+      if ((tipo === 'aerolinea' || tipo === 'empresa') && Array.isArray(d.tramos)) d.tramos.forEach(x => sumar(x.empresa));
+      if (tipo === 'alojamiento' && d.checkinFecha !== undefined) sumar(d.nombre);
+      if (tipo === 'seguro') sumar(d.compania);
+      if (tipo === 'rentadora') sumar(d.rentadora);
+    }));
+    if (tipo === 'aerolinea' && R.lector) Object.values(R.lector.AEROLINEAS).forEach(sumar);
+    (CONOCIDOS[tipo] || []).forEach(sumar);
+    return U.ordenAlfa(Array.from(set.values()), x => x);
+  }
+  /** "AR1672" → "Aerolíneas Argentinas" */
+  function aerolineaDe(numero) {
+    const m = String(numero || '').toUpperCase().replace(/\s/g, '').match(/^([A-Z0-9]{2})\d{1,4}$/);
+    return m && R.lector ? R.lector.AEROLINEAS[m[1]] || '' : '';
+  }
+
+  /* ---------- Ida y vuelta en la misma reserva ---------- */
+  const normal = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const parecido = (a, b) => !!(a && b && (normal(a).includes(normal(b)) || normal(b).includes(normal(a))));
+  function aeroDe(v, ciudad) { return R.aeropuertos ? R.aeropuertos.sugerencias(v, ciudad).map(a => a.iata) : []; }
+  /** ¿Este tramo es del traslado seg? (por ciudad o por aeropuerto) */
+  function tramoEs(v, tr, seg) {
+    if (!seg || !seg.desde || !seg.hasta) return false;
+    const desde = parecido(tr.desde, seg.desde.nombre) || (tr.desdeAeropuerto && aeroDe(v, seg.desde.nombre).includes(tr.desdeAeropuerto));
+    const hasta = parecido(tr.hasta, seg.hasta.nombre) || (tr.hastaAeropuerto && aeroDe(v, seg.hasta.nombre).includes(tr.hastaAeropuerto));
+    return !!(desde || hasta) && !(parecido(tr.desde, seg.hasta.nombre) && !hasta);
+  }
+  /** Si en la reserva vienen tramos de otro traslado (la vuelta), los carga en ese paso. Devuelve los pasos completados. */
+  function repartirTramos(v, tareaId, datos, ctx) {
+    if (!ctx || !ctx.seg || !Array.isArray(datos.tramos) || datos.tramos.length < 2) return [];
+    const otros = R.motor.lista(v).filter(x => x.base === 't_segmento' && x.id !== tareaId && x.ctx && x.ctx.seg && x.ctx.seg.medio === ctx.seg.medio);
+    const hechos = [];
+    otros.forEach(o => {
+      const suyos = datos.tramos.filter(tr => !tramoEs(v, tr, ctx.seg) && tramoEs(v, tr, o.ctx.seg));
+      if (!suyos.length) return;
+      datos.tramos = datos.tramos.filter(tr => !suyos.includes(tr));
+      const previo = (v.tareas[o.id] || {}).datos;
+      if (previo && (previo.tramos || []).some(x => x.numero || x.empresa) && !previo.mismaReservaQue) return;
+      const d2 = { codigo: datos.codigo || '', equipaje: datos.equipaje, asientos: '', mismaReservaQue: tareaId, tramos: suyos.map(x => Object.assign({}, x, { sentido: R.recorrido.TIPOS_TRAMO[o.ctx.tipo] || 'Tramo' })), costo: { monto: '' } };
+      v.tareas[o.id] = Object.assign({}, v.tareas[o.id], { estado: 'hecha', datos: d2, sinDatosOk: false });
+      R.motor.setEstado(v, o.id, 'hecha');
+      confirmarEnCronograma(v, d2, o.ctx);
+      hechos.push(o);
+    });
+    return hechos;
+  }
+  /** Para el botón "Es la misma reserva que la ida": otro traslado igual ya cargado. */
+  function idaCargada(v, tareaId, ctx) {
+    if (!ctx || !ctx.seg) return null;
+    return R.motor.lista(v).find(x => x.base === 't_segmento' && x.id !== tareaId && x.ctx && x.ctx.seg && x.ctx.seg.medio === ctx.seg.medio
+      && ((v.tareas[x.id] || {}).datos || {}).codigo && !((v.tareas[x.id] || {}).datos || {}).mismaReservaQue) || null;
+  }
+
+  /* ---------------------------------------------------------
      Motor de formularios
      --------------------------------------------------------- */
   function normalizarOpciones(ops) { return (ops || []).map(o => typeof o === 'string' ? { v: o, t: o } : o); }
@@ -460,7 +520,8 @@ R.formularios = (function () {
           `<option value="${esc(o.v)}" ${o.v === v ? 'selected' : ''}>${esc(o.t)}</option>`).join('')}</select>${ayuda}</label>`;
       default: {
         const tipo = { fecha: 'date', hora: 'time', numero: 'text' }[c.tipo] || 'text';
-        return `<label class="campo ${ancho}"><span>${esc(c.etiqueta)}</span><input type="${tipo}" ${attrs} ${c.rerender ? 'data-rerender="1"' : ''} ${c.tipo === 'numero' ? 'inputmode="decimal"' : ''} value="${esc(v)}" placeholder="${esc(c.placeholder || '')}">${ayuda}</label>`;
+        const extra = (c.mayusculas ? ' autocapitalize="characters" data-mayus="1"' : '') + (c.sugerir ? ` list="dl-${c.sugerir}" autocomplete="off"` : '');
+        return `<label class="campo ${ancho}"><span>${esc(c.etiqueta)}</span><input type="${tipo}" ${attrs}${extra} ${c.rerender ? 'data-rerender="1"' : ''} ${c.tipo === 'numero' ? 'inputmode="decimal"' : ''} value="${esc(v)}" placeholder="${esc(c.placeholder || '')}">${ayuda}</label>`;
       }
     }
   }
@@ -491,11 +552,14 @@ R.formularios = (function () {
       });
     }
     aplicarLeido(op.prellenar);
-    const escaneable = ['t_segmento', 'a_reserva', 'mv_auto', 'e_excursiones', 'p_seguro', 'pq_paquete'].includes(t.base || t.id);
+    const base = t.base || t.id;
+    const escaneable = ['t_segmento', 'a_reserva', 'mv_auto', 'p_seguro', 'pq_paquete'].includes(base);
+    const masAbierto = new Set();
+    let confirmando = !!(op.confirmar && op.prellenar && Object.keys(op.prellenar).length && d.resumen);
 
     function pasos() {
       const lista = d.pasos(v, datos, ctx).map(p => Object.assign({ tipo: 'campos' }, p));
-      const mostrarCosto = d.costo && !ctx.enPaquete && (!d.costo.si || d.costo.si(datos));
+      const mostrarCosto = d.costo && !ctx.enPaquete && !datos.mismaReservaQue && (!d.costo.si || d.costo.si(datos));
       if (mostrarCosto) lista.push({ tipo: 'costo', titulo: 'Costo' });
       if (d.archivos) lista.push({ tipo: 'archivos', titulo: 'Archivos' });
       if (!lista.length) lista.push({ tipo: 'campos', titulo: 'Listo', campos: [] });
@@ -510,7 +574,58 @@ R.formularios = (function () {
     });
     const cont = el.querySelector('#formPaso');
 
+    function datalists() {
+      const tipos = new Set();
+      pasos().forEach(p => (p.campos || []).forEach(c => { if (c.sugerir) tipos.add(c.sugerir); (c.subcampos || []).forEach(s => { if (s.sugerir) tipos.add(s.sugerir); }); }));
+      return Array.from(tipos).map(k => `<datalist id="dl-${k}">${recordados(k).map(x => `<option value="${esc(x)}">`).join('')}</datalist>`).join('');
+    }
+
+    /** Lo leído, para confirmar con un toque. */
+    function confirmarHTML() {
+      const lineas = (d.resumen(datos, v, ctx) || []).filter(Boolean);
+      const c = datos.costo;
+      if (c && U.numero(c.monto) > 0) lineas.push(`Costo: ${U.fmtMoneda(U.numero(c.monto), c.moneda)}${v.participantes.length > 1 ? ` · entre ${c.entre.length}` : ''}`);
+      if (archivosNuevos.length) lineas.push(`📎 ${archivosNuevos.map(f => f.name).join(', ')}`);
+      return `
+        <div class="confirmar-leido">
+          <p class="cl-titulo">✨ ${esc(aviso || 'Esto es lo que leí')}</p>
+          <ul>${lineas.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        </div>
+        <div class="asistente-pie">
+          <button type="button" class="btn btn-suave" data-a="revisar">✏️ Revisar o corregir</button>
+          <span class="espaciador"></span>
+          <button type="button" class="btn btn-primario" data-a="confirmar">✓ Está bien, guardar</button>
+        </div>`;
+    }
+
+    function herramientasHTML() {
+      if (!escaneable || paso !== 0) return '';
+      const ida = base === 't_segmento' && !datos.mismaReservaQue ? idaCargada(v, tareaId, ctx) : null;
+      return `<div class="form-herramientas">
+          <details class="pegar-mail"><summary>📋 Pegar el mail de la reserva</summary>
+            <textarea rows="5" data-pegar placeholder="Copiá el mail o el voucher y pegalo acá"></textarea>
+            <button type="button" class="btn btn-suave btn-chico" data-a="leerPegado">Completar con esto</button>
+            <small class="ayuda">Se lee en el celular, sin IA.</small>
+          </details>
+          <button type="button" class="btn btn-suave btn-escanear" data-a="escanear">📄 Subir el pasaje o voucher</button>
+          ${ida ? `<button type="button" class="btn btn-suave btn-escanear" data-a="mismaReserva">↩️ Es la misma reserva que la ida</button>` : ''}
+        </div>`;
+    }
+
     function pintar() {
+      if (confirmando) {
+        cont.innerHTML = confirmarHTML();
+        cont.querySelector('[data-a="revisar"]').onclick = () => { confirmando = false; aviso = 'Revisalo y corregí lo que haga falta.'; pintar(); };
+        cont.querySelector('[data-a="confirmar"]').onclick = () => {
+          const lista = pasos();
+          for (let i = 0; i < lista.length; i++) {
+            const error = validar(lista[i]);
+            if (error) { confirmando = false; paso = i; pintar(); U.toast(error); return; }
+          }
+          guardar();
+        };
+        return;
+      }
       const lista = pasos();
       paso = Math.min(paso, lista.length - 1);
       const p = lista[paso];
@@ -519,8 +634,10 @@ R.formularios = (function () {
         ${lista.length > 1 ? `<div class="pasos-asistente">${lista.map((x, i) =>
           `<span class="paso-a ${i === paso ? 'actual' : ''} ${i < paso ? 'listo' : ''}"><i>${i < paso ? '✓' : i + 1}</i>${esc(x.titulo)}</span>`).join('')}</div>` : ''}
         ${aviso ? `<div class="aviso-leido">✨ ${esc(aviso)}</div>` : ''}
-        ${escaneable && paso === 0 && R.escaneo && R.escaneo.disponible() ? '<button type="button" class="btn btn-suave btn-escanear" data-a="escanear">📷 Escanear reserva o pasaje</button>' : ''}
+        ${datos.mismaReservaQue ? '<div class="aviso-leido">↩️ Misma reserva que la ida: el costo ya quedó cargado ahí.</div>' : ''}
+        ${herramientasHTML()}
         <div class="form-paso">${cuerpoPaso(p)}</div>
+        ${datalists()}
         <div class="asistente-pie">
           <button type="button" class="btn btn-texto" data-a="sinDatos">${previo.datos ? 'Cancelar' : 'Marcar listo sin cargar datos'}</button>
           <span class="espaciador"></span>
@@ -536,9 +653,28 @@ R.formularios = (function () {
       if (p.tipo === 'costo') return costoHTML();
       if (p.tipo === 'archivos') return archivosHTML();
       const campos = (p.campos || []).filter(c => !c.si || c.si(datos, {}));
+      const pinta = c => c.tipo === 'lista' ? listaHTML(c) : campoHTML(c, datos[c.id]);
       return `${p.intro ? `<p class="texto-suave form-intro">${esc(p.intro)}</p>` : ''}
         ${!campos.length && !p.intro ? '<p class="texto-suave">Listo para guardar.</p>' : ''}
-        <div class="form-grilla">${campos.map(c => c.tipo === 'lista' ? listaHTML(c) : campoHTML(c, datos[c.id])).join('')}</div>`;
+        <div class="form-grilla">${campos.filter(c => !c.extra).map(pinta).join('')}
+          ${masDatos('p' + paso, campos.filter(c => c.extra), pinta, datos)}</div>`;
+    }
+
+    /** Campos opcionales plegados: se abren solos si ya tienen algo. */
+    function masDatos(clave, campos, pinta, fuente) {
+      if (!campos.length) return '';
+      const lleno = campos.some(c => {
+        const x = fuente[c.id];
+        if (c.id === 'desde' || c.id === 'hasta') return false;   // vienen del cronograma
+        if (c.id === 'fechaLlegada' && x === fuente.fechaSalida) return false;   // llega el mismo día: nada que mostrar
+        if (c.id === 'devolucionLugar' && x === fuente.retiroLugar) return false;
+        return x && x !== 'Sin definir' && x !== 'Directo' && !(Array.isArray(x) && !x.length);
+      });
+      const abierto = masAbierto.has(clave) || lleno;
+      return `<details class="mas-datos completo" data-mas="${clave}" ${abierto ? 'open' : ''}>
+          <summary>Más datos <small>(opcional)</small></summary>
+          <div class="form-grilla">${campos.map(pinta).join('')}</div>
+        </details>`;
     }
 
     function listaHTML(c) {
@@ -548,7 +684,11 @@ R.formularios = (function () {
           <div class="form-item">
             <div class="form-item-cab"><strong>${esc(c.etiquetaItem ? c.etiquetaItem(it, i) : 'Ítem ' + (i + 1))}</strong>
               <button type="button" class="btn-icono" data-quitar="${c.id}" data-i="${i}" title="Quitar">×</button></div>
-            <div class="form-grilla">${c.subcampos.filter(s => !s.si || s.si(datos, it)).map(s => s.tipo === 'aeropuerto' ? aeropuertoHTML(s, it, { lista: c.id, i }) : campoHTML(s, it[s.id], it, { lista: c.id, i })).join('')}</div>
+            ${(() => {
+              const subs = c.subcampos.filter(s => !s.si || s.si(datos, it));
+              const pinta = s => s.tipo === 'aeropuerto' ? aeropuertoHTML(s, it, { lista: c.id, i }) : campoHTML(s, it[s.id], it, { lista: c.id, i });
+              return `<div class="form-grilla">${subs.filter(s => !s.extra).map(pinta).join('')}${masDatos(c.id + i, subs.filter(s => s.extra), pinta, it)}</div>`;
+            })()}
           </div>`).join('')}
         <button type="button" class="btn btn-suave btn-chico" data-agregar="${c.id}">${esc(c.textoAgregar || '+ Agregar')}</button>
       </div>`;
@@ -621,7 +761,7 @@ R.formularios = (function () {
         } else if (x.type === 'checkbox') {
           destino[id] = x.checked;
         } else {
-          destino[id] = x.value.trim();
+          destino[id] = x.dataset.mayus ? x.value.trim().toUpperCase() : x.value.trim();
         }
       });
       cont.querySelectorAll('[data-costo]').forEach(x => { datos.costo[x.dataset.costo] = x.value.trim(); });
@@ -723,6 +863,38 @@ R.formularios = (function () {
       });
       const archivo = cont.querySelector('#fpArchivos');
       if (archivo) archivo.onchange = () => { archivosNuevos = archivosNuevos.concat(Array.from(archivo.files)); pintar(); };
+      cont.querySelectorAll('[data-mas]').forEach(x => x.addEventListener('toggle', () => { if (x.open) masAbierto.add(x.dataset.mas); else masAbierto.delete(x.dataset.mas); }));
+      // N° de vuelo → aerolínea
+      cont.querySelectorAll('[data-campo="numero"][data-lista]').forEach(x => x.addEventListener('change', () => {
+        const nombre = aerolineaDe(x.value);
+        const emp = cont.querySelector(`[data-campo="empresa"][data-lista="${x.dataset.lista}"][data-item="${x.dataset.item}"]`);
+        if (nombre && emp && !emp.value.trim()) emp.value = nombre;
+      }));
+      const bp = cont.querySelector('[data-a="leerPegado"]');
+      if (bp) bp.onclick = () => {
+        const texto = cont.querySelector('[data-pegar]').value;
+        if (texto.trim().length < 15) { U.toast('Pegá el texto de la reserva.'); return; }
+        const r = R.escaneo.leerSinIA(texto, v);
+        if (!r.util) { U.toast('No encontré datos de una reserva en ese texto.'); return; }
+        leer();
+        aplicarLeido(R.escaneo.aFormulario(base, r));
+        aviso = `Leí ${r.encontrado.join(', ')}. Revisalo antes de guardar.`;
+        pintar();
+      };
+      const bm = cont.querySelector('[data-a="mismaReserva"]');
+      if (bm) bm.onclick = () => {
+        leer();
+        const ida = idaCargada(v, tareaId, ctx);
+        const di = (v.tareas[ida.id] || {}).datos || {};
+        datos.codigo = di.codigo;
+        datos.equipaje = di.equipaje || datos.equipaje;
+        datos.mismaReservaQue = ida.id;
+        const emp = ((di.tramos || [])[0] || {}).empresa;
+        (datos.tramos || []).forEach(x => { if (!x.empresa && emp) x.empresa = emp; });
+        datos.costo.monto = '';
+        aviso = 'Copié el código y la empresa. Completá el número y el horario de la vuelta.';
+        pintar();
+      };
       const esc2 = cont.querySelector('[data-a="escanear"]');
       if (esc2) esc2.onclick = () => {
         const input = document.createElement('input');
@@ -733,9 +905,13 @@ R.formularios = (function () {
           leer();
           esc2.disabled = true; esc2.textContent = 'Leyendo… 🔎';
           try {
-            aplicarLeido(R.escaneo.aFormulario(t.base || t.id, await R.escaneo.analizar(f, t.titulo)));
+            // Primero con reglas (sin IA); la IA solo si con eso no alcanza
+            let r = null;
+            try { r = await R.escaneo.leerArchivoSinIA(f, v); } catch (e) { r = null; }
+            if (!r && R.escaneo.disponible()) r = await R.escaneo.analizar(f, t.titulo);
             archivosNuevos.push(f);
-            aviso = 'Completé lo que pude leer: revisalo antes de guardar.';
+            if (r) { aplicarLeido(R.escaneo.aFormulario(base, r)); aviso = 'Completé lo que pude leer: revisalo antes de guardar.'; }
+            else aviso = 'Adjunté el archivo. No pude leer los datos solo: completalos a mano.';
           } catch (e) { U.toast(e.message || 'No se pudo leer el archivo.'); }
           pintar();
         };
@@ -751,13 +927,14 @@ R.formularios = (function () {
     }
 
     async function guardar() {
-      const boton = cont.querySelector('[data-a="seguir"]');
+      const boton = cont.querySelector('[data-a="seguir"], [data-a="confirmar"]');
       boton.disabled = true;
       boton.textContent = 'Guardando…';
       try {
         const estabaHecha = R.motor.estado(v, tareaId) === 'hecha';
         const destrabadas = estabaHecha ? [] : R.motor.setEstado(v, tareaId, 'hecha');
         const deducidas = estabaHecha ? [] : R.motor.deducidasRecientes();
+        const vueltas = base === 't_segmento' ? repartirTramos(v, tareaId, datos, ctx) : [];
         const { costo } = datos;
         const datosPaso = Object.assign({}, datos);
         delete datosPaso.costo;
@@ -798,7 +975,8 @@ R.formularios = (function () {
         if (gastoCargado) partes.push('gastos');
         if (archivosNuevos.length) partes.push('documentos');
         U.toast(partes.length ? `¡Guardado! Ya está en ${partes.join(', ').replace(/, ([^,]*)$/, ' y $1')}.` : '¡Guardado!');
-        if (deducidas.length) setTimeout(() => U.toast(`También di por resuelto: ${deducidas.map(x => x.titulo).slice(0, 3).join(', ')}.`), 2600);
+        if (vueltas.length) setTimeout(() => U.toast(`En la misma reserva venía ${vueltas.map(x => x.titulo).join(' y ')}: también quedó cargado. ✓`), 2600);
+        else if (deducidas.length) setTimeout(() => U.toast(`También di por resuelto: ${deducidas.map(x => x.titulo).slice(0, 3).join(', ')}.`), 2600);
         else if (destrabadas.length) setTimeout(() => U.toast(`Se destrabó: ${destrabadas.map(x => x.titulo).slice(0, 2).join(', ')}`), 2600);
         if (op.alTerminar) op.alTerminar();
         else if (d.despues) setTimeout(() => d.despues(v), 450);
@@ -825,5 +1003,5 @@ R.formularios = (function () {
     return lineas.filter(Boolean);
   }
 
-  return { tiene, abrir, resumen, aplicarPaquete, incluidoEnPaquete, completarPaquete, faltantesPaquete, MODOS };
+  return { tiene, abrir, resumen, aplicarPaquete, incluidoEnPaquete, completarPaquete, faltantesPaquete, recordados, aerolineaDe, repartirTramos, MODOS };
 })();

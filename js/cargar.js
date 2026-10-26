@@ -61,6 +61,7 @@ R.cargar = (function () {
       <div class="cargar-grilla">
         ${boton('gasto', '−', 'Gasto', 'cg-gasto')}
         ${boton('ingreso', '+', 'Ingreso o reintegro', 'cg-ingreso')}
+        ${org ? boton('reserva', '🎫', 'Una reserva o pasaje', 'cg-reserva') : ''}
         ${boton('doc', '📄', 'Documento')}
         ${boton('valija', '🧳', 'Algo para la valija')}
         ${org ? boton('hacer', '📝', 'Algo para hacer') : ''}
@@ -98,6 +99,22 @@ R.cargar = (function () {
       gasto: salirY(vi => R.gastos.nuevo(vi)),
       ingreso: salirY(vi => R.gastos.nuevoIngreso(vi)),
       doc: salirY(vi => R.documentos.subir(vi)),
+      reserva: () => {
+        const vi = v(); if (!vi) return;
+        const g = caja.querySelector('.cargar-grilla');
+        g.hidden = true;
+        const r = document.createElement('div');
+        r.className = 'cargar-reserva';
+        r.innerHTML = `<p class="cargar-pregunta">¿Cómo la tenés?</p>
+          <button type="button" class="btn btn-suave btn-bloque" data-r="pegar">📋 Pegar el mail de confirmación</button>
+          <button type="button" class="btn btn-suave btn-bloque" data-r="archivo">📄 Subir el PDF o una foto</button>
+          <p class="ayuda">Rutenda la lee, te muestra lo que encontró y la guardás con un toque.</p>
+          <button type="button" class="btn btn-texto" data-r="volver">← Volver</button>`;
+        g.after(r);
+        r.querySelector('[data-r="pegar"]').onclick = () => R.escaneo.pegarReserva(vi);
+        r.querySelector('[data-r="archivo"]').onclick = () => { U.cerrarModal(); R.escaneo.escanearYAbrir(vi); };
+        r.querySelector('[data-r="volver"]').onclick = pintar;
+      },
       hacer: salirY(vi => R.itinerario.irAQueHacer(vi)),
       actividad: salirY(vi => R.itinerario.editar(vi, null, R.viajes.estadoViaje(vi) === 'en_curso' ? U.hoyISO() : (vi.fechaInicio || ''))),
       valija: () => {

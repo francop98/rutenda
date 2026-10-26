@@ -17,7 +17,7 @@ R.tour = (function () {
     { sel: ['.nav-inferior [data-nav="viajes"]', '.barra .nav [data-nav="viajes"]'], titulo: 'Tus viajes', texto: 'Los próximos, el que estás haciendo y los que ya hiciste, con el mapa de todos tus destinos.' },
     { sel: ['.nav-inferior [data-nav="valijas"]', '.barra .nav [data-nav="valijas"]'], titulo: 'Listas de valija', texto: 'Armá una vez lo que llevás siempre y sumalo a cada viaje con un toque.' },
     { sel: ['#btnMenu'], titulo: 'El menú ☰', texto: 'Tus datos, el modo claro u oscuro, la copia de seguridad y tus compañeros de viaje.' },
-    { titulo: 'Adentro de cada viaje', texto: '🧭 Guía: qué resolver y en qué orden.\n🗓️ Itinerario: los días y tu lista de qué hacer.\n💸 Gastos: quién pagó y cuentas claras.\n🧳 Valija y 📁 Docs: todo a mano, también sin señal.\n☀️ Y mientras viajás, la pestaña Hoy con lo de cada día.' }
+    { titulo: 'Adentro de cada viaje', texto: '🧭 Guía: qué resolver y en qué orden.\n🗓️ Itinerario: cada día del viaje.\n🎟️ Qué hacer: excursiones, entradas y lugares (y lo que falta reservar).\n💸 Gastos: quién pagó y cuentas claras.\n🧳 Valija y 📁 Docs: todo a mano, también sin señal.\n☀️ Y mientras viajás, la pestaña Hoy con lo de cada día.' }
   ];
 
   let i = 0, capa = null;

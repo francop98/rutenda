@@ -154,15 +154,12 @@ R.bandeja = (function () {
     if (!v) throw new Error('Elegí el viaje.');
     const archivo = await archivoDe(it);
     let datos = it.datos;
-    if ((!datos || datos.tipo === 'otro') && archivo) datos = await R.escaneo.analizar(archivo, it.asunto);
-    const id = datos ? R.escaneo.elegirPaso(v, datos) : null;
-    await marcar(it, 'usado');
-    if (id) {
-      const tarea = R.motor.lista(v).find(x => x.id === id);
-      U.cerrarModal();
-      R.formularios.abrir(v, id, { prellenar: R.escaneo.aFormulario(tarea.base, datos), archivo, aviso: 'Llegó por mail: completé lo que pude leer. Revisalo antes de guardar.' });
-      return;
+    if ((!datos || datos.tipo === 'otro') && archivo) {
+      try { datos = await R.escaneo.leerArchivoSinIA(archivo, v); } catch (e) { datos = null; }
+      if (!datos) datos = await R.escaneo.analizar(archivo, it.asunto);
     }
+    await marcar(it, 'usado');
+    if (datos && await R.escaneo.llevarAlViaje(v, datos, archivo, { sinGuardarSuelto: true, aviso: 'Llegó por mail: completé lo que pude leer. Revisalo antes de guardar.' })) return;
     if (archivo) {
       await R.documentos.guardarArchivos(v, [archivo], { categoria: 'otro' });
       R.db.guardarViaje(v);

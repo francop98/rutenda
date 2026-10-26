@@ -208,11 +208,13 @@ R.guia = (function () {
 
     /* ---------- Seguro y salud ---------- */
     {
-      id: 'p_seguro', fase: 'proteccion', titulo: 'Contratar seguro o asistencia al viajero',
-      desc: 'Elegí una cobertura para todas las fechas del viaje (en algunos destinos es obligatoria).',
-      consejo: 'Revisá si alguna de tus tarjetas ya incluye asistencia y qué cubre realmente antes de contratar otra.',
+      id: 'p_seguro', rec: true, fase: 'proteccion', titulo: 'Seguro o asistencia al viajero',
+      desc: v => esInter(v)
+        ? 'Elegí una cobertura para todas las fechas del viaje (en algunos destinos es obligatoria).'
+        : 'Revisá qué te cubre tu obra social o prepaga en el destino. Si no alcanza, hay asistencias al viajero para viajes por Argentina.',
+      consejo: 'Revisá si alguna de tus tarjetas ya incluye asistencia y qué cubre realmente antes de contratar otra. Si lo tenés, cargalo: el teléfono queda en 🆘 Emergencias.',
       porque: 'Te protege ante lo imprevisto; conviene contratarlo con fechas ya firmes.',
-      impacto: 4, anticipacion: 15, dependeDe: ['d_fechas'], despuesDe: ['t_segmento'], aplica: esInter, docCategoria: 'seguro'
+      impacto: 4, anticipacion: 15, dependeDe: ['d_fechas'], despuesDe: ['t_segmento'], docCategoria: 'seguro'
     },
     {
       id: 'p_vacunas', fase: 'proteccion',
@@ -281,8 +283,8 @@ R.guia = (function () {
 
     /* ---------- Experiencias ---------- */
     {
-      id: 'e_imperdibles', rec: true, fase: 'experiencias', titulo: 'Armar la lista de imperdibles',
-      desc: 'Anotá lugares, comidas y experiencias que no te querés perder.',
+      id: 'e_imperdibles', rec: true, fase: 'experiencias', titulo: 'Armar la lista de qué hacer',
+      desc: 'En la sección 🎟️ Qué hacer anotá lugares, excursiones y comidas que no te querés perder.',
       consejo: 'Separá lo que necesita reserva de lo que se puede improvisar.',
       porque: 'Te ayuda a detectar qué hay que reservar con anticipación.',
       impacto: 2, anticipacion: 30, dependeDe: ['d_destino']
@@ -292,7 +294,9 @@ R.guia = (function () {
       desc: 'Reservá lo que tiene cupo limitado o se agota: excursiones, museos, espectáculos.',
       consejo: 'Revisá la política de cancelación y subí los comprobantes a Documentos.',
       porque: 'Depende de las fechas y conviene saber dónde vas a estar parando.',
-      impacto: 3, anticipacion: 21, dependeDe: ['d_fechas'], despuesDe: ['e_imperdibles', 'a_reserva'], docCategoria: 'excursion'
+      impacto: 3, anticipacion: 21, dependeDe: ['d_fechas'], despuesDe: ['e_imperdibles', 'a_reserva'], docCategoria: 'excursion',
+      // Ya no es un paso de la guía: las excursiones tienen su sección "Qué hacer"
+      aplica: () => false
     },
     {
       id: 'e_escapada', fase: 'experiencias', porEscapada: true,

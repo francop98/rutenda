@@ -102,13 +102,9 @@ R.cronogramaEditor = (function () {
       const inicio = segs[0].sale.fecha;
       const ult = segs[segs.length - 1];
       const fin = C().fechaLlega(ult) || ult.sale.fecha || '';
-      R.feriados.pintarAviso(caja, inicio, fin > inicio ? fin : '', (desde, hasta) => {
-        segs[0].sale.fecha = desde;
-        const vuelta = b.recorrido.find(t => t.tipo === 'vuelta');
-        if (vuelta && vuelta.segmentos[0]) vuelta.segmentos[0].sale.fecha = hasta;
-        U.toast(vuelta ? `Listo: del ${U.fmtFecha(desde, 'dia')} al ${U.fmtFecha(hasta, 'dia')}. Ajustá lo que quieras.` : `Listo: salís el ${U.fmtFecha(desde, 'dia')}.`);
-        pintar();
-      });
+      // Los próximos findes largos ahora están en el inicio; acá solo el aviso si tu viaje cae en uno
+      if (!inicio) { caja.innerHTML = ''; return; }
+      R.feriados.pintarAviso(caja, inicio, fin > inicio ? fin : '');
     }
 
     function segmentoHTML(t, ti, s, si, M) {
@@ -215,10 +211,10 @@ R.cronogramaEditor = (function () {
               <button type="button" class="btn-texto-mini" data-cr-editar-noches="${ti}">Cambiar</button>
             </div>` : `
             <div class="cr-noches">
+              <small class="cr-noches-tip">💡 <strong>No hace falta contar las noches:</strong> si cargás la fecha ${b.recorrido[ti + 1] && b.recorrido[ti + 1].tipo === 'vuelta' ? 'de la vuelta' : 'del próximo traslado'} (más abajo), se calculan solas. Si preferís, ponelas acá.</small>
               <span>${e.desde ? 'Llegás el ' + U.fmtFecha(e.desde, 'dia') + '. ¿Cuántas noches te quedás?' : 'Cargá cuándo salís y te calculo la llegada'}</span>
               <label class="cr-noches-campo"><input type="number" inputmode="numeric" min="0" max="365" data-cr-noches-input="${ti}" value="${e.noches != null && e.hasta ? e.noches : ''}" placeholder="—" ${!e.desde ? 'disabled' : ''} aria-label="Cantidad de noches"> <span>noches</span></label>
               ${e.hasta ? `<span>Te vas el ${U.fmtFecha(e.hasta, 'dia')}</span>` : ''}
-              ${e.desde ? `<small class="cr-noches-tip">💡 No hace falta contarlas: si cargás la fecha en que te vas (abajo, en el próximo traslado o la vuelta), las noches se calculan solas.</small>` : ''}
             </div>`}`}
             ${escapadas.map(d => `
               <div class="cr-escapada">☀️ Escapada a <strong>${esc(d.nombre)}</strong>

@@ -44,7 +44,7 @@ R.documentos = (function () {
           <p class="texto-suave">Pasajes, reservas y papeles, todo a mano.</p>
         </div>
         <div class="acciones-fila">
-          ${R.escaneo && R.escaneo.disponible() ? '<button class="btn btn-suave" data-a="escanear" title="Leo la reserva y completo el paso de la guía">📷 Escanear reserva</button>' : ''}
+          ${R.escaneo && R.db.puedeOrganizar(v) ? '<button class="btn btn-suave" data-a="escanear" title="Leo la reserva y la llevo a su lugar en el viaje">🎫 Leer una reserva</button>' : ''}
           ${grupos.length ? '<button class="btn btn-primario" data-a="subir">+ Subir</button>' : ''}
         </div>
       </div>

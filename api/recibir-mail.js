@@ -3,7 +3,7 @@
    Reenviás un mail de reserva a rutendaviajes@gmail.com y un
    script de Google (Apps Script, gratis) que corre en esa casilla
    lo manda acá. Rutenda busca tu cuenta por el mail desde el que
-   lo reenviaste, lo lee con IA (si el texto alcanza) y lo deja en
+   lo reenviaste, lo lee con reglas (y con IA solo si con eso no alcanza) y lo deja en
    tu "Bandeja" para que lo sumes al viaje con un toque.
    POST /api/recibir-mail   (solo el script, con la clave secreta)
    Cabecera: X-Rutenda-Clave: <MAIL_SECRET>
@@ -15,6 +15,29 @@
 const crypto = require('crypto');
 const { app, db, admin } = require('./_lib/firebase');
 const { limpiarJSON } = require('./escanear-reserva');
+const lector = require('../js/lector.js');
+
+/** Aeropuertos para el lector por reglas (el mismo archivo que usa la app). */
+let AEROS = null;
+function aeros() {
+  if (AEROS) return AEROS;
+  AEROS = {};
+  try {
+    const g = global;
+    const antes = { window: g.window, R: g.R };
+    g.window = g; g.R = g.R || {};
+    require('../js/aeropuertosdatos.js');
+    (g.R.AEROPUERTOS_DATOS || []).forEach(a => { AEROS[a[0]] = a[2]; });
+    g.window = antes.window; if (!antes.R) delete g.R;
+  } catch (e) { /* sin datos: el lector igual lee lo demás */ }
+  return AEROS;
+}
+/** Primero con reglas (gratis); si no alcanza, con IA. */
+function leerConReglas(asunto, texto) {
+  const A = aeros();
+  const r = lector.leer(`${asunto}\n${texto}`, { esAeropuerto: c => c in A, ciudadDe: c => A[c] || '', anio: new Date().getFullYear() });
+  return r && r.util ? r : null;
+}
 
 const LIMITE_DIARIO = 30;
 const MAX_ADJUNTO = 3 * 1024 * 1024;
@@ -126,7 +149,8 @@ module.exports = async (req, res) => {
     if (g) adjuntos.push(g);
   }
   let datos = null;
-  try { datos = await leerConIA(asunto, texto); } catch (e) { console.error(e); }
+  try { datos = leerConReglas(asunto, texto); } catch (e) { datos = null; }
+  if (!datos) { try { datos = await leerConIA(asunto, texto); } catch (e) { console.error(e); } }
   if (datos && datos.tipo === 'otro' && !adjuntos.length) datos = null;
 
   await ref.set({
@@ -138,3 +162,4 @@ module.exports = async (req, res) => {
 
 module.exports.soloMail = soloMail;
 module.exports.claveOk = claveOk;
+module.exports.leerConReglas = leerConReglas;

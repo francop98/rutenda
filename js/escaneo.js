@@ -42,6 +42,42 @@ R.escaneo = (function () {
       img.src = url;
     });
   }
+  /** Solo el texto de un PDF (para leerlo sin IA). Vacío si es una imagen escaneada. */
+  async function textoDePdf(blob) {
+    const pdfjs = await cargarPdfJs();
+    const pdf = await pdfjs.getDocument({ data: await blob.arrayBuffer() }).promise;
+    let texto = '';
+    for (let i = 1; i <= Math.min(pdf.numPages, 4); i++) {
+      const pag = await pdf.getPage(i);
+      const c = await pag.getTextContent();
+      let ultY = null;
+      texto += c.items.map(x => { const y = x.transform ? Math.round(x.transform[5]) : null; const salto = ultY != null && y != null && Math.abs(y - ultY) > 3; ultY = y; return (salto ? '\n' : ' ') + x.str; }).join('') + '\n';
+    }
+    return texto;
+  }
+
+  /* ---------- Leer sin IA (reglas) ---------- */
+  function opcionesLector(v) {
+    const ciudades = {};
+    if (R.AEROPUERTOS_DATOS) R.AEROPUERTOS_DATOS.forEach(a => { ciudades[a[0]] = a[2]; });
+    return {
+      esAeropuerto: c => !!(R.aeropuertos && R.aeropuertos.porCodigo(c)),
+      ciudadDe: c => ciudades[c] || '',
+      anio: v && v.fechaInicio ? Number(v.fechaInicio.slice(0, 4)) : new Date().getFullYear()
+    };
+  }
+  /** Lee un texto pegado con reglas, sin IA. Devuelve el mismo formato que el escaneo. */
+  function leerSinIA(texto, v) { return R.lector.leer(texto, opcionesLector(v)); }
+  /** Lee un archivo sin IA: si es PDF con texto, lo procesa con reglas. null si no se pudo. */
+  async function leerArchivoSinIA(archivo, v) {
+    const esPdf = archivo.type === 'application/pdf' || /\.pdf$/i.test(archivo.name || '');
+    if (!esPdf) return null;
+    const texto = await textoDePdf(archivo);
+    if (texto.replace(/\s/g, '').length < 40) return null;
+    const r = leerSinIA(texto, v);
+    return r.util ? r : null;
+  }
+
   /** PDF: primero intenta leer el texto; si es una imagen escaneada, convierte la 1.ª página en foto. */
   async function prepararPdf(blob) {
     const pdfjs = await cargarPdfJs();
@@ -146,6 +182,7 @@ R.escaneo = (function () {
       const primero = (r.tramos || [])[0] || {}, ultimo = (r.tramos || []).slice(-1)[0] || {};
       const parecido = (a, b) => a && b && (normal(a).includes(normal(b)) || normal(b).includes(normal(a)));
       return (segs.find(x => parecido(x.ctx.seg.desde.nombre, primero.desde) && parecido(x.ctx.seg.hasta.nombre, ultimo.hasta))
+        || segs.find(x => parecido(x.ctx.seg.desde.nombre, primero.desde) && parecido(x.ctx.seg.hasta.nombre, primero.hasta))
         || segs.find(x => parecido(x.ctx.seg.hasta.nombre, ultimo.hasta) && (!medio || x.ctx.seg.medio === medio))
         || segs.find(x => (!medio || x.ctx.seg.medio === medio) && !R.motor.resuelta(v, x.id))
         || segs[0] || {}).id || null;
@@ -160,13 +197,43 @@ R.escaneo = (function () {
         || alojs.find(x => f && x.ctx.destino.desde === f)
         || alojs.find(x => !R.motor.resuelta(v, x.id)) || alojs[0] || {}).id || null;
     }
-    const porTipo = { auto: 'mv_auto', excursion: 'e_excursiones', seguro: 'p_seguro', paquete: 'pq_paquete' }[tipo];
+    const porTipo = { auto: 'mv_auto', seguro: 'p_seguro', paquete: 'pq_paquete' }[tipo];
     return porTipo && lista.some(x => x.id === porTipo) ? porTipo : null;
   }
 
-  /** Botón "Escanear" desde Documentos o Completá los datos. */
+  /** Lleva una reserva leída (con reglas o con IA) a su lugar en el viaje.
+      Excursión → Qué hacer · pasaje/hotel/auto/seguro → su formulario · lo demás → Documentos. */
+  async function llevarAlViaje(v, r, archivo, op) {
+    const o = op || {};
+    const aviso = o.aviso || 'Completé lo que pude leer: revisalo antes de guardar.';
+    if (r && r.tipo === 'excursion' && (r.actividades || []).length && R.ideas && R.ideas.sumarReserva) {
+      const n = (await R.ideas.sumarReserva(v, r, archivo)).length;
+      R.db.guardarViaje(v);
+      U.cerrarModal();
+      location.hash = '#viaje/' + v.id + '/quehacer';
+      R.app.refrescar();
+      U.toast(n > 1 ? `Sumé ${n} actividades reservadas a Qué hacer.` : 'Lo sumé como reservado en Qué hacer. 🎟️');
+      return 'quehacer';
+    }
+    const id = (r && (o.tareaId || elegirPaso(v, r))) || null;
+    const tarea = id ? R.motor.lista(v).find(x => x.id === id) : null;
+    if (!tarea) {
+      if (o.sinGuardarSuelto) return null;
+      if (archivo) {
+        await R.documentos.guardarArchivos(v, [archivo], { categoria: 'otro' });
+        R.db.guardarViaje(v); R.app.refrescar();
+        U.toast('No encontré a qué parte del viaje corresponde. Lo guardé en Documentos.');
+      } else U.toast('No encontré datos de una reserva en ese texto.');
+      return null;
+    }
+    U.cerrarModal();
+    R.formularios.abrir(v, id, { prellenar: aFormulario(tarea.base, r), archivo, aviso, confirmar: true });
+    return id;
+  }
+
+  /** Botón "Escanear" desde Documentos o Completá los datos.
+      Si es un PDF con texto, lo lee primero con reglas (sin IA ni costo); si no alcanza, usa la IA. */
   function escanearYAbrir(v, tareaId) {
-    if (!disponible()) { U.toast('El escaneo funciona con tu cuenta en la nube y con conexión.'); return; }
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*,application/pdf';
@@ -175,16 +242,13 @@ R.escaneo = (function () {
       if (!archivo) return;
       U.toast('Leyendo el archivo… 🔎');
       try {
-        const r = await analizar(archivo);
-        const id = tareaId || elegirPaso(v, r);
-        if (!id) {
-          U.toast('Leí el archivo, pero no encontré a qué paso corresponde. Lo guardo en Documentos.');
-          await R.documentos.guardarArchivos(v, [archivo], { categoria: 'otro' });
-          R.db.guardarViaje(v); R.app.refrescar();
-          return;
+        let r = null;
+        try { r = await leerArchivoSinIA(archivo, v); } catch (e) { r = null; }
+        if (!r) {
+          if (!disponible()) { U.toast('No pude leerlo solo. La lectura de fotos funciona con tu cuenta en la nube y con conexión.'); return; }
+          r = await analizar(archivo);
         }
-        const tarea = R.motor.lista(v).find(x => x.id === id);
-        R.formularios.abrir(v, id, { prellenar: aFormulario(tarea.base, r), archivo, aviso: 'Completé lo que pude leer: revisalo antes de guardar.' });
+        await llevarAlViaje(v, r, archivo, { tareaId });
       } catch (e) {
         U.toast(e.message || 'No se pudo leer el archivo.');
       }
@@ -192,5 +256,26 @@ R.escaneo = (function () {
     input.click();
   }
 
-  return { leerTicket, disponible, analizar, analizarTexto, aFormulario, elegirPaso, escanearYAbrir };
+  /** Cartel para pegar el texto de una reserva (mail, WhatsApp…) y leerlo sin IA. */
+  function pegarReserva(v, op) {
+    const o = op || {};
+    const { el } = U.modal({
+      titulo: '📋 Pegar una reserva',
+      subtitulo: 'Copiá el mail de confirmación (o el texto del voucher) y pegalo acá.',
+      cuerpo: `<label class="campo completo"><textarea id="prTexto" rows="8" placeholder="Ej: Código de reserva ABC123 · AR1672 Buenos Aires (AEP) → Bariloche (BRC) 12/12 07:15…"></textarea></label>
+        <p class="ayuda">Se lee en el celular, con reglas: no usa IA ni se manda a ningún lado.</p>`,
+      acciones: [{ texto: 'Cancelar' }, { texto: 'Leer', clase: 'btn-primario', onClick: () => { leerPegado(); return false; } }]
+    });
+    async function leerPegado() {
+        const texto = el.querySelector('#prTexto').value;
+        if (texto.trim().length < 15) { U.toast('Pegá el texto de la reserva.'); return; }
+        const r = leerSinIA(texto, v);
+        if (!r.util) { U.toast('No encontré datos de una reserva. Probá pegando el mail completo.'); return; }
+        if (o.alLeer) { U.cerrarModal(); o.alLeer(r); return; }
+        await llevarAlViaje(v, r, null, { tareaId: o.tareaId, aviso: `Leí ${r.encontrado.join(', ')}. Revisalo antes de guardar.` });
+    }
+    setTimeout(() => { const t = el.querySelector('#prTexto'); if (t) t.focus(); }, 60);
+  }
+
+  return { leerTicket, disponible, analizar, analizarTexto, aFormulario, elegirPaso, escanearYAbrir, llevarAlViaje, pegarReserva, leerSinIA, leerArchivoSinIA, textoDePdf };
 })();
