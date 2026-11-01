@@ -808,7 +808,7 @@ R.formularios = (function () {
         R.app.refrescar();
         U.toast(deducidasSin.length
           ? `Listo. También di por resuelto: ${deducidasSin.map(x => x.titulo).slice(0, 3).join(', ')}.`
-          : 'Listo. Podés cargar los datos cuando quieras desde "Completá los datos".');
+          : 'Listo. Los datos los cargás cuando quieras desde "Datos para cargar".');
       };
       cont.querySelectorAll('[data-seg] [data-opcion]').forEach(b => b.onclick = () => {
         const caja = b.closest('.campo');

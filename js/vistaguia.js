@@ -72,17 +72,15 @@ R.vistaGuia = (function () {
       ${top ? tarjetaProximo(v, top) : tarjetaSinProximo(v, prog, pendientes.length)}
       ${ahora.length > 1 ? `<div class="lista-siguientes lista-ahora">${ahora.slice(1).map(t => filaPaso(v, t)).join('')}</div>` : ''}
 
-      ${faltanDatos.length ? `
-        <div class="bloque bloque-datos">
-          <h3 class="bloque-titulo">Completá los datos <span class="contador">${faltanDatos.length}</span></h3>
+      ${faltanDatos.length ? plegable('datos', '📎 Datos para cargar, cuando quieras', faltanDatos.length, `
+          <p class="texto-suave datos-ayuda">Código de reserva, horarios, costo y el voucher. No hace falta para organizar: sumalos cuando los tengas.</p>
           <div class="lista-siguientes">${faltanDatos.map(t => `
             <div class="fila-siguiente fila-datos">
               <span class="num">${R.guia.fase(t.fase).icono}</span>
-              <span class="fs-texto" data-tarea="${t.id}"><strong>${esc(t.titulo)}</strong><small>${(v.tareas[t.id] || {}).incluidoEnPaquete ? 'Del paquete · ' : ''}Faltan horarios, códigos o costos</small></span>
-              <button class="btn btn-primario btn-chico" data-completar="${t.id}">Completar</button>
+              <span class="fs-texto" data-tarea="${t.id}"><strong>${esc(t.titulo)}</strong><small>${(v.tareas[t.id] || {}).incluidoEnPaquete ? 'Del paquete · ' : ''}✓ Resuelto · sin datos cargados</small></span>
+              <button class="btn btn-suave btn-chico" data-completar="${t.id}">Cargar</button>
               <button class="btn btn-texto btn-chico" data-nohace="${t.id}">No hace falta</button>
-            </div>`).join('')}</div>
-        </div>` : ''}
+            </div>`).join('')}</div>`) : ''}
 
       ${pendientes.length ? plegable('despues', 'Más adelante', pendientes.length, `
         <div class="lista-siguientes">${pendientes.map(t => `
@@ -157,7 +155,7 @@ R.vistaGuia = (function () {
     if (verRec) verRec.onclick = () => { verTodasRec = !verTodasRec; R.app.refrescar(); };
     const notas = cont.querySelector('#notasViaje');
     if (notas) notas.oninput = () => { v.notasViaje = notas.value; guardar(v); };
-    cont.querySelectorAll('[data-completar]').forEach(b => b.onclick = () => R.formularios.abrir(v, b.dataset.completar));
+    cont.querySelectorAll('[data-completar]').forEach(b => b.onclick = e => { e.stopPropagation(); R.formularios.abrir(v, b.dataset.completar); });
     cont.querySelectorAll('[data-nohace]').forEach(b => b.onclick = () => {
       v.tareas[b.dataset.nohace] = Object.assign({}, v.tareas[b.dataset.nohace], { sinDatosOk: true });
       guardar(v);
@@ -200,7 +198,7 @@ R.vistaGuia = (function () {
       <div class="fila-siguiente fila-ahora">
         <span class="num">${R.guia.fase(t.fase).icono}</span>
         <span class="fs-texto" data-tarea="${t.id}"><strong>${esc(t.titulo)}</strong>${t.fechaLimite ? `<small>${t.diasRestantes < 0 ? 'Atrasado' : 'Ideal antes del ' + U.fmtFecha(t.fechaLimite, 'corto')}</small>` : ''}</span>
-        <button class="btn btn-suave btn-chico" data-rapido="hecha" data-id="${t.id}">${t.abreCronograma ? 'Cargar' : t.tieneFormulario ? 'Cargar' : '✓'}</button>
+        <button class="btn btn-suave btn-chico" data-rapido="hecha" data-id="${t.id}">${t.abreCronograma ? 'Cargar' : '✓'}</button>
       </div>`;
   }
 
@@ -217,7 +215,8 @@ R.vistaGuia = (function () {
           </div>
         </div>
         <div class="pp-acciones">
-          <button class="btn btn-primario" data-rapido="hecha" data-id="${t.id}">${t.abreCronograma ? '📅 Cargar las fechas' : t.tieneFormulario ? '✓ Listo, cargar datos' : '✓ Listo'}</button>
+          <button class="btn btn-primario" data-rapido="hecha" data-id="${t.id}">${t.abreCronograma ? '📅 Cargar las fechas' : t.tieneFormulario ? '✓ Ya está' : '✓ Listo'}</button>
+          ${t.tieneFormulario && !t.abreCronograma ? `<button class="btn btn-suave" data-completar="${t.id}">Cargar datos</button>` : ''}
           ${t.base === 's_valija' ? '<button class="btn btn-suave" data-a="abrirValija">🧳 Armar valija</button>' : ''}
           <button class="btn btn-texto" data-posponer="${t.id}">Más tarde</button>
           <button class="btn btn-texto" data-rapido="no_aplica" data-id="${t.id}">No aplica</button>
@@ -282,10 +281,8 @@ R.vistaGuia = (function () {
         return;
       }
     }
-    if (nuevo === 'hecha' && R.motor.estado(v, id) !== 'hecha') {
-      const t = R.motor.lista(v).find(x => x.id === id);
-      if (t && R.formularios.tiene(t) && R.formularios.abrir(v, id)) return;
-    }
+    // Marcar "listo" no pide datos: el código, los horarios y el costo se cargan después, cuando quieras
+    const conDatos = nuevo === 'hecha' && R.motor.estado(v, id) !== 'hecha' && (t0 => t0 && R.formularios.tiene(t0))(R.motor.lista(v).find(x => x.id === id));
     const progAntes = R.motor.progreso(v).pct;
     const destrabadas = R.motor.setEstado(v, id, nuevo);
     guardar(v);
@@ -299,6 +296,8 @@ R.vistaGuia = (function () {
 
     if (progDespues === 100 && progAntes < 100) {
       celebrar();
+    } else if (conDatos) {
+      U.toast(destrabadas.length ? `Listo ✓ Se destrabó: ${destrabadas[0].titulo}${destrabadas.length > 1 ? ' y más' : ''}.` : 'Listo ✓ Los datos, cuando quieras.');
     } else if (nuevo === 'hecha' && destrabadas.length) {
       U.toast(`¡Bien! Se destrabó: ${destrabadas.map(t => t.titulo).slice(0, 2).join(', ')}${destrabadas.length > 2 ? '…' : ''}`);
     } else if (nuevo === 'hecha') {
@@ -341,7 +340,7 @@ R.vistaGuia = (function () {
         ${t.enlaces && t.enlaces.length ? `<div class="detalle-enlaces"><h4>Dónde hacerlo</h4>${t.enlaces.map(e => `<a class="enlace-oficial" href="${esc(e.url)}" target="_blank" rel="noopener noreferrer"><span>🔗</span>${esc(e.texto)}<small>${esc(new URL(e.url).hostname.replace(/^www\./, ''))}</small></a>`).join('')}</div>` : ''}
         ${t.tieneFormulario && !t.esperaVentana ? `
           <div class="detalle-datos">
-            <div class="bloque-cab"><h4>Datos cargados</h4><button type="button" class="btn ${datos.datos ? 'btn-suave' : 'btn-primario'} btn-chico" data-a="formulario">${datos.datos ? 'Editar datos' : (t.estado === 'hecha' ? 'Cargar datos' : 'Listo, cargar datos')}</button></div>
+            <div class="bloque-cab"><h4>Datos cargados</h4><button type="button" class="btn ${datos.datos ? 'btn-suave' : 'btn-primario'} btn-chico" data-a="formulario">${datos.datos ? 'Editar datos' : 'Cargar datos'}</button></div>
             ${datos.datos ? `<ul class="lista-resumen">${R.formularios.resumen(v, t).map(l => `<li>${esc(l)}</li>`).join('') || '<li>Sin detalles.</li>'}</ul>` : '<p class="texto-suave">Lo que cargues se suma solo al itinerario, a los gastos y a documentos.</p>'}
           </div>` : ''}
         ${['d_destino', 'd_fechas', 'd_participantes'].includes(t.id) ? '<button type="button" class="btn btn-suave btn-chico boton-editar-viaje" data-a="editarViaje">✎ Editar destinos, fechas y viajeros</button>' : ''}
