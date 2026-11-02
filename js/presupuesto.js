@@ -57,7 +57,7 @@ R.presupuesto = (function () {
   async function abrir(v) {
     if (!estadias(v).length) { U.toast('Cargá los destinos y las noches para estimarlo.'); return; }
     let nivel = 'medio';
-    const { el } = U.modal({ titulo: '✨ Presupuesto sugerido', subtitulo: 'Estimación orientativa: no incluye pasajes.', ancho: true, cuerpo: '<div class="presupuesto"><p class="texto-suave">Calculando… 🧮</p></div>' });
+    const { el } = U.modal({ titulo: '💡 Presupuesto sugerido (IA)', subtitulo: 'Estimación orientativa: no incluye pasajes.', ancho: true, cuerpo: '<div class="presupuesto"><p class="texto-suave">Calculando… 🧮</p></div>' });
     const caja = el.querySelector('.presupuesto');
     let datos = v.presupuestoSugerido && v.presupuestoSugerido.destinos ? v.presupuestoSugerido : null;
     try {

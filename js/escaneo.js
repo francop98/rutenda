@@ -13,7 +13,7 @@ R.escaneo = (function () {
   const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const normal = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 
-  function disponible() { return R.db.modo() === 'nube' && navigator.onLine !== false; }
+  function disponible() { return U.conIA() && navigator.onLine !== false; }
 
   /* ---------- Preparar el archivo ---------- */
   function cargarPdfJs() {
@@ -277,5 +277,5 @@ R.escaneo = (function () {
     setTimeout(() => { const t = el.querySelector('#prTexto'); if (t) t.focus(); }, 60);
   }
 
-  return { leerTicket, disponible, analizar, analizarTexto, aFormulario, elegirPaso, escanearYAbrir, llevarAlViaje, pegarReserva, leerSinIA, leerArchivoSinIA, textoDePdf };
+  return { cargarPdfJs, leerTicket, disponible, analizar, analizarTexto, aFormulario, elegirPaso, escanearYAbrir, llevarAlViaje, pegarReserva, leerSinIA, leerArchivoSinIA, textoDePdf };
 })();

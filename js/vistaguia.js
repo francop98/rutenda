@@ -103,7 +103,6 @@ R.vistaGuia = (function () {
 
       ${est !== 'planificando' ? plegable('notas', 'Notas y recuerdos del viaje', null, `<textarea id="notasViaje" rows="3" placeholder="Lo que te gustó, lo que harías distinto…">${esc(v.notasViaje || '')}</textarea>`) : ''}
 
-      ${R.preguntar && R.db.modo() === 'nube' ? '<button type="button" class="barra-preguntar" data-a="preguntar"><span>✨</span><span><strong>¿Dudas con el viaje?</strong><small>Preguntale a Rutenda: sabe lo que cargaste.</small></span><b>Preguntar →</b></button>' : ''}
 
       ${plegable('todos', 'Todos los pasos', `${prog.hechas}/${prog.total}`, `
         <div class="fases">${fases.map(f => faseHTML(v, f)).join('')}</div>
@@ -296,6 +295,8 @@ R.vistaGuia = (function () {
 
     if (progDespues === 100 && progAntes < 100) {
       celebrar();
+    } else if (conDatos && R.formularios.preguntarEmpresa(v, id)) {
+      // Una sola pregunta (la empresa o el vuelo); lo demás, cuando quieras
     } else if (conDatos) {
       U.toast(destrabadas.length ? `Listo ✓ Se destrabó: ${destrabadas[0].titulo}${destrabadas.length > 1 ? ' y más' : ''}.` : 'Listo ✓ Los datos, cuando quieras.');
     } else if (nuevo === 'hecha' && destrabadas.length) {
@@ -343,7 +344,7 @@ R.vistaGuia = (function () {
             <div class="bloque-cab"><h4>Datos cargados</h4><button type="button" class="btn ${datos.datos ? 'btn-suave' : 'btn-primario'} btn-chico" data-a="formulario">${datos.datos ? 'Editar datos' : 'Cargar datos'}</button></div>
             ${datos.datos ? `<ul class="lista-resumen">${R.formularios.resumen(v, t).map(l => `<li>${esc(l)}</li>`).join('') || '<li>Sin detalles.</li>'}</ul>` : '<p class="texto-suave">Lo que cargues se suma solo al itinerario, a los gastos y a documentos.</p>'}
           </div>` : ''}
-        ${['d_destino', 'd_fechas', 'd_participantes'].includes(t.id) ? '<button type="button" class="btn btn-suave btn-chico boton-editar-viaje" data-a="editarViaje">✎ Editar destinos, fechas y viajeros</button>' : ''}
+        ${['d_destino', 'd_fechas', 'd_participantes'].includes(t.id) ? `<button type="button" class="btn btn-suave btn-chico boton-editar-viaje" data-a="editarViaje">✎ ${t.id === 'd_destino' ? 'Cambiar los destinos' : t.id === 'd_fechas' ? 'Cambiar fechas y traslados' : 'Cambiar los viajeros'}</button>` : ''}
         ${t.base === 's_valija' ? '<button type="button" class="btn btn-primario btn-chico boton-editar-viaje" data-a="abrirValija">🧳 Abrir el armador de valija</button>' : ''}
         ${['e_imperdibles', 'e_excursiones'].includes(t.base) ? '<button type="button" class="btn btn-primario btn-chico boton-editar-viaje" data-a="verIdeas">📝 Abrir mi lista de qué hacer</button>' : ''}
         ${['doc_pasaporte', 'doc_visa', 'doc_requisitos', 'p_vacunas'].includes(t.base) ? R.requisitos.tarjeta(v) : ''}
@@ -372,7 +373,7 @@ R.vistaGuia = (function () {
     const bVal = el.querySelector('[data-a="abrirValija"]');
     if (bVal) bVal.onclick = () => { U.cerrarModal(); location.hash = `#viaje/${v.id}/valija`; };
     const bEdit = el.querySelector('[data-a="editarViaje"]');
-    if (bEdit) bEdit.onclick = () => R.viajes.abrirAsistente(v);
+    if (bEdit) bEdit.onclick = () => { U.cerrarModal(); R.viajes.editarParte(v, id === 'd_destino' ? 'destinos' : id === 'd_fechas' ? 'fechas' : 'viajeros'); };
     const nota = el.querySelector('#tNota');
     nota.addEventListener('input', () => {
       v.tareas[id] = Object.assign({}, v.tareas[id] || { estado: t.estado }, { nota: nota.value });

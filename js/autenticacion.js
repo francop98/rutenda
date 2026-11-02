@@ -425,6 +425,10 @@ R.auth = (function () {
           ${push === 'disponible' ? '<button type="button" class="btn btn-suave btn-chico" data-a="push">Activar recordatorios</button>' : ''}
           ${push === 'activo' ? '<button type="button" class="btn btn-texto btn-chico" data-a="pushNo">Desactivar en este dispositivo</button>' : ''}
         </div>
+        ${enNube() ? `<div class="bloque-interno">
+          <label class="check"><input type="checkbox" id="mcIA" ${R.db.prefs().ia !== false ? 'checked' : ''}> <strong>💡 Ayudas con IA</strong></label>
+          <p class="texto-suave">Pedir ideas de qué hacer, ver cómo es el destino, estimar el presupuesto, leer fotos de pasajes y tickets, y preguntarle a Rutenda. Siempre solo cuando lo tocás. Si lo apagás, la app funciona igual: todo se carga a mano o leyendo el mail con reglas.</p>
+        </div>` : ''}
         ${u.conClave === false ? `<p class="ayuda">${u.conGoogle ? '🔐 Entrás con tu cuenta de Google.' : ''}</p>` : `<details class="detalle-plegable">
           <summary>Cambiar contraseña</summary>
           <div class="grilla-2">
@@ -451,6 +455,8 @@ R.auth = (function () {
             if (!nombre) { U.toast('El nombre no puede quedar vacío.'); return false; }
             const pv = el.querySelector('#mcPasaporte');
             if (pv) R.db.guardarPrefs({ pasaporteVence: pv.value || '' });
+            const ia = el.querySelector('#mcIA');
+            if (ia) R.db.guardarPrefs({ ia: ia.checked });
             actualizarPerfil({ nombre, apellido: el.querySelector('#mcApellido').value, nacionalidad: el.querySelector('#mcNac').value, alias: el.querySelector('#mcAlias').value })
               .then(() => {
                 R.db.guardarPersona(Object.assign(R.db.yo(), { nombre }));

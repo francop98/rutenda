@@ -371,7 +371,7 @@ R.gastos = (function () {
           <label class="campo"><span>Moneda principal</span><select id="gMoneda" ${conMovs ? 'disabled' : ''}>${U.opcionesMoneda(v.monedaBase)}</select></label>
         </div>
         ${conMovs ? '<p class="ayuda">La moneda principal no se puede cambiar cuando ya hay gastos cargados.</p>' : ''}
-        ${R.presupuesto && R.db.modo() === 'nube' ? '<button type="button" class="btn btn-suave btn-bloque" data-a="sugerirPresupuesto">✨ ¿Cuánto me va a salir? Sugerime un presupuesto</button>' : ''}`,
+        ${R.presupuesto && U.conIA() ? '<button type="button" class="btn btn-suave btn-bloque" data-a="sugerirPresupuesto">✨ ¿Cuánto me va a salir? Sugerime un presupuesto</button>' : ''}`,
       alAbrir: el => { const b = el.querySelector('[data-a="sugerirPresupuesto"]'); if (b) b.onclick = () => { U.cerrarModal(); R.presupuesto.abrir(v); }; },
       acciones: [
         { texto: 'Cancelar' },
@@ -592,7 +592,7 @@ R.gastos = (function () {
         if (!archivo) return;
         const etiqueta = ticket.closest('label');
         etiqueta.classList.add('cargando');
-        etiqueta.firstChild.textContent = '✨ Leyendo el ticket… ';
+        etiqueta.firstChild.textContent = 'Leyendo el ticket… ';
         try {
           const r = await R.escaneo.leerTicket(archivo);
           leer();

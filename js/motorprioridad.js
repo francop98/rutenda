@@ -119,7 +119,7 @@ R.motor = (function () {
     const viajeEmpezo = v.fechaInicio && v.fechaInicio <= hoy;
 
     return ts.map(t => {
-      const est = estado(v, t.id);
+      let est = estado(v, t.id);
       // Un paso de la guía nunca espera a una recomendación
       const valida = d => ids.has(d) && (t.rec || !recs.has(d));
       const deps = t.dependeDe.filter(valida);
@@ -173,10 +173,16 @@ R.motor = (function () {
       }
 
       const bloqueada = bloqueadaPor.length > 0;
+      // Recomendaciones que ya se ven hechas en lo que cargaste (documentos, valija, horarios…)
+      let autoHecha = false;
+      if (t.rec && typeof t.hechaSi === 'function' && !RESUELTO.has(est)) { try { autoHecha = !!t.hechaSi(v, t.ctx || {}); } catch (e) { autoHecha = false; } }
+      if (autoHecha) est = 'hecha';
+      let cubierta = false;
+      if (t.rec && typeof t.cubiertaSi === 'function') { try { cubierta = !!t.cubiertaSi(v, t.ctx || {}); } catch (e) { cubierta = false; } }
       const datosPaso = v.tareas[t.id] || {};
       const tieneFormulario = !!(R.formularios && R.formularios.tiene(t));
       const faltanDatos = !t.rec && tieneFormulario && est === 'hecha' && !datosPaso.datos && !datosPaso.sinDatosOk;
-      const esperaVentana = !!t.ventanaDias && !RESUELTO.has(est) && !!t.fechaBaseValor && R.util.diasEntre(hoy, t.fechaBaseValor) > t.ventanaDias;
+      const esperaVentana = t.ventanaDias != null && !RESUELTO.has(est) && !!t.fechaBaseValor && R.util.diasEntre(hoy, t.fechaBaseValor) > t.ventanaDias;
       return Object.assign({}, t, {
         esperaVentana,
         habilitaEl: esperaVentana ? R.util.sumarDias(t.fechaBaseValor, -t.ventanaDias) : null,
@@ -185,6 +191,8 @@ R.motor = (function () {
         faltanDatos,
         dependeDe: deps,
         estado: est,
+        autoHecha,
+        cubierta,
         resuelta: RESUELTO.has(est),
         bloqueada,
         bloqueadaPor,
@@ -285,7 +293,8 @@ R.motor = (function () {
   /** Recomendaciones pendientes, de la más necesaria a la menos. */
   function recomendaciones(v) {
     const todas = analizar(v).filter(t => t.rec);
-    const pendientes = todas.filter(t => !t.resuelta).sort((a, b) => b.orden - a.orden);
+    // Sin lo que ya está hecho, lo que la app ya hace sola y lo que todavía depende de otro paso (aparece cuando toca)
+    const pendientes = todas.filter(t => !t.resuelta && !t.cubierta && !t.bloqueada).sort((a, b) => b.orden - a.orden);
     return { pendientes, hechas: todas.filter(t => t.estado === 'hecha').length, total: todas.filter(t => t.estado !== 'no_aplica').length };
   }
 

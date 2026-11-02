@@ -104,7 +104,7 @@ R.preguntar = (function () {
     const lista = charlas[v.id] = charlas[v.id] || [];
     const sug = R.viajes.estadoViaje(v) === 'en_curso' ? SUGERENCIAS_VIAJANDO : SUGERENCIAS;
     const { el } = U.modal({
-      titulo: '✨ Preguntale a Rutenda',
+      titulo: '💬 Preguntale a Rutenda',
       subtitulo: 'Sabe lo que cargaste en este viaje. Usa IA solo cuando enviás.',
       ancho: true,
       cuerpo: `

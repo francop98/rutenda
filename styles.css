@@ -2382,3 +2382,44 @@ html[data-letra="enorme"] body { font-size: 19.4px; }
 /* Aviso de "leí esto": legible en modo oscuro */
 :root[data-tema="oscuro"] .aviso-leido { color: #f1d9a0; }
 @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) .aviso-leido { color: #f1d9a0; } }
+
+/* Rutenda 23 */
+@keyframes sacudir { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+.modal-sacudir { animation: sacudir .25s ease; }
+/* Visor de fotos y PDF dentro de la app */
+.visor { position: fixed; inset: 0; z-index: 400; background: #0b0f0e; display: flex; flex-direction: column; }
+.visor-barra { display: flex; align-items: center; gap: 10px; padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px; color: #fff; }
+.visor-barra strong { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .95rem; }
+.visor-x, .visor-bajar { width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.14); color: #fff; font-size: 1.3rem; cursor: pointer; flex: none; }
+.visor-cuerpo { flex: 1; overflow: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px 8px calc(env(safe-area-inset-bottom, 0px) + 16px); touch-action: pan-x pan-y pinch-zoom; -webkit-overflow-scrolling: touch; }
+.visor-cuerpo img { max-width: 100%; height: auto; margin: auto; }
+.visor-cuerpo canvas { max-width: 900px; background: #fff; border-radius: 4px; }
+.visor-cargando { color: #cfd8d5; margin: auto; }
+.visor-cargando a { color: #9CC4B8; }
+body.con-visor { overflow: hidden; }
+/* Archivos que se van sumando */
+.zona-multi { display: grid; gap: 8px; }
+.za-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.za-lista li { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border: 1px solid var(--linea); border-radius: 10px; background: var(--papel); font-size: .88rem; }
+.za-lista li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zona-archivo.za-mas { padding: 10px 12px; min-height: 0; flex-direction: row; gap: 8px; font-size: .88rem; }
+.zona-archivo.za-mas .za-icono, .zona-archivo-chica .za-icono { width: 28px; height: 28px; font-size: 1rem; }
+/* Editar desde donde ves el dato */
+.editable { cursor: pointer; text-decoration: underline dotted rgba(255,255,255,.55); text-underline-offset: 4px; }
+.ev-editable { cursor: pointer; }
+.menu-op-dato { display: flex; align-items: center; gap: 12px; text-align: left; }
+.menu-op-dato .mo-texto { flex: 1; min-width: 0; display: grid; }
+.menu-op-dato .mo-texto small { color: var(--tinta-suave); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu-op-dato .mo-flecha { color: var(--tinta-tenue); font-size: 1.3rem; }
+/* Direcciones con desplegable */
+.dir-lista { display: grid; margin-top: 4px; border: 1px solid var(--linea); border-radius: 12px; background: var(--papel); box-shadow: var(--sombra); overflow: hidden; }
+.dir-lista button { display: grid; gap: 1px; text-align: left; padding: 9px 12px; border: 0; border-bottom: 1px solid var(--linea); background: none; color: var(--tinta); font: inherit; cursor: pointer; }
+.dir-lista button:hover, .dir-lista button:focus { background: var(--mar-claro); }
+.dir-lista button strong { font-size: .9rem; font-weight: 600; }
+.dir-lista button small { color: var(--tinta-suave); font-size: .78rem; }
+.dir-pie { margin: 0; padding: 6px 12px; font-size: .72rem; color: var(--tinta-tenue); }
+.menu-op.menu-op-dato { justify-content: flex-start; text-align: left; }
+.menu-op-dato .mo-texto { text-align: left; justify-items: start; }
+.menu-op-dato .mo-texto { width: auto; font-size: 1rem; }
+.menu-op-dato .mo-texto strong { font-size: .98rem; }
+.menu-op-dato .mo-flecha { width: auto; }

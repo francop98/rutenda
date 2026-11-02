@@ -27,15 +27,18 @@ R.recordatorios = (function () {
       if (fecha && fecha >= hoy) r.push({ id: `${v.id}_${id}_${fecha}`, viajeId: v.id, fecha, titulo, cuerpo, url: url(pestana) });
     };
 
-    // Check-in de cada vuelo (el día antes de volar)
+    // Check-in de cada vuelo (cuando lo habilita la aerolínea)
     R.recorrido.todosLosSegmentos(v.recorrido).forEach(x => {
       const s = x.seg;
       if (s.medio !== 'avion' || !s.sale || !s.sale.fecha) return;
       const tarea = 's_checkin__' + s.id;
       if (R.motor.resuelta(v, tarea)) return;
       const det = R.cronogramaEditor.datosSegmento(v, s);
-      agregar(U.sumarDias(s.sale.fecha, -1), 'checkin_' + s.id, '✈️ Ya podés hacer el check-in',
-        `${s.desde.nombre} → ${s.hasta.nombre}${s.sale.hora ? ', sale mañana ' + s.sale.hora : ', sale mañana'}${det ? ' · ' + det : ''}.`, 'guia');
+      // El día que la aerolínea lo habilita (JetSMART 72 h, Aerolíneas 24 h…)
+      const k = R.guia.checkin(v, s);
+      const cuando = U.diasEntre(k.fecha, s.sale.fecha);
+      agregar(k.fecha, 'checkin_' + s.id, '✈️ Ya podés hacer el check-in',
+        `${s.desde.nombre} → ${s.hasta.nombre}, sale ${cuando === 0 ? 'hoy' : cuando === 1 ? 'mañana' : 'el ' + U.fmtFecha(s.sale.fecha, 'dia')}${s.sale.hora ? ' ' + s.sale.hora : ''}${det ? ' · ' + det : ''}${k.hora ? ` (se habilita a las ${k.hora})` : ''}.`, 'guia');
     });
 
     // Pasos de la guía que vencen pronto: un solo aviso por día y por viaje

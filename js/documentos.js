@@ -115,11 +115,7 @@ R.documentos = (function () {
     const { el } = U.modal({
       titulo: 'Subir documento',
       cuerpo: `
-        <label class="zona-archivo" id="zonaArchivo">
-          <input type="file" id="dArchivo" multiple accept="image/*,application/pdf,.doc,.docx,.txt">
-          <span class="za-icono">⬆</span>
-          <span id="dArchivoTxt">Elegí uno o varios archivos (fotos o PDF)</span>
-        </label>
+        ${U.zonaArchivos('docs', [], '')}
         <label class="campo"><span>Nombre</span><input id="dNombre" placeholder="Se completa con el nombre del archivo"></label>
         <div class="grilla-2">
           <label class="campo"><span>Categoría</span><select id="dCategoria">${U.ordenAlfa(CATEGORIAS.filter(c => c.id !== 'otro'), 'nombre').concat(CATEGORIAS.filter(c => c.id === 'otro')).map(c => `<option value="${c.id}" ${c.id === catInicial ? 'selected' : ''}>${c.icono} ${c.nombre}</option>`).join('')}</select></label>
@@ -133,22 +129,22 @@ R.documentos = (function () {
       ]
     });
 
-    const archivo = el.querySelector('#dArchivo');
+    const elegidos = [];
+    el._archivos = elegidos;
+    const alCambiarArchivos = () => {
+      const n = elegidos.length;
+      const nombre = el.querySelector('#dNombre');
+      if (n === 1 && !nombre.value) nombre.value = elegidos[0].name.replace(/\.[^.]+$/, '');
+      nombre.disabled = n > 1;
+      if (n > 1) nombre.value = '';
+    };
+    U.enlazarArchivos(el, 'docs', elegidos, () => { U.repintarArchivos(el, 'docs', elegidos, '', false, alCambiarArchivos); alCambiarArchivos(); });
     const selCat = el.querySelector('#dCategoria');
     const selTarea = el.querySelector('#dTarea');
     const filaMarcar = el.querySelector('#dMarcarFila');
     const actualizarMarcar = () => {
       const id = selTarea.value;
       filaMarcar.style.display = id && !R.motor.resuelta(v, id) ? '' : 'none';
-    };
-    archivo.onchange = () => {
-      const n = archivo.files.length;
-      el.querySelector('#dArchivoTxt').textContent = n === 1 ? archivo.files[0].name : n > 1 ? `${n} archivos elegidos` : 'Elegí uno o varios archivos (fotos o PDF)';
-      el.querySelector('#zonaArchivo').classList.toggle('con-archivo', n > 0);
-      const nombre = el.querySelector('#dNombre');
-      if (n === 1 && !nombre.value) nombre.value = archivo.files[0].name.replace(/\.[^.]+$/, '');
-      nombre.disabled = n > 1;
-      if (n > 1) nombre.value = '';
     };
     selCat.onchange = () => {
       if (op.tareaId) return;
@@ -164,7 +160,7 @@ R.documentos = (function () {
   }
 
   async function guardarSubida(v, el, op) {
-    const archivos = Array.from(el.querySelector('#dArchivo').files);
+    const archivos = (el._archivos || []).slice();
     if (!archivos.length) { U.toast('Elegí al menos un archivo.'); return; }
     const pesado = archivos.find(a => a.size > LIMITE_MB * 1048576);
     if (pesado) { U.toast(`"${pesado.name}" supera ${LIMITE_MB} MB.`); return; }
@@ -222,24 +218,86 @@ R.documentos = (function () {
     return blob;
   }
 
-  /** Si no se pudo traer el archivo, se abre directo desde la nube. */
-  async function abrirDesdeNube(d, v) {
+  /* ---------------------------------------------------------
+     Visor: fotos y PDF se ven adentro de la app (sin abrir otra app)
+     --------------------------------------------------------- */
+  async function urlNube(d, v) {
     const id = d.viajeId || (v && v.id) || viajeActual;
-    const url = R.db.modo() === 'nube' && id ? await R.nube.urlArchivo(id, d.archivoId) : null;
-    if (!url) return false;
-    if (!window.open(url, '_blank')) location.href = url;
-    return true;
+    return R.db.modo() === 'nube' && id ? R.nube.urlArchivo(id, d.archivoId) : null;
   }
 
   async function abrir(d, v) {
     if (!d) return;
+    let blob = null, url = null;
+    try { blob = await blobDe(d, v); url = URL.createObjectURL(blob); } catch (e) {
+      try { url = await urlNube(d, v); } catch (e2) { url = null; }
+    }
+    if (!url) { U.toast('Este archivo no está guardado en este dispositivo.'); return; }
+    const tipo = (blob && blob.type) || d.tipoMime || '';
+    const imagen = /^image\//.test(tipo) || /\.(jpe?g|png|webp|gif|heic)$/i.test(d.nombreArchivo || '');
+    const pdf = /pdf/.test(tipo) || /\.pdf$/i.test(d.nombreArchivo || '');
+    if (!imagen && !pdf) { descargarURL(url, d); return; }
+    visor(d, url, imagen ? 'imagen' : 'pdf', blob);
+  }
+
+  function visor(d, url, tipo, blob) {
+    const viejo = document.querySelector('.visor');
+    if (viejo) viejo.remove();
+    const el = document.createElement('div');
+    el.className = 'visor';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', d.nombre || 'Archivo');
+    el.innerHTML = `
+      <div class="visor-barra">
+        <button type="button" class="visor-x" aria-label="Cerrar">×</button>
+        <strong>${esc(d.nombre || d.nombreArchivo || 'Archivo')}</strong>
+        <button type="button" class="visor-bajar" title="Guardar o compartir">⬇</button>
+      </div>
+      <div class="visor-cuerpo">${tipo === 'imagen' ? `<img src="${esc(url)}" alt="${esc(d.nombre || '')}">` : '<p class="visor-cargando">Abriendo el PDF…</p>'}</div>`;
+    document.body.appendChild(el);
+    document.body.classList.add('con-visor');
+    const cerrar = () => {
+      el.remove();
+      document.body.classList.remove('con-visor');
+      document.removeEventListener('keydown', tecla);
+      if (blob) setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    const tecla = e => { if (e.key === 'Escape') cerrar(); };
+    document.addEventListener('keydown', tecla);
+    el.querySelector('.visor-x').onclick = cerrar;
+    el.querySelector('.visor-bajar').onclick = async () => {
+      // En el celular, "Compartir" deja guardarlo o mandarlo; si no, se descarga
+      try {
+        if (blob && navigator.canShare && navigator.canShare({ files: [new File([blob], d.nombreArchivo || 'archivo', { type: blob.type })] })) {
+          await navigator.share({ files: [new File([blob], d.nombreArchivo || 'archivo', { type: blob.type })], title: d.nombre });
+          return;
+        }
+      } catch (e) { if (e && e.name === 'AbortError') return; }
+      descargarURL(url, d);
+    };
+    if (tipo === 'pdf') pintarPdf(el.querySelector('.visor-cuerpo'), blob, url);
+  }
+
+  async function pintarPdf(caja, blob, url) {
     try {
-      const url = URL.createObjectURL(await blobDe(d, v));
-      const w = window.open(url, '_blank');
-      if (!w) descargarURL(url, d);
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      const pdfjs = await R.escaneo.cargarPdfJs();
+      const pdf = await pdfjs.getDocument(blob ? { data: await blob.arrayBuffer() } : { url }).promise;
+      caja.innerHTML = '';
+      const ancho = Math.min(caja.clientWidth || window.innerWidth, 900);
+      for (let i = 1; i <= Math.min(pdf.numPages, 30); i++) {
+        if (!caja.isConnected) return;
+        const pag = await pdf.getPage(i);
+        const base = pag.getViewport({ scale: 1 });
+        const escala = (ancho / base.width) * Math.min(2, window.devicePixelRatio || 1);
+        const vista = pag.getViewport({ scale: escala });
+        const c = document.createElement('canvas');
+        c.width = vista.width; c.height = vista.height;
+        c.style.width = '100%';
+        caja.appendChild(c);
+        await pag.render({ canvasContext: c.getContext('2d'), viewport: vista }).promise;
+      }
     } catch (e) {
-      if (!(await abrirDesdeNube(d, v))) U.toast('Este archivo no está guardado en este dispositivo.');
+      caja.innerHTML = `<p class="visor-cargando">No pude mostrar el PDF acá. <a href="${esc(url)}" download>Descargarlo</a></p>`;
     }
   }
 
@@ -259,7 +317,8 @@ R.documentos = (function () {
       descargarURL(url, d);
       setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (e) {
-      if (!(await abrirDesdeNube(d, v))) U.toast('Este archivo no está guardado en este dispositivo.');
+      const url = await urlNube(d, v).catch(() => null);
+      if (url) descargarURL(url, d); else U.toast('Este archivo no está guardado en este dispositivo.');
     }
   }
 

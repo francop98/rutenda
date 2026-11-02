@@ -157,9 +157,8 @@ R.ideas = (function () {
           ${fuera.length ? `<details class="plan-descartadas" ${verDescartadas[d.id] ? 'open' : ''} data-plan-descartadas="${d.id}"><summary>Descartadas (${fuera.length})</summary>
             <div class="plan-lista">${U.ordenAlfa(fuera, 'titulo').map(p => itemHTML(v, d, p)).join('')}</div></details>` : ''}
           ${org ? `<div class="plan-ia">
-            ${sug && sug.ideas && sug.ideas.length ? sugerenciasHTML(v, d, sug) : `
-              <button type="button" class="btn btn-suave btn-chico" data-plan-ia="${d.id}">✨ Sugerir ideas con IA</button>
-              <small class="texto-tenue">Usa una consulta de IA. Solo cuando lo tocás.</small>`}
+            ${sug && sug.ideas && sug.ideas.length ? sugerenciasHTML(v, d, sug) : U.conIA() ? `
+              <button type="button" class="btn btn-texto btn-chico" data-plan-ia="${d.id}">💡 Pedir ideas (IA)</button>` : ''}
           </div>` : ''}
         </div>
       </details>`;
@@ -211,7 +210,7 @@ R.ideas = (function () {
     const pendientes = U.ordenAlfa(sug.ideas.filter(i => !ya.has(String(i.titulo).toLowerCase())), 'titulo');
     return `
       <div class="plan-sugerencias">
-        <div class="ps-cab"><strong>✨ Ideas sugeridas</strong>${pendientes.length > 1 ? `<button type="button" class="btn-texto-mini" data-plan-todas="${d.id}">Agregar todas</button>` : ''}</div>
+        <div class="ps-cab"><strong>💡 Ideas sugeridas</strong>${pendientes.length > 1 ? `<button type="button" class="btn-texto-mini" data-plan-todas="${d.id}">Agregar todas</button>` : ''}</div>
         ${pendientes.length ? pendientes.map(i => `
           <div class="ps-idea">
             <span class="plan-icono">${ICONOS[i.tipo] || '⭐'}</span>
@@ -256,6 +255,7 @@ R.ideas = (function () {
      --------------------------------------------------------- */
   function editar(v, destId, id, alGuardar, opciones) {
     const op = opciones || {};
+    const elegidos = [];
     const p = Object.assign({}, planesDe(v, destId).find(x => x.id === id));
     if (!p.id) return;
     if (op.reservar) { p.reserva = true; p.reservado = true; if (p.estado !== 'va') p.estado = 'va'; }
@@ -277,7 +277,7 @@ R.ideas = (function () {
         if (p.reservado) { p.reserva = true; if (p.estado !== 'va') p.estado = 'va'; }
         if (p.fecha && p.estado !== 'va') p.estado = 'va';
         guardarPlan(v, destId, p);
-        const archivos = Array.from((el.querySelector('#plArchivos') || {}).files || []);
+        const archivos = elegidos.slice();
         if (archivos.length) {
           R.documentos.guardarArchivos(v, archivos, { categoria: 'excursion', tareaId: 'plan_' + p.id, nombre: archivos.length === 1 ? p.titulo : '' })
             .then(() => { R.db.guardarViaje(v); if (alGuardar) alGuardar(); U.toast('Guardado, con el comprobante.'); })
@@ -303,18 +303,18 @@ R.ideas = (function () {
           <label class="campo"><span>Día</span><select id="plFecha" ${org ? '' : 'disabled'}><option value="">Sin día</option>${dias.map(f => `<option value="${f}" ${p.fecha === f ? 'selected' : ''}>${U.fmtFecha(f, 'dia')}</option>`).join('')}</select></label>
           <label class="campo"><span>Hora</span><input type="time" id="plHora" value="${esc(p.hora)}" ${org ? '' : 'disabled'}></label>
         </div>` : ''}
-        <label class="campo"><span>Dirección o lugar (para el mapa)</span><input id="plLugar" value="${esc(p.lugar)}" placeholder="Ej: Cerro Campanario" ${org ? '' : 'disabled'}></label>
+        <label class="campo"><span>Dirección o lugar (para el mapa)</span> <input id="plLugar" value="${esc(p.lugar)}" placeholder="Escribí el lugar y elegí de la lista" ${org ? '' : 'disabled'}></label>
         <label class="check"><input type="checkbox" id="plReserva" ${p.reserva ? 'checked' : ''} ${org ? '' : 'disabled'}> Hay que reservar antes</label>
         <div class="plan-reserva-datos">
           <label class="check"><input type="checkbox" id="plReservado" ${p.reservado ? 'checked' : ''} ${org ? '' : 'disabled'}> ✓ Ya está reservado</label>
           <label class="campo"><span>Código o empresa <small>(opcional)</small></span><input id="plCodigo" value="${esc(p.codigo || '')}" placeholder="Ej: Turisur · 48213" ${org ? '' : 'disabled'}></label>
           ${docsDe(v, p.id).length ? `<div class="docs-mini">${docsDe(v, p.id).map(d => `<button type="button" class="doc-mini" data-plan-doc="${d.id}">${R.documentos.iconoDoc(d)} ${esc(d.nombre)}</button>`).join('')}</div>` : ''}
-          ${org ? `<label class="zona-archivo zona-archivo-chica"><input type="file" id="plArchivos" multiple accept="image/*,application/pdf"><span class="za-icono">📎</span><span>Sumar entrada, voucher o comprobante</span></label>` : ''}
+          ${org ? U.zonaArchivos('plan', elegidos, 'Sumar entrada, voucher o comprobante', true) : ''}
         </div>`,
       alAbrir: el => {
         el.querySelectorAll('[data-plan-doc]').forEach(b => b.onclick = () => R.documentos.abrir((v.documentos || []).find(d => d.id === b.dataset.planDoc), v));
-        const fa = el.querySelector('#plArchivos');
-        if (fa) fa.onchange = () => { const n = fa.files.length; fa.closest('.zona-archivo').querySelector('span:last-child').textContent = n ? `${n === 1 ? fa.files[0].name : n + ' archivos'} (se guarda al tocar Guardar)` : 'Sumar entrada, voucher o comprobante'; };
+        if (R.direcciones && org) { const dd = (v.destinos || []).find(x => x.id === destId); R.direcciones.enlazar(el.querySelector('#plLugar'), { cerca: R.direcciones.cercaDe(v, dd) }); }
+        U.enlazarArchivos(el, 'plan', elegidos, () => U.repintarArchivos(el, 'plan', elegidos, 'Sumar entrada, voucher o comprobante', true));
         if (op.reservar) setTimeout(() => { const c = el.querySelector('#plCodigo'); if (c) c.focus(); }, 60);
       },
       acciones
@@ -484,7 +484,7 @@ R.ideas = (function () {
         if (!d || cargando[destId]) return;
         cargando[destId] = true;
         const caja = b.closest('.plan-ia');
-        caja.innerHTML = `<p class="texto-suave ideas-cargando">✨ Buscando ideas para ${esc(d.nombre)}…</p>`;
+        caja.innerHTML = `<p class="texto-suave ideas-cargando">💡 Buscando ideas para ${esc(d.nombre)}…</p>`;
         try {
           const datos = await pedirIA(v, d, !!b.dataset.otras);
           v.sugerencias = v.sugerencias || {};

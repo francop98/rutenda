@@ -130,9 +130,25 @@ R.viajes = (function () {
     return ultimo && ultimo.origen && ultimo.origen.nombre ? Object.assign({}, ultimo.origen) : { nombre: '' };
   }
 
+  const CLAVE_BORRADOR = 'rutenda_borrador_viaje';
+  function leerBorradorViaje() {
+    try { const x = JSON.parse(localStorage.getItem(CLAVE_BORRADOR)); return x && x.b && Date.now() - x.t < 30 * 864e5 && (x.b.destinos || []).some(d => d.nombre) ? x : null; } catch (e) { return null; }
+  }
+  function borrarBorradorViaje() { try { localStorage.removeItem(CLAVE_BORRADOR); } catch (e) { /* nada */ } }
+
   function abrirAsistente(existente, opciones) {
     const editando = !!existente;
     const opA = opciones || {};
+    // ¿Quedó un viaje a medio armar? (se cerró la app, se tocó afuera…)
+    if (!editando && !opA.borrador && !opA.sinBorrador) {
+      const bor = leerBorradorViaje();
+      if (bor) {
+        const dests = bor.b.destinos.filter(d => d.nombre).map(d => d.nombre).join(' → ');
+        U.confirmar(`Tenías un viaje a medio armar (${dests}). ¿Seguís desde donde lo dejaste?`, { titulo: '💾 Viaje sin terminar', textoSi: 'Sí, seguir', textoNo: 'Empezar uno nuevo' })
+          .then(ok => { if (!ok) borrarBorradorViaje(); abrirAsistente(null, Object.assign({}, opA, ok ? { borrador: bor } : { sinBorrador: true })); });
+        return;
+      }
+    }
     const yo = R.db.yo();
     const nuevoDestino = soloDia => ({ id: U.id('dst'), nombre: '', region: '', pais: '', codigoPais: '', noches: '', soloDia: !!soloDia, fecha: '' });
     const b = existente ? JSON.parse(JSON.stringify({
@@ -164,14 +180,15 @@ R.viajes = (function () {
     b.viajeros = editando
       ? existente.participantes.filter(id => id !== R.db.yoEn(existente)).map(id => R.db.persona(id)).filter(Boolean).map(p => ({ id: p.id, nombre: p.nombre }))
       : [];
+    if (opA.borrador) Object.assign(b, JSON.parse(JSON.stringify(opA.borrador.b)));
 
     // Tres pasos: a dónde (y con quién), cuándo, y qué ya tenés
     const PASOS = editando
-      ? ['Destinos', 'Cronograma', 'Detalles']
+      ? (opA.pasos || ['Destinos', 'Cronograma', 'Detalles'])
       : ['Destinos', 'Cronograma', 'Lo resuelto'];
     const ETIQUETA_PASO = { Destinos: '¿A dónde?', Cronograma: '¿Cuándo?', 'Lo resuelto': '¿Ya tenés algo?', Detalles: 'Detalles' };
     let editorCronograma = null;
-    let paso = 0;
+    let paso = opA.borrador ? Math.min(opA.borrador.paso || 0, PASOS.length - 1) : 0;
     let camposLugar = { origen: null, destinos: [] };
 
     const { el } = U.modal({
@@ -181,6 +198,15 @@ R.viajes = (function () {
       ancho: true
     });
     const cont = el.querySelector('#asistente');
+    // Lo que vas armando queda guardado en el teléfono hasta que terminás
+    let terminado = false;
+    if (!editando) {
+      const reloj = setInterval(() => {
+        if (terminado || !cont.isConnected) { clearInterval(reloj); return; }
+        try { leerPaso(); } catch (e) { /* a mitad de un cambio */ }
+        if (b.destinos.some(d => d.nombre)) { try { localStorage.setItem(CLAVE_BORRADOR, JSON.stringify({ t: Date.now(), paso, b })); } catch (e) { /* sin lugar */ } }
+      }, 2500);
+    }
     const banda = el.querySelector('#asPaisaje');
 
     const nombrePaso = () => PASOS[paso];
@@ -194,7 +220,7 @@ R.viajes = (function () {
       const primerSeg = b.recorrido && b.recorrido[0] && b.recorrido[0].segmentos[0];
       const temaBanda = lista.length ? R.paisaje.tema({ destinos: b.destinos, perfil: b.perfil, fechaInicio: primerSeg && primerSeg.sale.fecha }) : 'campo';
       banda.style.background = R.paisaje.fondo({ id: lista[0] || 'viaje' }, temaBanda);
-      banda.innerHTML = `${R.paisaje.svg(null, { tema: temaBanda, transporte: b.recorrido && b.recorrido.length ? R.recorrido.medioPrincipal(b.recorrido) : 'avion', progreso: paso / (PASOS.length - 1) })}
+      banda.innerHTML = `${R.paisaje.svg(null, { tema: temaBanda, transporte: b.recorrido && b.recorrido.length ? R.recorrido.medioPrincipal(b.recorrido) : 'avion', progreso: paso / Math.max(1, PASOS.length - 1) })}
         <span class="ap-texto">${esc(lista.length ? lista.join(' → ') : 'Tu próximo viaje')}</span>`;
     }
 
@@ -209,7 +235,7 @@ R.viajes = (function () {
         <div class="asistente-cuerpo">${contenidoPaso()}</div>
         <div class="asistente-pie">
           <button type="button" class="btn btn-suave" data-a="atras" ${paso === 0 ? 'style="visibility:hidden"' : ''}>← Atrás</button>
-          <button type="button" class="btn btn-primario" data-a="seguir">${ultimo ? (editando ? 'Guardar cambios' : 'Empezar a organizar ✨') : 'Siguiente →'}</button>
+          <button type="button" class="btn btn-primario" data-a="seguir">${ultimo ? (editando ? 'Guardar cambios' : 'Empezar a organizar →') : 'Siguiente →'}</button>
         </div>`;
       enlazarPaso();
       // Al pasar de paso, arrancar desde arriba
@@ -615,7 +641,7 @@ R.viajes = (function () {
       recalcularTramos(temp);
       const incluye = b.resuelto.paquete ? b.paqueteIncluye : [];
       // Lo que tiene ventana (como el check-in) no se puede tener resuelto de antemano
-      return R.motor.lista(temp).filter(t => (!t.rec || t.id === 'p_seguro') && !t.ventanaDias && t.fase !== 'definir' && t.base !== 'pq_paquete' && !R.formularios.incluidoEnPaquete(t, incluye));
+      return R.motor.lista(temp).filter(t => (!t.rec || t.id === 'p_seguro') && t.ventanaDias == null && t.fase !== 'definir' && t.base !== 'pq_paquete' && !R.formularios.incluidoEnPaquete(t, incluye));
     }
 
     /** Convierte los viajeros del asistente en personas guardadas (sin duplicar). */
@@ -661,6 +687,7 @@ R.viajes = (function () {
 
     function finalizar() {
       const datos = datosDelViaje();
+      if (!editando) { terminado = true; borrarBorradorViaje(); }
 
       if (editando) {
         const v = R.db.viaje(existente.id);
@@ -769,14 +796,51 @@ R.viajes = (function () {
   /* ---------------------------------------------------------
      Vista de un viaje
      --------------------------------------------------------- */
+  /** Editar una parte del viaje, directo (sin pasar por todo el asistente). */
+  function editarParte(v, que) {
+    if (!R.db.puedeOrganizar(v)) return;
+    if (que === 'fechas') { R.itinerario.editarCronograma(v); return; }
+    if (que === 'destinos') { abrirAsistente(v, { pasos: ['Destinos', 'Cronograma'] }); return; }
+    if (que === 'detalles') { abrirAsistente(v, { pasos: ['Detalles'] }); return; }
+    if (que === 'viajeros') { location.hash = `#viaje/${v.id}/viajeros`; return; }
+    if (que === 'nombre') {
+      const { el } = U.modal({
+        titulo: 'Nombre del viaje',
+        cuerpo: `<label class="campo"><span>Nombre</span><input id="evNombre" value="${esc(v.nombre || '')}" placeholder="${esc(conAlojamiento(v).map(d => d.nombre).join(' → ') || 'Ej: Vacaciones de invierno')}" maxlength="60"></label>
+          <p class="ayuda">Si lo dejás vacío, se muestran los destinos.</p>`,
+        acciones: [{ texto: 'Cancelar' }, { texto: 'Guardar', clase: 'btn-primario', onClick: el2 => {
+          v.nombre = el2.querySelector('#evNombre').value.trim();
+          R.db.guardarViaje(v); R.app.refrescar(); U.toast('Listo ✓');
+        } }]
+      });
+      setTimeout(() => { const i = el.querySelector('#evNombre'); i.focus(); i.select(); }, 60);
+    }
+  }
+  /** "Editar el viaje": cada cosa por separado, a un toque. */
+  function menuEditar(v) {
+    const ops = [
+      ['nombre', '✏️', 'Nombre', v.nombre || 'Sin nombre'],
+      ['destinos', '📍', 'Destinos', conAlojamiento(v).map(d => d.nombre).join(' → ') || 'Sin destinos'],
+      ['fechas', '📅', 'Fechas y traslados', U.fmtRango(v.fechaInicio, v.fechaFin) || 'Sin fechas'],
+      ['viajeros', '👥', 'Viajeros', U.plural((v.participantes || []).length, 'persona', 'personas')],
+      ['detalles', '⚙️', 'Detalles', 'Auto, mascotas, menores, trabajo…']
+    ];
+    const { el } = U.modal({
+      titulo: 'Editar el viaje',
+      subtitulo: 'Tocá lo que quieras cambiar. También podés tocar el dato donde lo veas (el nombre, las fechas, un vuelo, el hotel…).',
+      cuerpo: `<div class="menu-acciones">${ops.map(([id, ic, t, sub]) => `<button type="button" class="menu-op menu-op-dato" data-ed="${id}"><span>${ic}</span><span class="mo-texto"><strong>${t}</strong><small>${esc(sub)}</small></span><span class="mo-flecha">›</span></button>`).join('')}</div>`
+    });
+    el.querySelectorAll('[data-ed]').forEach(b => b.onclick = () => { U.cerrarModal(); editarParte(v, b.dataset.ed); });
+  }
+
   /** Menú ⋯ del viaje: lo que se usa poco, fuera de la vista. */
   function menuViaje(v) {
     const ops = [];
     if (R.db.puedeOrganizar(v)) {
-      ops.push(['editar', '✏️', 'Editar destinos, fechas y opciones']);
+      ops.push(['editar', '✏️', 'Editar el viaje']);
       if (estadoViaje(v) !== 'pasado') ops.push(['cambio', '🔄', 'Cambiaron los planes']);
     }
-    if (R.preguntar && R.db.modo() === 'nube') ops.push(['preguntar', '✨', 'Preguntale a Rutenda']);
+    if (R.preguntar && U.conIA()) ops.push(['preguntar', '💬', 'Preguntale a Rutenda (IA)']);
     ops.push(['viajeros', '👥', 'Viajeros']);
     ops.push(['ruta', '🗺️', 'Ver la ruta en Google Maps']);
     if (estadoViaje(v) === 'en_curso') ops.push(['guia', '🧭', 'Guía de organización']);
@@ -792,7 +856,7 @@ R.viajes = (function () {
     el.querySelectorAll('[data-op]').forEach(b => b.onclick = async () => {
       const op = b.dataset.op;
       U.cerrarModal();
-      if (op === 'editar') abrirAsistente(v);
+      if (op === 'editar') menuEditar(v);
       else if (op === 'cambio') R.vistaGuia.cambioDePlanes(v);
       else if (op === 'preguntar') R.preguntar.abrir(v);
       else if (op === 'ruta') R.gmaps.abrirRutaViaje(v);
@@ -828,8 +892,8 @@ R.viajes = (function () {
         ${U.paisaje(v)}
         <button class="btn-menu-viaje" data-a="menu" aria-label="Opciones del viaje">⋯</button>
         <div class="portada-contenido">
-          <h1>${esc(titulo)}</h1>
-          <p class="portada-meta">${esc(U.fmtRango(v.fechaInicio, v.fechaFin))} · <strong>${esc(cuentaRegresiva(v))}</strong></p>
+          <h1 ${R.db.puedeOrganizar(v) ? 'class="editable" data-editar="nombre" title="Cambiar el nombre"' : ''}>${esc(titulo)}</h1>
+          <p class="portada-meta"><span ${R.db.puedeOrganizar(v) ? 'class="editable" data-editar="fechas" title="Cambiar fechas y traslados"' : ''}>${esc(U.fmtRango(v.fechaInicio, v.fechaFin) || 'Sin fechas')}</span> · <strong>${esc(cuentaRegresiva(v))}</strong></p>
           ${grande ? `
           <div class="portada-pie">
             <a class="portada-avatares" href="#viaje/${v.id}/viajeros" title="Viajeros">${personas.map(p => U.avatar(p, 30)).join('')}<span class="pa-mas">${personas.length > 1 ? personas.length + ' viajeros' : '+ Viajeros'}</span></a>
@@ -844,6 +908,7 @@ R.viajes = (function () {
       <section class="contenido-pestana" id="contPestana"></section>`;
 
     app.querySelector('[data-a="menu"]').onclick = () => menuViaje(v);
+    app.querySelectorAll('.portada-viaje [data-editar]').forEach(x => x.onclick = () => editarParte(v, x.dataset.editar));
     const bRes = app.querySelector('[data-a="verResumen"]');
     if (bRes) bRes.onclick = () => R.resumen.abrir(v);
     const bEj = app.querySelector('[data-a="borrarEjemplo"]');
@@ -961,6 +1026,6 @@ R.viajes = (function () {
   return {
     crearEjemplo, borrarEjemplo,
     TIPOS, PESTANAS, EXTRAS, tipoDe, etiquetaTransporte, estadoViaje, cuentaRegresiva, destinoCompleto, deteccionInternacional, recalcularTramos,
-    abrirAsistente, renderViaje, tarjeta, siguienteHTML, marcarRaizResuelta
+    abrirAsistente, editarParte, menuEditar, renderViaje, tarjeta, siguienteHTML, marcarRaizResuelta
   };
 })();

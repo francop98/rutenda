@@ -5,7 +5,7 @@
 window.R = window.R || {};
 
 /** Versión de la app (cambios chicos: 10.1, 10.2…; cambios grandes: 11, 12…). Igual que VERSION en sw.js. */
-window.R.VERSION = '22.1';
+window.R.VERSION = '23';
 
 R.util = (function () {
   const pad = n => String(n).padStart(2, '0');
@@ -194,7 +194,15 @@ R.util = (function () {
       </div>`;
     capa.appendChild(el);
     bloquearFondo();
-    el.addEventListener('mousedown', e => { if (e.target === el) cerrarModal(); });
+    // Si ya escribiste algo, tocar afuera no cierra (para no perder lo cargado por un toque sin querer)
+    let tocado = false;
+    el.addEventListener('input', () => { tocado = true; });
+    el.addEventListener('change', () => { tocado = true; });
+    el.addEventListener('mousedown', e => {
+      if (e.target !== el) return;
+      if (tocado || opciones.fijo) { const m = el.querySelector('.modal'); if (m) { m.classList.remove('modal-sacudir'); void m.offsetWidth; m.classList.add('modal-sacudir'); } return; }
+      cerrarModal();
+    });
     el.querySelector('.modal-x').addEventListener('click', cerrarModal);
     el.querySelectorAll('[data-accion]').forEach(b => {
       b.addEventListener('click', () => {
@@ -329,7 +337,44 @@ R.util = (function () {
     return (lista || []).slice().sort((a, b) => alfa(f(a), f(b)));
   }
 
+  /**
+   * Zona para elegir archivos que se van sumando (uno, después otro…), con × para quitar.
+   * archivos: array que se modifica. Devuelve el HTML; después llamá a enlazarArchivos.
+   */
+  function zonaArchivos(clave, archivos, texto, chica) {
+    return `<div class="zona-multi" data-zona="${clave}">
+      ${archivos.length ? `<ul class="za-lista">${archivos.map((f, i) => `<li><span>${/^image\//.test(f.type || '') ? '🖼️' : '📄'} ${esc(f.name)}</span><button type="button" class="btn-icono" data-quitar-archivo="${i}" aria-label="Quitar">×</button></li>`).join('')}</ul>` : ''}
+      <label class="zona-archivo ${chica ? 'zona-archivo-chica' : ''} ${archivos.length ? 'za-mas' : ''}">
+        <input type="file" multiple accept="image/*,application/pdf,.doc,.docx,.txt">
+        <span class="za-icono">${archivos.length ? '+' : chica ? '📎' : '⬆'}</span>
+        <span>${archivos.length ? 'Sumar otro archivo' : esc(texto || 'Elegí uno o varios archivos (fotos o PDF)')}</span>
+      </label>
+    </div>`;
+  }
+  function enlazarArchivos(raiz, clave, archivos, alCambiar) {
+    const z = raiz.querySelector(`[data-zona="${clave}"]`);
+    if (!z) return;
+    const inp = z.querySelector('input[type="file"]');
+    inp.onchange = () => { archivos.push(...Array.from(inp.files)); inp.value = ''; alCambiar(); };
+    z.querySelectorAll('[data-quitar-archivo]').forEach(b => b.onclick = e => { e.preventDefault(); archivos.splice(Number(b.dataset.quitarArchivo), 1); alCambiar(); });
+  }
+  /** Repinta solo la zona (sin tocar el resto del formulario). */
+  function repintarArchivos(raiz, clave, archivos, texto, chica, alCambiar) {
+    const z = raiz.querySelector(`[data-zona="${clave}"]`);
+    if (!z) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = zonaArchivos(clave, archivos, texto, chica);
+    z.replaceWith(tmp.firstElementChild);
+    enlazarArchivos(raiz, clave, archivos, () => { repintarArchivos(raiz, clave, archivos, texto, chica, alCambiar); if (alCambiar) alCambiar(); });
+  }
+
+  /** ¿Están prendidas las ayudas con IA? (Mi cuenta → Ayudas con IA). Necesitan la cuenta en la nube. */
+  function conIA() {
+    try { return R.db.modo() === 'nube' && R.db.prefs().ia !== false; } catch (e) { return false; }
+  }
+
   return {
+    conIA, zonaArchivos, enlazarArchivos, repintarArchivos,
     tema, aplicarTema, letra, aplicarLetra, vacio, alfa, ordenAlfa,
     campoClave, enlazarClaves, sugerirFechas,
     MONEDAS, fondoBloqueado, id, esc, aISO, hoyISO, aFecha, sumarDias, diasEntre, fmtFecha, fmtRango, plural,

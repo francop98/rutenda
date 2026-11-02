@@ -149,7 +149,8 @@ R.guia = (function () {
       desc: 'Subí a Documentos fotos o PDFs de pasaporte, DNI, pasajes y reservas.',
       consejo: 'Si perdés algo durante el viaje, tener la copia a mano acelera cualquier trámite.',
       porque: 'Es rápido y te salva ante cualquier pérdida.',
-      impacto: 2, anticipacion: 5, dependeDe: [], docCategoria: 'identidad'
+      impacto: 2, anticipacion: 5, dependeDe: [], docCategoria: 'identidad',
+      hechaSi: v => (v.documentos || []).some(d => d.categoria === 'identidad')
     },
 
     /* ---------- Transporte ---------- */
@@ -185,7 +186,9 @@ R.guia = (function () {
       desc: 'Seleccioná asientos y confirmá cuánto equipaje incluye tu tarifa (y si conviene sumar valija).',
       consejo: 'Sumar equipaje al reservar suele ser más barato que pagarlo en el aeropuerto.',
       porque: 'Detalle importante pero que se puede resolver más cerca de la fecha.',
-      impacto: 2, anticipacion: 14, dependeDe: ['t_segmento'], aplica: usa('avion')
+      impacto: 2, anticipacion: 14, dependeDe: ['t_segmento'], aplica: usa('avion'),
+      cubiertaSi: v => R.recorrido.segmentos(v).some(x => x.seg.medio === 'avion' && !R.motor.resuelta(v, 's_checkin__' + x.seg.id)),
+      hechaSi: v => { const ds = Object.keys(v.tareas || {}).filter(k => /^t_segmento__/.test(k)).map(k => v.tareas[k].datos).filter(Boolean); return ds.length > 0 && ds.every(d => d.asientos || (d.equipaje && d.equipaje !== 'Sin definir')); }
     },
 
     /* ---------- Alojamiento ---------- */
@@ -199,11 +202,12 @@ R.guia = (function () {
     },
     {
       id: 'a_confirmar', rec: true, fase: 'alojamiento', porDestino: true,
-      titulo: (v, c) => c.varios ? `Confirmar check-in en ${c.destino.nombre}` : 'Confirmar reserva y horario de check-in',
-      desc: 'Revisá que la reserva esté confirmada y avisá tu horario estimado de llegada.',
+      titulo: (v, c) => c.varios ? `Avisar al alojamiento de ${c.destino.nombre} a qué hora llegás` : 'Avisar al alojamiento a qué hora llegás',
+      desc: 'Confirmá la reserva y avisá tu horario estimado de llegada. Cuando cargues la hora de check-in en el alojamiento, lo doy por hecho.',
       consejo: 'Si llegás tarde de noche, avisalo: algunos lugares no tienen recepción 24 h.',
       porque: 'Evita sorpresas al llegar cansado.',
-      impacto: 2, anticipacion: 7, dependeDe: ['a_reserva']
+      impacto: 2, anticipacion: 7, dependeDe: ['a_reserva'],
+      hechaSi: (v, c) => { const d = ((v.tareas || {})['a_reserva__' + (c.destino || {}).id] || {}).datos; return !!(d && d.checkinHora); }
     },
 
     /* ---------- Seguro y salud ---------- */
@@ -287,7 +291,8 @@ R.guia = (function () {
       desc: 'En la sección 🎟️ Qué hacer anotá lugares, excursiones y comidas que no te querés perder.',
       consejo: 'Separá lo que necesita reserva de lo que se puede improvisar.',
       porque: 'Te ayuda a detectar qué hay que reservar con anticipación.',
-      impacto: 2, anticipacion: 30, dependeDe: ['d_destino']
+      impacto: 2, anticipacion: 30, dependeDe: ['d_destino'],
+      hechaSi: v => !!(R.ideas && R.ideas.cuenta(v) >= 3)
     },
     {
       id: 'e_excursiones', fase: 'experiencias', titulo: 'Reservar excursiones y entradas con cupo',
@@ -311,7 +316,8 @@ R.guia = (function () {
       desc: 'Distribuí actividades en los días del viaje en la pestaña Itinerario.',
       consejo: 'Dejá huecos libres: los mejores momentos muchas veces son los no planeados.',
       porque: 'Ordena todo lo anterior; se arma mejor con transporte y alojamiento definidos.',
-      impacto: 2, anticipacion: 10, dependeDe: ['d_fechas'], despuesDe: ['t_segmento', 'a_reserva', 'e_excursiones']
+      impacto: 2, anticipacion: 10, dependeDe: ['d_fechas'], despuesDe: ['t_segmento', 'a_reserva', 'e_excursiones'],
+      hechaSi: v => !!(R.ideas && R.ideas.todos(v).filter(p => p.fecha).length + (v.itinerario || []).filter(e => !/^(t_segmento__|a_reserva)/.test(e.origen || '')).length >= 3)
     },
 
     /* ---------- Conectividad ---------- */
@@ -378,10 +384,10 @@ R.guia = (function () {
     {
       id: 's_checkin', fase: 'salida', porSegmento: true, soloMedio: 'avion',
       titulo: (v, c) => `Check-in online: ${c.seg.desde.nombre} → ${c.seg.hasta.nombre}`,
-      desc: 'Se habilita normalmente entre 24 y 48 h antes del vuelo. Hasta entonces queda en tus pendientes.',
+      desc: (v, c) => { const k = checkin(v, c.seg); return k && k.conocida ? `${k.aerolinea} lo habilita ${k.horas} h antes del vuelo${k.hora ? ` (el ${R.util.fmtFecha(k.fecha, 'dia')} a las ${k.hora})` : ''}. Hasta entonces queda en tus pendientes.` : 'Se habilita entre 24 y 72 h antes del vuelo, según la aerolínea. Cargá la aerolínea en el pasaje y te digo el día exacto.'; },
       consejo: 'Guardá la tarjeta de embarque en el teléfono y subila a Documentos.',
       porque: 'Tiene una ventana de tiempo concreta antes del vuelo.',
-      impacto: 3, anticipacion: 1, ventanaDias: 2, fechaBase: (v, c) => c.fechaVuelo || c.fecha || '',
+      impacto: 3, anticipacion: 0, ventanaDias: 0, fechaBase: (v, c) => { const k = checkin(v, c.seg); return k ? k.fecha : (c.fechaVuelo || c.fecha || ''); },
       dependeDe: ['t_segmento'], docCategoria: 'pasaje'
     },
     {
@@ -396,21 +402,24 @@ R.guia = (function () {
       desc: 'Prepará ropa según el clima, cargadores, adaptadores y lo esencial en el equipaje de mano.',
       consejo: 'En el equipaje de mano: documentos, medicación, cargador y una muda de ropa.',
       porque: 'Se hace sobre la fecha, con el pronóstico a mano.',
-      impacto: 2, anticipacion: 1, dependeDe: []
+      impacto: 2, anticipacion: 1, dependeDe: [],
+      hechaSi: v => Object.values(v.valijas || {}).some(x => (x.items || []).length >= 5)
     },
     {
       id: 's_compartir', rec: true, fase: 'salida', titulo: 'Compartir el itinerario con alguien de confianza',
       desc: 'Pasale a alguien que se queda las fechas, dónde vas a dormir y cómo contactarte. Desde el itinerario podés descargar el PDF.',
       consejo: 'Sumá el teléfono del alojamiento y del seguro de viaje.',
       porque: 'Ante cualquier imprevisto, alguien sabe dónde estás.',
-      impacto: 2, anticipacion: 2, dependeDe: []
+      impacto: 2, anticipacion: 2, dependeDe: [],
+      hechaSi: v => !!(v.linkFamilia && v.linkFamilia.activo)
     },
     {
       id: 's_repaso', rec: true, fase: 'salida', titulo: 'Repasar documentos y horarios del primer día',
       desc: 'Revisá que tengas todo: documentos, reservas, horarios de salida y cómo llegar al alojamiento.',
       consejo: 'Calculá con margen el horario para salir hacia el aeropuerto o terminal.',
       porque: 'El último control antes de salir.',
-      impacto: 3, anticipacion: 1, dependeDe: ['a_reserva'], despuesDe: ['t_segmento']
+      impacto: 3, anticipacion: 1, dependeDe: ['a_reserva'], despuesDe: ['t_segmento'],
+      cubiertaSi: () => !!R.salida
     },
 
     /* ---------- Durante y al volver ---------- */
@@ -435,5 +444,36 @@ R.guia = (function () {
 
   function fase(id) { return fases.find(f => f.id === id) || { id, nombre: 'Otros', icono: '📌' }; }
 
-  return { TRANSPORTE, fases, tareas, motivosCambio, ESTADOS, fase };
+  /* ---------- Check-in online: cuándo se habilita según la aerolínea ---------- */
+  // Horas antes del vuelo (lo que publica cada aerolínea). Si no la conocemos, 24 h.
+  const CHECKIN_HORAS = [
+    [/jet ?smart|^(WJ|JA)\d/i, 72, 'JetSMART'],
+    [/aerol[ií]neas argentinas|^AR\d/i, 24, 'Aerolíneas Argentinas'],
+    [/flybondi|^FO\d/i, 48, 'Flybondi'],
+    [/latam|^(LA|JJ|LP|XL|4C)\d/i, 48, 'LATAM'],
+    [/gol\b|^G3\d/i, 48, 'Gol'],
+    [/azul|^AD\d/i, 72, 'Azul'],
+    [/copa|^CM\d/i, 24, 'Copa'],
+    [/sky|^H2\d/i, 48, 'Sky'],
+    [/iberia|^IB\d/i, 24, 'Iberia'],
+    [/air europa|^UX\d/i, 24, 'Air Europa']
+  ];
+  /** { fecha, hora, horas, aerolinea } de cuándo se habilita el check-in de un tramo en avión. */
+  function checkin(v, seg) {
+    if (!seg || !seg.sale || !seg.sale.fecha) return null;
+    const d = ((v.tareas || {})['t_segmento__' + seg.id] || {}).datos || {};
+    const tr = (d.tramos || [])[0] || {};
+    const clave = `${String(tr.numero || '').replace(/\s/g, '').toUpperCase()} ${tr.empresa || ''}`;
+    const fila = CHECKIN_HORAS.find(([re]) => re.test(String(tr.numero || '').replace(/\s/g, '')) || re.test(tr.empresa || '')) || null;
+    const horas = fila ? fila[1] : 24;
+    const hora = tr.horaSalida || seg.sale.hora || '';
+    const [hh, mm] = (hora || '12:00').split(':').map(Number);
+    const sale = new Date(seg.sale.fecha + 'T00:00:00');
+    sale.setHours(hh || 0, mm || 0, 0, 0);
+    const abre = new Date(sale.getTime() - horas * 3600000);
+    const iso = `${abre.getFullYear()}-${String(abre.getMonth() + 1).padStart(2, '0')}-${String(abre.getDate()).padStart(2, '0')}`;
+    return { fecha: iso, hora: hora ? `${String(abre.getHours()).padStart(2, '0')}:${String(abre.getMinutes()).padStart(2, '0')}` : '', horas, aerolinea: fila ? fila[2] : '', conocida: !!fila, clave };
+  }
+
+  return { TRANSPORTE, fases, tareas, motivosCambio, ESTADOS, fase, checkin, CHECKIN_HORAS };
 })();

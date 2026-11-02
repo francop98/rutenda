@@ -51,6 +51,9 @@ R.itinerario = (function () {
    * Arma un día: { fecha, numero, amaneces, dormis, items[], lugarPrincipal, clima }
    * items: { hora, icono, titulo, sub, clase, evento?, docs[] }
    */
+  /** Eventos que el itinerario ya arma solo (traslados y check-in/out): no se repiten. */
+  const aparte = e => /^(t_segmento__|a_reserva)/.test(e.origen || '');
+
   function diaDe(v, fecha) {
     const segs = C().todosLosSegmentos(v.recorrido);
     const est = C().estadias(v);
@@ -83,15 +86,15 @@ R.itinerario = (function () {
 
     est.forEach(e => {
       const a = datosAloj(v, e.id);
-      if (a && a.checkinFecha === fecha) items.push({ hora: a.checkinHora, icono: '🏨', clase: 'ev-aloj', titulo: `Check-in · ${a.nombre || e.nombre}`, sub: [a.direccion, a.codigo ? 'Cód. ' + a.codigo : ''].filter(Boolean).join(' · '), docs: documentosDe(v, 'a_reserva__' + e.id), lugar: lugarAloj(a, e) });
-      if (a && a.checkoutFecha === fecha) items.push({ hora: a.checkoutHora, icono: '🧳', clase: 'ev-aloj', titulo: `Check-out · ${a.nombre || e.nombre}`, sub: a.direccion || '', docs: [], lugar: lugarAloj(a, e) });
+      if (a && a.checkinFecha === fecha) items.push({ hora: a.checkinHora, icono: '🏨', clase: 'ev-aloj', titulo: `Check-in · ${a.nombre || e.nombre}`, sub: [a.direccion, a.codigo ? 'Cód. ' + a.codigo : ''].filter(Boolean).join(' · '), docs: documentosDe(v, 'a_reserva__' + e.id), lugar: lugarAloj(a, e), tareaId: 'a_reserva__' + e.id });
+      if (a && a.checkoutFecha === fecha) items.push({ hora: a.checkoutHora, icono: '🧳', clase: 'ev-aloj', titulo: `Check-out · ${a.nombre || e.nombre}`, sub: a.direccion || '', docs: [], lugar: lugarAloj(a, e), tareaId: 'a_reserva__' + e.id });
     });
 
     (v.destinos || []).filter(d => d.soloDia && d.nombre && d.fecha === fecha && !d.fechaPendiente).forEach(d => {
       items.push({ hora: '', icono: '☀️', clase: 'ev-escapada', aire: true, titulo: `Escapada a ${d.nombre}`, sub: 'Volvés en el día', docs: documentosDe(v, 'e_escapada__' + d.id), lugar: R.gmaps ? R.gmaps.textoLugar(d) : d.nombre });
     });
 
-    (v.itinerario || []).filter(e => e.fecha === fecha && !(e.origen || '').startsWith('t_segmento__')).forEach(e => {
+    (v.itinerario || []).filter(e => e.fecha === fecha && !aparte(e)).forEach(e => {
       items.push({ hora: e.hora, icono: tipo(e.tipo).icono, clase: 'ev-propio', titulo: e.titulo, sub: [e.lugar && '📍 ' + e.lugar, e.confirmacion && 'Cód. ' + e.confirmacion, e.notas].filter(Boolean).join(' · '), evento: e.id, origen: e.origen, docs: [], lugar: conCiudad(e.lugar, ciudad), aire: esAireLibre(e.tipo, e.titulo + ' ' + (e.lugar || '')) });
     });
 
@@ -111,7 +114,7 @@ R.itinerario = (function () {
     let dormis = null;
     if (durmiendo) {
       const a = datosAloj(v, durmiendo.id);
-      dormis = { icono: '🛏️', texto: a && a.nombre ? `${a.nombre}, ${durmiendo.nombre}` : `${durmiendo.nombre} · alojamiento a reservar`, direccion: a && a.direccion ? a.direccion : '', falta: !a };
+      dormis = { icono: '🛏️', texto: a && a.nombre ? `${a.nombre}, ${durmiendo.nombre}` : `${durmiendo.nombre} · alojamiento a reservar`, direccion: a && a.direccion ? a.direccion : '', falta: !a, tareaId: 'a_reserva__' + durmiendo.id };
     } else {
       const nocheViajando = segs.find(x => x.seg.sale.fecha && x.seg.sale.fecha <= fecha && C().fechaLlega(x.seg) > fecha);
       if (nocheViajando) dormis = { icono: '🌙', texto: `Noche viajando en ${C().medio(nocheViajando.seg.medio).nombre.toLowerCase()}`, direccion: '' };
@@ -133,7 +136,7 @@ R.itinerario = (function () {
     const dias = diasDelViaje(v);
     const avisos = C().validar(v).filter(a => a.nivel !== 'info' || /Faltan|Falta/.test(a.texto));
     const hoy = U.hoyISO();
-    const fuera = (v.itinerario || []).filter(e => !(e.origen || '').startsWith('t_segmento__') && (!e.fecha || !dias.includes(e.fecha)));
+    const fuera = (v.itinerario || []).filter(e => !aparte(e) && (!e.fecha || !dias.includes(e.fecha)));
     const sinDia = R.ideas ? R.ideas.sinDia(v) : [];
 
     cont.innerHTML = `
@@ -182,10 +185,25 @@ R.itinerario = (function () {
     };
     cont.querySelectorAll('[data-agregar]').forEach(b => b.onclick = () => editar(v, null, b.dataset.agregar));
     cont.querySelectorAll('[data-evento]').forEach(b => b.onclick = () => editar(v, b.dataset.evento));
+    enlazarDatos(cont, v);
     cont.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const [d, id] = b.dataset.plan.split('|'); R.ideas.editar(v, d, id, () => render(v, cont)); });
     cont.querySelectorAll('[data-doc]').forEach(b => b.onclick = e => { e.stopPropagation(); R.documentos.abrir(v.documentos.find(d => d.id === b.dataset.doc), v); });
     if (R.ordenar) R.ordenar.enlazar(cont, v);
     cargarClima(v, cont); cargarFeriados(v, cont);
+  }
+
+  /** Tocar un traslado, un check-in o "dónde dormís" abre sus datos para cambiarlos ahí mismo. */
+  function enlazarDatos(cont, v) {
+    cont.querySelectorAll('[data-dato]').forEach(b => b.onclick = e => {
+      if (e.target.closest('a, button')) return;
+      editarDato(v, b.dataset.dato);
+    });
+  }
+  function editarDato(v, id) {
+    if (!R.db.puedeOrganizar(v)) return;
+    const t = R.motor.lista(v).find(x => x.id === id);
+    if (t && R.formularios.tiene(t)) R.formularios.abrir(v, id);
+    else if (/^t_segmento__/.test(id)) editarCronograma(v);
   }
 
   /** Abre la sección "Qué hacer" del viaje. */
@@ -195,7 +213,7 @@ R.itinerario = (function () {
 
   function itemHTML(it) {
     return `
-      <article class="evento ${it.clase || ''}" ${it.evento ? `data-evento="${it.evento}"` : ''} ${it.plan ? `data-plan="${it.plan}"` : ''}>
+      <article class="evento ${it.clase || ''} ${it.tareaId ? 'ev-editable' : ''}" ${it.evento ? `data-evento="${it.evento}"` : ''} ${it.plan ? `data-plan="${it.plan}"` : ''} ${it.tareaId ? `data-dato="${it.tareaId}"` : ''}>
         <span class="ev-hora">${esc(it.hora || '—')}</span>
         <span class="ev-icono">${it.icono}</span>
         <div class="ev-texto">
@@ -237,7 +255,7 @@ R.itinerario = (function () {
   }
 
   function dormisHTML(dm) {
-    return dm ? `<p class="dia-linea dia-dormis ${dm.falta ? 'falta' : ''}">${dm.icono} ${esc(dm.texto)}${dm.direccion ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dm.direccion)}" target="_blank" rel="noopener">${esc(dm.direccion)}</a>` : ''}</p>` : '';
+    return dm ? `<p class="dia-linea dia-dormis ${dm.falta ? 'falta' : ''} ${dm.tareaId ? 'ev-editable' : ''}" ${dm.tareaId ? `data-dato="${dm.tareaId}"` : ''}>${dm.icono} ${esc(dm.texto)}${dm.direccion ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dm.direccion)}" target="_blank" rel="noopener">${esc(dm.direccion)}</a>` : ''}</p>` : '';
   }
 
   function grupoHTML(a, b, dormis) {
@@ -472,7 +490,7 @@ R.itinerario = (function () {
       if (a && a.checkoutFecha) agregar(a.checkoutFecha, a.checkoutHora, '', '', e.lugar.zona, `🧳 Check-out ${a.nombre || e.nombre}`, '', a.direccion || e.nombre);
     });
     (v.destinos || []).filter(d => d.soloDia && d.fecha && !d.fechaPendiente).forEach(d => agregar(d.fecha, '', '', '', '', `☀️ Escapada a ${d.nombre}`, '', d.nombre));
-    (v.itinerario || []).filter(e => e.fecha && !(e.origen || '').startsWith('t_segmento__')).forEach(e => agregar(e.fecha, e.hora, '', '', '', e.titulo, [e.confirmacion && 'Código ' + e.confirmacion, e.notas].filter(Boolean).join(' · '), e.lugar));
+    (v.itinerario || []).filter(e => e.fecha && !aparte(e)).forEach(e => agregar(e.fecha, e.hora, '', '', '', e.titulo, [e.confirmacion && 'Código ' + e.confirmacion, e.notas].filter(Boolean).join(' · '), e.lugar));
     if (v.fechaInicio && v.fechaFin) agregar(v.fechaInicio, '', '', U.sumarDias(v.fechaFin, 1), '', `🧳 Viaje: ${v.nombre || R.viajes.destinoCompleto(v)}`, '', '');
     return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Rutenda//ES', 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${icsTexto(v.nombre || 'Rutenda')}`].concat(ev).concat(['END:VCALENDAR']).join('\r\n');
   }
@@ -536,13 +554,15 @@ R.itinerario = (function () {
           <label class="campo"><span>Fecha</span><input type="date" id="iFecha" value="${esc(e.fecha)}" min="${esc(v.fechaInicio || '')}" max="${esc(v.fechaFin || '')}"></label>
           <label class="campo"><span>Hora</span><input type="time" id="iHora" value="${esc(e.hora)}"></label>
         </div>
-        <div class="grilla-2">
-          <label class="campo"><span>Lugar</span><input id="iLugar" value="${esc(e.lugar)}" placeholder="Dirección o referencia"></label>
-          <label class="campo"><span>Código de reserva</span><input id="iConf" value="${esc(e.confirmacion)}"></label>
-        </div>
+        <label class="campo"><span>Lugar</span><input id="iLugar" value="${esc(e.lugar)}" placeholder="Escribí el lugar y elegí de la lista"></label>
+        <label class="campo"><span>Código de reserva <small>(opcional)</small></span><input id="iConf" value="${esc(e.confirmacion)}"></label>
         <label class="campo"><span>Notas</span><textarea id="iNotas" rows="2">${esc(e.notas)}</textarea></label>`,
       acciones,
       alAbrir: el => {
+        if (R.direcciones) {
+          const est = C().estadias(v).find(x => x.desde && x.desde <= e.fecha && e.fecha <= (x.hasta || x.desde));
+          R.direcciones.enlazar(el.querySelector('#iLugar'), { cerca: R.direcciones.cercaDe(v, est && est.lugar) });
+        }
         el.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => {
           el.querySelector('#iTipo').value = b.dataset.tipo;
           el.querySelectorAll('[data-tipo]').forEach(x => x.classList.toggle('activo', x === b));
@@ -638,7 +658,6 @@ R.itinerario = (function () {
           <button class="btn btn-primario" data-a="gasto">− Cargar gasto</button>
         </section>
         <button type="button" class="btn btn-texto btn-chico hoy-algo-mal" data-a="algoMal">🧭 ¿Algo salió mal? Qué hacer si…</button>
-        ${R.preguntar && R.db.modo() === 'nube' ? '<button type="button" class="barra-preguntar" data-a="preguntar"><span>✨</span><span><strong>Preguntale a Rutenda</strong><small>¿Qué hay mañana? ¿Cuánto llevo gastado?</small></span><b>Preguntar →</b></button>' : ''}
 
         ${ultimo && !(R.vuelta && R.vuelta.aplica(v)) ? `
           <section class="bloque">
@@ -668,6 +687,7 @@ R.itinerario = (function () {
     cont.querySelectorAll('[data-tarea-hoy]').forEach(b => b.onclick = () => R.vistaGuia.abrirTarea(v, b.dataset.tareaHoy));
     cont.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const [d, id] = b.dataset.plan.split('|'); R.ideas.editar(v, d, id, () => renderHoy(v, cont)); });
     cont.querySelectorAll('[data-evento]').forEach(b => b.onclick = () => editar(v, b.dataset.evento));
+    enlazarDatos(cont, v);
     cont.querySelectorAll('[data-doc]').forEach(b => b.onclick = e => { e.stopPropagation(); R.documentos.abrir(v.documentos.find(x => x.id === b.dataset.doc), v); });
     // Clima de hoy y de mañana (y aviso si llueve con planes al aire libre)
     cargarClima(v, cont);

@@ -67,9 +67,9 @@ R.costumbres = (function () {
       <div class="cost-dest" data-cost-dest="${d.id}">
         ${varios ? `<h4>${R.lugares.bandera(d.codigoPais) || '📍'} ${esc(d.nombre)}</h4>` : ''}
         ${horaHTML(v, d)}
-        ${r ? datosHTML(r) : `
-          <button type="button" class="btn btn-suave btn-chico" data-costumbres="${d.id}" ${enCurso ? 'disabled' : ''}>${enCurso ? 'Buscando…' : `✨ Ver cómo es ${esc(d.nombre)}`}</button>
-          <small class="texto-tenue cost-ayuda">Horarios de comida, platos típicos, costumbres y frases. Usa una consulta de IA, solo cuando lo tocás.</small>`}
+        ${r ? datosHTML(r) : U.conIA() ? `
+          <button type="button" class="btn btn-suave btn-chico" data-costumbres="${d.id}" ${enCurso ? 'disabled' : ''}>${enCurso ? 'Buscando…' : `🌎 Ver cómo es ${esc(d.nombre)} (IA)`}</button>
+          <small class="texto-tenue cost-ayuda">Horarios de comida, platos típicos, costumbres y frases.</small>` : ''}
       </div>`;
   }
 
