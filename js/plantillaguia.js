@@ -305,7 +305,7 @@ R.guia = (function () {
     },
     {
       id: 'e_escapada', fase: 'experiencias', porEscapada: true,
-      titulo: (v, c) => `Organizar la escapada a ${c.destino.nombre}`,
+      titulo: (v, c) => `Organizar el paseo de un día a ${c.destino.nombre}`,
       desc: 'Aunque sea por el día: cómo ir y volver, cruce de frontera, documentación y horarios.',
       consejo: 'Si cruzás a otro país, llevá el documento original de todos (también de los menores) y revisá el horario de la frontera.',
       porque: 'Un cruce de un día también necesita documentación y logística.',
@@ -479,15 +479,19 @@ R.guia = (function () {
   // solo: únicos pasos que entran · sin: pasos que no entran · pestanas: las que se ven (el resto, en el menú ⋯)
   const ESCAPADA = ['d_destino', 'd_participantes', 'd_fechas', 't_segmento', 'pq_paquete', 'a_reserva', 'mv_auto', 's_checkin', 's_valija', 's_mascotas',
     'doc_pasaporte', 'doc_requisitos', 'doc_visa', 'doc_menores', 'doc_licencia', 'x_mascota_viaja', 'x_accesibilidad', 'x_evento', 'x_equipo'];
+  const DIA = ['d_destino', 'd_participantes', 'd_fechas', 't_segmento', 'mv_auto', 'doc_pasaporte', 'doc_requisitos', 'doc_visa', 'doc_menores', 'doc_licencia', 'x_mascota_viaja', 'x_accesibilidad', 'x_evento', 'x_equipo'];
   const TIPOS_VIAJE = [
-    { id: 'vacaciones', nombre: 'Vacaciones', icono: '🏖️', desc: 'Con todo: reservas, excursiones, qué hacer, documentos y recomendaciones.' },
-    { id: 'escapada', nombre: 'Escapada', icono: '🌿', desc: 'Unos días, sin vueltas. Lo justo: cómo llegás, dónde dormís, la valija y los gastos.', solo: ESCAPADA, pestanas: ['guia', 'gastos', 'valija'] },
-    { id: 'familia', nombre: 'Visita a familia o amigos', icono: '🏠', desc: 'Dormís en su casa: el traslado, la valija y los gastos.', solo: ESCAPADA.filter(x => x !== 'a_reserva'), pestanas: ['guia', 'itinerario', 'gastos', 'valija'], sinAlojamiento: true },
-    { id: 'evento', nombre: 'Evento', icono: '🎉', desc: 'Casamiento, recital, partido, cumple: la entrada, cómo llegás, dónde dormís y qué ponerte.', solo: ESCAPADA, pestanas: ['guia', 'itinerario', 'gastos', 'valija'] },
+    { id: 'vacaciones', nombre: 'Vacaciones programadas', icono: '🏖️', desc: 'Con todo planificado: pasajes, alojamiento, excursiones, qué hacer, documentos y recomendaciones.' },
+    { id: 'escapada', nombre: 'Escapada / viaje corto', icono: '🌿', desc: 'Unos días, sin vueltas. Lo justo: cómo llegás, dónde dormís, la valija y los gastos.', solo: ESCAPADA, pestanas: ['guia', 'gastos', 'valija'] },
+    { id: 'dia', nombre: 'Pasar el día', icono: '☀️', desc: 'Vas y volvés en el día: cómo llegás, a qué hora volvés y los gastos. Sin alojamiento ni valija.', solo: DIA, pestanas: ['guia', 'itinerario', 'gastos'], sinAlojamiento: true, mismoDia: true, medio: 'auto' },
     { id: 'trabajo', nombre: 'Trabajo', icono: '💼', desc: 'Traslados, alojamiento y gastos para rendir. Sin excursiones.', sin: ['e_imperdibles', 'e_excursiones', 'e_itinerario', 'mv_local', 'c_offline', 's_compartir'], pestanas: ['guia', 'itinerario', 'gastos', 'valija', 'documentos'] },
-    { id: 'ruta', nombre: 'En ruta (auto)', icono: '🚗', desc: 'Manejando: el auto a punto, las paradas, dónde dormir y qué hacer.', medio: 'auto' },
+    { id: 'familia', nombre: 'Visitar familia o amigos', icono: '🏠', desc: 'Dormís en su casa: el traslado, la valija y los gastos.', solo: ESCAPADA.filter(x => x !== 'a_reserva'), pestanas: ['guia', 'itinerario', 'gastos', 'valija'], sinAlojamiento: true },
+    { id: 'evento', nombre: 'Ir a un evento', icono: '🎉', desc: 'Casamiento, recital, partido, cumple: la entrada, cómo llegás, dónde dormís y qué ponerte.', solo: ESCAPADA, pestanas: ['guia', 'itinerario', 'gastos', 'valija'] },
+    { id: 'ruta', nombre: 'Viaje en auto (ruta)', icono: '🚗', desc: 'Manejando: el auto a punto, las paradas, dónde dormir y qué hacer.', medio: 'auto' },
+    { id: 'chicos', nombre: 'Con chicos', icono: '🧸', desc: 'Todo planificado, pensando en los más chicos: autorizaciones, documentos de menores y qué llevar.', perfil: { menores: true } },
+    { id: 'pareja', nombre: 'Luna de miel o aniversario', icono: '💞', desc: 'Planificado y con un momento especial: reservas, sorpresa y lo que no puede fallar.', perfil: { eventoEspecial: true } },
     { id: 'aventura', nombre: 'Aventura o mochilero', icono: '🥾', desc: 'Más movida: seguro, botiquín, equipo y actividades.' },
-    { id: 'otro', nombre: 'Otro', icono: '✳️', desc: 'Con todo, como vacaciones.' }
+    { id: 'otro', nombre: 'Otro', icono: '✳️', desc: 'Con todo, como unas vacaciones programadas.' }
   ];
   function tipoViaje(v) { return TIPOS_VIAJE.find(x => x.id === (v && v.tipo)) || TIPOS_VIAJE[0]; }
   /** ¿Este paso entra en este tipo de viaje? */

@@ -280,14 +280,14 @@ R.viajes = (function () {
           <div class="fila-destino ${d.soloDia ? 'escapada' : ''}">
             <span class="fd-num">${d.soloDia ? '☀️' : b.destinos.filter((x, j) => !x.soloDia && j <= i).length}</span>
             <div class="fd-campo">
-              ${d.soloDia ? '<small class="fd-etiqueta">Escapada de un día</small>' : ''}
+              ${d.soloDia ? '<small class="fd-etiqueta">Paseo de un día</small>' : ''}
               <div data-lugar-destino="${i}"></div>
             </div>
             ${b.destinos.length > 1 ? `<button type="button" class="btn-icono" data-quitar-destino="${i}" title="Quitar">×</button>` : ''}
           </div>`).join('')}</div>
         <div class="acciones-fila">
           <button type="button" class="btn btn-suave btn-chico" data-a="masDestino">+ Otro destino</button>
-          <button type="button" class="btn btn-suave btn-chico" data-a="masEscapada">+ Escapada (ida y vuelta en el día)</button>
+          <button type="button" class="btn btn-suave btn-chico" data-a="masEscapada">+ Paseo de un día (ida y vuelta)</button>
         </div>
         <div id="bloqueVuelta">${htmlVuelta()}</div>
         <div id="avisoInter"></div>
@@ -364,6 +364,14 @@ R.viajes = (function () {
       cont.querySelectorAll('[data-vuelta-por]').forEach(x => x.onchange = () => { leerPaso(); b.perfil.vueltaPor = x.dataset.vueltaPor; refrescarVuelta(); });
     }
 
+    /** "Pasar el día": la vuelta es el mismo día que la ida (si no pusiste otra). */
+    function mismoDia() {
+      if (!R.guia.tipoViaje(b).mismoDia || !b.recorrido || !b.recorrido.length) return;
+      const ida = b.recorrido[0].segmentos[0];
+      const vuelta = b.recorrido.find(t => t.tipo === 'vuelta');
+      if (ida && ida.sale.fecha && vuelta && vuelta.segmentos[0] && !vuelta.segmentos[0].sale.fecha) vuelta.segmentos[0].sale.fecha = ida.sale.fecha;
+    }
+
     /** Pone las fechas del finde largo elegido en el inicio (una sola vez). */
     function aplicarFechasPreset() {
       const f = b.fechasPreset;
@@ -394,6 +402,7 @@ R.viajes = (function () {
         b.conexionAplicada = nueva;
         aplicarVueltaPor();
         aplicarFechasPreset();
+        mismoDia();
         return `
         <h4 class="titulo-paso">¿Cuándo salís y cuándo volvés?</h4>
         <p class="ayuda">Poné en qué viajás, la fecha de ida y la de vuelta: las noches se calculan solas.</p>
@@ -516,6 +525,7 @@ R.viajes = (function () {
         if (!b.destinos.some(d => d.nombre && !d.soloDia)) return 'Contanos a dónde vas (al menos un destino donde te quedes).';
       }
       if (n === 'Cronograma' && !b.sinFechas) {
+        mismoDia();
         const v = { recorrido: b.recorrido, destinos: b.destinos, tareas: {} };
         const errores = R.recorrido.validar(v).filter(a => a.nivel === 'error');
         if (errores.length) return errores[0].texto;
@@ -527,7 +537,7 @@ R.viajes = (function () {
 
     function enlazarPaso() {
       const n = nombrePaso();
-      cont.querySelectorAll('[data-tipo-v]').forEach(x => x.onclick = () => { leerPaso(); b.tipo = x.dataset.tipoV; pintar(); });
+      cont.querySelectorAll('[data-tipo-v]').forEach(x => x.onclick = () => { leerPaso(); b.tipo = x.dataset.tipoV; Object.assign(b.perfil, R.guia.tipoViaje(b).perfil || {}); pintar(); });
       cont.querySelector('[data-a="atras"]').onclick = () => { leerPaso(); paso = Math.max(0, paso - 1); pintar(); };
       cont.querySelector('[data-a="seguir"]').onclick = () => {
         leerPaso();
@@ -811,6 +821,7 @@ R.viajes = (function () {
       cuerpo: '<div class="tipo-caja"></div>',
       acciones: [{ texto: 'Cancelar' }, { texto: 'Guardar', clase: 'btn-primario', onClick: () => {
         v.tipo = elegido;
+        Object.assign(v.perfil, R.guia.tipoViaje(v).perfil || {});
         if (elegido !== 'otro') v.tipoOtro = '';
         R.db.guardarViaje(v); R.app.refrescar();
         U.toast(`Listo: ${R.guia.tipoViaje(v).nombre.toLowerCase()}. La guía se acomodó.`);

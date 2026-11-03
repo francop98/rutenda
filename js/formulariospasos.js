@@ -257,8 +257,8 @@ R.formularios = (function () {
       inicial: (v, ctx) => ({ fecha: (ctx && ctx.destino && ctx.destino.fecha) || '' }),
       costo: { categoria: 'actividades' },
       archivos: { categoria: 'excursion' },
-      concepto: (v, d, ctx) => `Escapada a ${ctx && ctx.destino ? ctx.destino.nombre : ''}`.trim(),
-      itinerario: (v, d, ctx) => d.fecha ? [{ fecha: d.fecha, hora: d.horaSalida || '', tipo: 'actividad', titulo: `Escapada a ${ctx && ctx.destino ? ctx.destino.nombre : ''}`, notas: unir(d.como, d.horaRegreso && 'Regreso ' + d.horaRegreso, d.documentacion) }] : [],
+      concepto: (v, d, ctx) => `Paseo de un día a ${ctx && ctx.destino ? ctx.destino.nombre : ''}`.trim(),
+      itinerario: (v, d, ctx) => d.fecha ? [{ fecha: d.fecha, hora: d.horaSalida || '', tipo: 'actividad', titulo: `Paseo de un día a ${ctx && ctx.destino ? ctx.destino.nombre : ''}`, notas: unir(d.como, d.horaRegreso && 'Regreso ' + d.horaRegreso, d.documentacion) }] : [],
       resumen: d => [d.como, d.fecha && fh(d.fecha, d.horaSalida) + (d.horaRegreso ? ' a ' + d.horaRegreso : ''), d.documentacion].filter(Boolean)
     },
 

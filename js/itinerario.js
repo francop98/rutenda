@@ -91,7 +91,7 @@ R.itinerario = (function () {
     });
 
     (v.destinos || []).filter(d => d.soloDia && d.nombre && d.fecha === fecha && !d.fechaPendiente).forEach(d => {
-      items.push({ hora: '', icono: '☀️', clase: 'ev-escapada', aire: true, titulo: `Escapada a ${d.nombre}`, sub: 'Volvés en el día', docs: documentosDe(v, 'e_escapada__' + d.id), lugar: R.gmaps ? R.gmaps.textoLugar(d) : d.nombre });
+      items.push({ hora: '', icono: '☀️', clase: 'ev-escapada', aire: true, titulo: `Paseo de un día a ${d.nombre}`, sub: 'Volvés en el día', docs: documentosDe(v, 'e_escapada__' + d.id), lugar: R.gmaps ? R.gmaps.textoLugar(d) : d.nombre });
     });
 
     (v.itinerario || []).filter(e => e.fecha === fecha && !aparte(e)).forEach(e => {
@@ -490,7 +490,7 @@ R.itinerario = (function () {
       if (a && a.checkinFecha) agregar(a.checkinFecha, a.checkinHora, '', '', e.lugar.zona, `🏨 Check-in ${a.nombre || e.nombre}`, a.codigo ? 'Código ' + a.codigo : '', a.direccion || e.nombre);
       if (a && a.checkoutFecha) agregar(a.checkoutFecha, a.checkoutHora, '', '', e.lugar.zona, `🧳 Check-out ${a.nombre || e.nombre}`, '', a.direccion || e.nombre);
     });
-    (v.destinos || []).filter(d => d.soloDia && d.fecha && !d.fechaPendiente).forEach(d => agregar(d.fecha, '', '', '', '', `☀️ Escapada a ${d.nombre}`, '', d.nombre));
+    (v.destinos || []).filter(d => d.soloDia && d.fecha && !d.fechaPendiente).forEach(d => agregar(d.fecha, '', '', '', '', `☀️ Paseo de un día a ${d.nombre}`, '', d.nombre));
     (v.itinerario || []).filter(e => e.fecha && !aparte(e)).forEach(e => agregar(e.fecha, e.hora, '', '', '', e.titulo, [e.confirmacion && 'Código ' + e.confirmacion, e.notas].filter(Boolean).join(' · '), e.lugar));
     if (v.fechaInicio && v.fechaFin) agregar(v.fechaInicio, '', '', U.sumarDias(v.fechaFin, 1), '', `🧳 Viaje: ${v.nombre || R.viajes.destinoCompleto(v)}`, '', '');
     return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Rutenda//ES', 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${icsTexto(v.nombre || 'Rutenda')}`].concat(ev).concat(['END:VCALENDAR']).join('\r\n');

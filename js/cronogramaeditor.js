@@ -217,7 +217,7 @@ R.cronogramaEditor = (function () {
               ${e.hasta ? `<span>Te vas el ${U.fmtFecha(e.hasta, 'dia')}</span>` : ''}
             </div>`}`}
             ${escapadas.map(d => `
-              <div class="cr-escapada">☀️ Escapada a <strong>${esc(d.nombre)}</strong>
+              <div class="cr-escapada">☀️ Paseo de un día a <strong>${esc(d.nombre)}</strong>
                 <select data-cr-escapada="${d.id}">
                   <option value="">Día a definir</option>
                   ${diasEstadia.map(f => `<option value="${f}" ${d.fecha === f && !d.fechaPendiente ? 'selected' : ''}>${U.fmtFecha(f, 'dia')}</option>`).join('')}
