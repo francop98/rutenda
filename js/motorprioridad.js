@@ -42,7 +42,7 @@ R.motor = (function () {
     });
 
     const base = [];
-    R.guia.tareas.filter(t => !t.aplica || t.aplica(v)).forEach(t => {
+    R.guia.tareas.filter(t => (!t.aplica || t.aplica(v)) && R.guia.entraEnTipo(v, t)).forEach(t => {
       if (t.porDestino) {
         const lugares = estadias.length || (v.destinos || []).some(d => d.dePaso) ? estadias : (conAloj.length ? conAloj : [{ id: 'unico', nombre: v.destino || 'destino' }]);
         lugares.forEach(d => base.push(concreta(t, `${t.id}__${d.id}`, { destino: d, varios })));

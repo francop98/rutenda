@@ -10,14 +10,14 @@ R.viajes = (function () {
   const U = R.util;
   const { esc } = U;
 
-  const TIPOS = [
-    { id: 'vacaciones', nombre: 'Vacaciones', icono: '🏖️' },
-    { id: 'escapada', nombre: 'Escapada', icono: '🌿' },
-    { id: 'aventura', nombre: 'Aventura', icono: '🥾' },
-    { id: 'familia', nombre: 'Visita familiar', icono: '🏠' },
-    { id: 'trabajo', nombre: 'Trabajo', icono: '💼' },
-    { id: 'otro', nombre: 'Otro', icono: '✳️' }
-  ];
+  // Los tipos de viaje (y qué guía arma cada uno) están en plantillaguia.js
+  const TIPOS = R.guia.TIPOS_VIAJE;
+  const medioDeTipo = b => (R.guia.tipoViaje(b).medio || 'avion');
+  /** Pestañas que se ven según el tipo de viaje (las otras quedan en el menú ⋯). */
+  function pestanasDe(v) {
+    const tv = R.guia.tipoViaje(v);
+    return PESTANAS.filter(p => !p.oculta && (!tv.pestanas || tv.pestanas.includes(p.id) || p.id === 'hoy'));
+  }
   function tipoDe(v) {
     const t = TIPOS.find(x => x.id === v.tipo) || TIPOS[0];
     return t.id === 'otro' && v.tipoOtro ? Object.assign({}, t, { nombre: v.tipoOtro }) : t;
@@ -40,8 +40,7 @@ R.viajes = (function () {
     { id: 'mascotas', icono: '🏠', texto: 'Dejo mascotas en casa', suma: 'Organizar quién las cuida' },
     { id: 'accesibilidad', icono: '♿', texto: 'Alguien necesita asistencia o accesibilidad', suma: 'Pedir asistencia en el transporte y el alojamiento' },
     { id: 'equipamiento', icono: '🎿', texto: 'Deportes o actividades con equipo (ski, buceo, bici…)', suma: 'Reservar equipo y clases' },
-    { id: 'eventoEspecial', icono: '🎉', texto: 'Hay un evento especial (cumpleaños, aniversario…)', suma: 'Organizar el momento especial' },
-    { id: 'trabajo', icono: '💼', texto: 'Es un viaje de trabajo', suma: 'Rendir los gastos al volver' }
+    { id: 'eventoEspecial', icono: '🎉', texto: 'Hay un evento especial (cumpleaños, aniversario…)', suma: 'Organizar el momento especial' }
   ];
   const extraActivo = (b, id) => id === 'trabajo' ? b.tipo === 'trabajo' : !!b.perfil[id];
 
@@ -265,6 +264,7 @@ R.viajes = (function () {
     function htmlDestinos() {
       return `
         ${b.fechasPreset ? `<div class="aviso-leido">🎉 Del ${esc(U.fmtFecha(b.fechasPreset.desde, 'dia'))} al ${esc(U.fmtFecha(b.fechasPreset.hasta, 'dia'))}${b.fechasPreset.motivo ? ` (${esc(b.fechasPreset.motivo)})` : ''}: ya te dejo esas fechas en el cronograma.</div>` : ''}
+        ${editando ? '' : `<h4 class="titulo-paso">¿Qué tipo de viaje es?</h4>${tiposHTML(b.tipo)}`}
         <h4 class="titulo-paso">¿Desde dónde salís?</h4>
         ${b.origen && b.origen.nombre && b.origen.codigoPais && !b.cambiarOrigen ? `
           <div class="origen-fijo">
@@ -375,7 +375,7 @@ R.viajes = (function () {
       const conNoches = b.destinos.filter(d => d.nombre && !d.soloDia);
       if (conNoches.length === 1 && !Number(conNoches[0].noches) && f.hasta > f.desde) {
         conNoches[0].noches = U.diasEntre(f.desde, f.hasta);
-        b.recorrido = R.recorrido.construir(b.origen, b.destinos, b.recorrido, 'avion', { soloIda: !!b.perfil.soloIda });
+        b.recorrido = R.recorrido.construir(b.origen, b.destinos, b.recorrido, medioDeTipo(b), { soloIda: !!b.perfil.soloIda });
         aplicarVueltaPor();
       }
       const p0 = b.recorrido[0].segmentos[0];
@@ -387,7 +387,7 @@ R.viajes = (function () {
 
     function htmlCronograma() {
       {
-        b.recorrido = R.recorrido.construir(b.origen, b.destinos, b.recorrido, 'avion', { soloIda: !!b.perfil.soloIda });
+        b.recorrido = R.recorrido.construir(b.origen, b.destinos, b.recorrido, medioDeTipo(b), { soloIda: !!b.perfil.soloIda });
         const nueva = b.conexion && b.conexion.lugar && b.conexion.lugar.nombre ? b.conexion.lugar.nombre : '';
         if (b.conexionAplicada && normal(b.conexionAplicada) !== normal(nueva)) R.recorrido.quitarConexion(b.recorrido, { nombre: b.conexionAplicada });
         if (nueva) R.recorrido.aplicarConexion(b.recorrido, b.conexion);
@@ -527,6 +527,7 @@ R.viajes = (function () {
 
     function enlazarPaso() {
       const n = nombrePaso();
+      cont.querySelectorAll('[data-tipo-v]').forEach(x => x.onclick = () => { leerPaso(); b.tipo = x.dataset.tipoV; pintar(); });
       cont.querySelector('[data-a="atras"]').onclick = () => { leerPaso(); paso = Math.max(0, paso - 1); pintar(); };
       cont.querySelector('[data-a="seguir"]').onclick = () => {
         leerPaso();
@@ -658,7 +659,7 @@ R.viajes = (function () {
       const destinos = b.destinos.filter(d => d.nombre).map(d => Object.assign({}, d));
       const perfil = Object.assign({}, b.perfil);
       perfil.internacional = internacional();
-      const recorrido = R.recorrido.construir(b.origen, destinos, b.recorrido, 'avion', { soloIda: !!b.perfil.soloIda });
+      const recorrido = R.recorrido.construir(b.origen, destinos, b.recorrido, medioDeTipo(b), { soloIda: !!b.perfil.soloIda });
       if (b.sinFechas) {
         // Sin fechas: todo queda "a definir" (los medios y paradas se conservan)
         R.recorrido.todosLosSegmentos(recorrido).forEach(x => {
@@ -796,10 +797,38 @@ R.viajes = (function () {
   /* ---------------------------------------------------------
      Vista de un viaje
      --------------------------------------------------------- */
+  /** Elegir el tipo de viaje: cada uno arma una guía más corta o más completa. */
+  function tiposHTML(actual) {
+    const t = R.guia.tipoViaje({ tipo: actual });
+    return `<div class="tipos-viaje" role="radiogroup" aria-label="Tipo de viaje">${TIPOS.map(x => `<button type="button" role="radio" aria-checked="${x.id === t.id}" class="tipo-v ${x.id === t.id ? 'activo' : ''}" data-tipo-v="${x.id}"><span>${x.icono}</span>${esc(x.nombre)}</button>`).join('')}</div>
+      <p class="ayuda tipo-desc">${esc(t.desc)}</p>`;
+  }
+  function elegirTipo(v) {
+    let elegido = R.guia.tipoViaje(v).id;
+    const { el } = U.modal({
+      titulo: 'Tipo de viaje',
+      subtitulo: 'Cambia qué pasos te muestra la guía y qué pestañas se ven. No se borra nada de lo que cargaste.',
+      cuerpo: '<div class="tipo-caja"></div>',
+      acciones: [{ texto: 'Cancelar' }, { texto: 'Guardar', clase: 'btn-primario', onClick: () => {
+        v.tipo = elegido;
+        if (elegido !== 'otro') v.tipoOtro = '';
+        R.db.guardarViaje(v); R.app.refrescar();
+        U.toast(`Listo: ${R.guia.tipoViaje(v).nombre.toLowerCase()}. La guía se acomodó.`);
+      } }]
+    });
+    const caja = el.querySelector('.tipo-caja');
+    const pintar = () => {
+      caja.innerHTML = tiposHTML(elegido);
+      caja.querySelectorAll('[data-tipo-v]').forEach(x => x.onclick = () => { elegido = x.dataset.tipoV; pintar(); });
+    };
+    pintar();
+  }
+
   /** Editar una parte del viaje, directo (sin pasar por todo el asistente). */
   function editarParte(v, que) {
     if (!R.db.puedeOrganizar(v)) return;
     if (que === 'fechas') { R.itinerario.editarCronograma(v); return; }
+    if (que === 'tipo') { elegirTipo(v); return; }
     if (que === 'destinos') { abrirAsistente(v, { pasos: ['Destinos', 'Cronograma'] }); return; }
     if (que === 'detalles') { abrirAsistente(v, { pasos: ['Detalles'] }); return; }
     if (que === 'viajeros') { location.hash = `#viaje/${v.id}/viajeros`; return; }
@@ -819,6 +848,7 @@ R.viajes = (function () {
   /** "Editar el viaje": cada cosa por separado, a un toque. */
   function menuEditar(v) {
     const ops = [
+      ['tipo', R.guia.tipoViaje(v).icono, 'Tipo de viaje', R.guia.tipoViaje(v).nombre],
       ['nombre', '✏️', 'Nombre', v.nombre || 'Sin nombre'],
       ['destinos', '📍', 'Destinos', conAlojamiento(v).map(d => d.nombre).join(' → ') || 'Sin destinos'],
       ['fechas', '📅', 'Fechas y traslados', U.fmtRango(v.fechaInicio, v.fechaFin) || 'Sin fechas'],
@@ -841,6 +871,8 @@ R.viajes = (function () {
       if (estadoViaje(v) !== 'pasado') ops.push(['cambio', '🔄', 'Cambiaron los planes']);
     }
     if (R.preguntar && U.conIA()) ops.push(['preguntar', '💬', 'Preguntale a Rutenda (IA)']);
+    const visibles = pestanasDe(v).map(p => p.id);
+    PESTANAS.filter(p => !p.oculta && !p.soloViajando && !visibles.includes(p.id)).forEach(p => ops.push(['tab_' + p.id, p.icono, p.nombre]));
     ops.push(['viajeros', '👥', 'Viajeros']);
     ops.push(['ruta', '🗺️', 'Ver la ruta en Google Maps']);
     if (estadoViaje(v) === 'en_curso') ops.push(['guia', '🧭', 'Guía de organización']);
@@ -861,6 +893,7 @@ R.viajes = (function () {
       else if (op === 'preguntar') R.preguntar.abrir(v);
       else if (op === 'ruta') R.gmaps.abrirRutaViaje(v);
       else if (op === 'viajeros') location.hash = `#viaje/${v.id}/viajeros`;
+      else if (op.startsWith('tab_')) location.hash = `#viaje/${v.id}/${op.slice(4)}`;
       else if (op === 'guia') location.hash = `#viaje/${v.id}/guia`;
       else if (op === 'pdf') R.itinerarioPdf.descargar(v);
       else if (op === 'resumen') R.resumen.abrir(v);
@@ -894,6 +927,7 @@ R.viajes = (function () {
         <div class="portada-contenido">
           <h1 ${R.db.puedeOrganizar(v) ? 'class="editable" data-editar="nombre" title="Cambiar el nombre"' : ''}>${esc(titulo)}</h1>
           <p class="portada-meta"><span ${R.db.puedeOrganizar(v) ? 'class="editable" data-editar="fechas" title="Cambiar fechas y traslados"' : ''}>${esc(U.fmtRango(v.fechaInicio, v.fechaFin) || 'Sin fechas')}</span> · <strong>${esc(cuentaRegresiva(v))}</strong></p>
+          <p class="portada-tipo"><span ${R.db.puedeOrganizar(v) ? 'class="editable" data-editar="tipo" title="Cambiar el tipo de viaje"' : ''}>${tipo.icono} ${esc(tipo.nombre)}</span></p>
           ${grande ? `
           <div class="portada-pie">
             <a class="portada-avatares" href="#viaje/${v.id}/viajeros" title="Viajeros">${personas.map(p => U.avatar(p, 30)).join('')}<span class="pa-mas">${personas.length > 1 ? personas.length + ' viajeros' : '+ Viajeros'}</span></a>
@@ -903,7 +937,7 @@ R.viajes = (function () {
       </section>
       ${estadoViaje(v) === 'pasado' && !v.ejemplo ? `<div class="aviso-vuelta"><span>🎉 <strong>¡Volviste!</strong> Mirá cómo fue el viaje.</span><button class="btn btn-primario btn-chico" data-a="verResumen">Ver resumen</button></div>` : ''}
       <nav class="pestanas" role="tablist">
-        ${PESTANAS.filter(p => !p.oculta && (!p.soloViajando || viajando) && !(viajando && p.id === 'guia' && pestana !== 'guia')).map(p => `<a role="tab" href="#viaje/${v.id}/${p.id}" class="pestana ${p.id === pestana ? 'activa' : ''}"><span>${p.icono}</span>${p.nombre}</a>`).join('')}
+        ${pestanasDe(v).concat(pestanasDe(v).some(p => p.id === pestana) ? [] : PESTANAS.filter(p => p.id === pestana && !p.oculta)).filter(p => (!p.soloViajando || viajando) && !(viajando && p.id === 'guia' && pestana !== 'guia')).map(p => `<a role="tab" href="#viaje/${v.id}/${p.id}" class="pestana ${p.id === pestana ? 'activa' : ''}"><span>${p.icono}</span>${p.nombre}</a>`).join('')}
       </nav>
       <section class="contenido-pestana" id="contPestana"></section>`;
 

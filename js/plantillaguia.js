@@ -359,11 +359,11 @@ R.guia = (function () {
       impacto: 3, anticipacion: 21, dependeDe: ['d_fechas'], aplica: v => !!v.perfil.equipamiento
     },
     {
-      id: 'x_evento', fase: 'experiencias', titulo: 'Organizar el momento especial',
-      desc: 'Cumpleaños, aniversario, casamiento: reservas, regalo, sorpresa o vestimenta.',
+      id: 'x_evento', fase: 'experiencias', titulo: v => v.tipo === 'evento' ? 'Tener la entrada o la invitación (y qué ponerte)' : 'Organizar el momento especial',
+      desc: v => v.tipo === 'evento' ? 'Comprá la entrada (o confirmá que vas), guardala en Documentos y pensá la ropa o el regalo.' : 'Cumpleaños, aniversario, casamiento: reservas, regalo, sorpresa o vestimenta.',
       consejo: 'Si es una sorpresa, coordiná con el alojamiento o el restaurante con anticipación.',
       porque: 'Es lo que más se recuerda del viaje.',
-      impacto: 3, anticipacion: 21, dependeDe: ['d_fechas'], aplica: v => !!v.perfil.eventoEspecial
+      impacto: 3, anticipacion: 21, dependeDe: ['d_fechas'], aplica: v => !!v.perfil.eventoEspecial || v.tipo === 'evento'
     },
     {
       id: 'x_rendicion', fase: 'regreso', titulo: 'Rendir los gastos del viaje de trabajo',
@@ -475,5 +475,28 @@ R.guia = (function () {
     return { fecha: iso, hora: hora ? `${String(abre.getHours()).padStart(2, '0')}:${String(abre.getMinutes()).padStart(2, '0')}` : '', horas, aerolinea: fila ? fila[2] : '', conocida: !!fila, clave };
   }
 
-  return { TRANSPORTE, fases, tareas, motivosCambio, ESTADOS, fase, checkin, CHECKIN_HORAS };
+  /* ---------- Tipos de viaje: cada uno arma una guía más corta o más completa ---------- */
+  // solo: únicos pasos que entran · sin: pasos que no entran · pestanas: las que se ven (el resto, en el menú ⋯)
+  const ESCAPADA = ['d_destino', 'd_participantes', 'd_fechas', 't_segmento', 'pq_paquete', 'a_reserva', 'mv_auto', 's_checkin', 's_valija', 's_mascotas',
+    'doc_pasaporte', 'doc_requisitos', 'doc_visa', 'doc_menores', 'doc_licencia', 'x_mascota_viaja', 'x_accesibilidad', 'x_evento', 'x_equipo'];
+  const TIPOS_VIAJE = [
+    { id: 'vacaciones', nombre: 'Vacaciones', icono: '🏖️', desc: 'Con todo: reservas, excursiones, qué hacer, documentos y recomendaciones.' },
+    { id: 'escapada', nombre: 'Escapada', icono: '🌿', desc: 'Unos días, sin vueltas. Lo justo: cómo llegás, dónde dormís, la valija y los gastos.', solo: ESCAPADA, pestanas: ['guia', 'gastos', 'valija'] },
+    { id: 'familia', nombre: 'Visita a familia o amigos', icono: '🏠', desc: 'Dormís en su casa: el traslado, la valija y los gastos.', solo: ESCAPADA.filter(x => x !== 'a_reserva'), pestanas: ['guia', 'itinerario', 'gastos', 'valija'], sinAlojamiento: true },
+    { id: 'evento', nombre: 'Evento', icono: '🎉', desc: 'Casamiento, recital, partido, cumple: la entrada, cómo llegás, dónde dormís y qué ponerte.', solo: ESCAPADA, pestanas: ['guia', 'itinerario', 'gastos', 'valija'] },
+    { id: 'trabajo', nombre: 'Trabajo', icono: '💼', desc: 'Traslados, alojamiento y gastos para rendir. Sin excursiones.', sin: ['e_imperdibles', 'e_excursiones', 'e_itinerario', 'mv_local', 'c_offline', 's_compartir'], pestanas: ['guia', 'itinerario', 'gastos', 'valija', 'documentos'] },
+    { id: 'ruta', nombre: 'En ruta (auto)', icono: '🚗', desc: 'Manejando: el auto a punto, las paradas, dónde dormir y qué hacer.', medio: 'auto' },
+    { id: 'aventura', nombre: 'Aventura o mochilero', icono: '🥾', desc: 'Más movida: seguro, botiquín, equipo y actividades.' },
+    { id: 'otro', nombre: 'Otro', icono: '✳️', desc: 'Con todo, como vacaciones.' }
+  ];
+  function tipoViaje(v) { return TIPOS_VIAJE.find(x => x.id === (v && v.tipo)) || TIPOS_VIAJE[0]; }
+  /** ¿Este paso entra en este tipo de viaje? */
+  function entraEnTipo(v, t) {
+    const tv = tipoViaje(v);
+    if (tv.solo) return tv.solo.includes(t.id);
+    if (tv.sin) return !tv.sin.includes(t.id);
+    return true;
+  }
+
+  return { TRANSPORTE, fases, tareas, motivosCambio, ESTADOS, fase, checkin, CHECKIN_HORAS, TIPOS_VIAJE, tipoViaje, entraEnTipo };
 })();

@@ -114,7 +114,8 @@ R.itinerario = (function () {
     let dormis = null;
     if (durmiendo) {
       const a = datosAloj(v, durmiendo.id);
-      dormis = { icono: '🛏️', texto: a && a.nombre ? `${a.nombre}, ${durmiendo.nombre}` : `${durmiendo.nombre} · alojamiento a reservar`, direccion: a && a.direccion ? a.direccion : '', falta: !a, tareaId: 'a_reserva__' + durmiendo.id };
+      const casa = !a && R.guia.tipoViaje(v).sinAlojamiento;
+      dormis = { icono: casa ? '🏠' : '🛏️', texto: a && a.nombre ? `${a.nombre}, ${durmiendo.nombre}` : casa ? `${durmiendo.nombre} · en casa de familia o amigos` : `${durmiendo.nombre} · alojamiento a reservar`, direccion: a && a.direccion ? a.direccion : '', falta: !a && !casa, tareaId: casa ? '' : 'a_reserva__' + durmiendo.id };
     } else {
       const nocheViajando = segs.find(x => x.seg.sale.fecha && x.seg.sale.fecha <= fecha && C().fechaLlega(x.seg) > fecha);
       if (nocheViajando) dormis = { icono: '🌙', texto: `Noche viajando en ${C().medio(nocheViajando.seg.medio).nombre.toLowerCase()}`, direccion: '' };

@@ -2423,3 +2423,10 @@ body.con-visor { overflow: hidden; }
 .menu-op-dato .mo-texto { width: auto; font-size: 1rem; }
 .menu-op-dato .mo-texto strong { font-size: .98rem; }
 .menu-op-dato .mo-flecha { width: auto; }
+/* Tipos de viaje */
+.tipos-viaje { display: flex; flex-wrap: wrap; gap: 8px; }
+.tipo-v { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--linea); background: var(--papel); color: var(--tinta); font: inherit; font-size: .9rem; cursor: pointer; }
+.tipo-v span { font-size: 1.05rem; }
+.tipo-v.activo { background: var(--mar); color: var(--sobre-mar); border-color: var(--mar); font-weight: 600; }
+.tipo-desc { margin: 8px 0 4px; }
+.portada-tipo { margin: 2px 0 0; font-size: .85rem; opacity: .92; }
