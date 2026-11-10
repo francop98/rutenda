@@ -2430,3 +2430,29 @@ body.con-visor { overflow: hidden; }
 .tipo-v.activo { background: var(--mar); color: var(--sobre-mar); border-color: var(--mar); font-weight: 600; }
 .tipo-desc { margin: 8px 0 4px; }
 .portada-tipo { margin: 2px 0 0; font-size: .85rem; opacity: .92; }
+
+/* Rutenda 25 — Reservas: todo lo que se reserva, en un lugar */
+.rv-herramientas { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+.rv-grupo { margin-bottom: 14px; }
+.rv-fila { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-top: 8px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--papel); color: var(--tinta); font: inherit; text-align: left; cursor: pointer; }
+.rv-fila:first-of-type { margin-top: 0; }
+.rv-fila:disabled { cursor: default; }
+.rv-texto { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.rv-texto strong { font-size: .96rem; }
+.rv-texto small { color: var(--tinta-suave); font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-meta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rv-estado { font-size: .76rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.rv-ok { background: var(--mar-claro); color: var(--mar); }
+.rv-falta { background: var(--sol-claro); color: #7a5a14; }
+.rv-pend { background: var(--fondo-2, rgba(0,0,0,.05)); color: var(--tinta-suave); }
+.rv-na { color: var(--tinta-tenue); }
+.rv-docs { font-size: .78rem; color: var(--tinta-suave); }
+.rv-accion { flex: none; font-size: .85rem; font-weight: 600; color: var(--mar); }
+:root[data-tema="oscuro"] .rv-falta { color: #f1d9a0; }
+@media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) .rv-falta { color: #f1d9a0; } }
+.hoy-falta { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px; margin: 0 0 14px; border-radius: var(--radio); border: 1.5px dashed var(--sol, #e0a63b); background: var(--sol-claro); color: var(--tinta); font: inherit; text-align: left; cursor: pointer; }
+.hoy-falta > span:first-child { font-size: 1.5rem; }
+.hf-texto { flex: 1; display: grid; gap: 2px; }
+.hf-texto small { color: var(--tinta-suave); }
+.hoy-falta b { color: var(--mar); }
+.hoy-reservas { margin-top: 16px; }

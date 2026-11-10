@@ -108,11 +108,13 @@ R.cargar = (function () {
         r.innerHTML = `<p class="cargar-pregunta">¿Cómo la tenés?</p>
           <button type="button" class="btn btn-suave btn-bloque" data-r="pegar">📋 Pegar el mail de confirmación</button>
           <button type="button" class="btn btn-suave btn-bloque" data-r="archivo">📄 Subir el PDF o una foto</button>
+          <button type="button" class="btn btn-suave btn-bloque" data-r="mano">✍️ Escribir los datos (pasaje, alojamiento…)</button>
           <p class="ayuda">Rutenda la lee, te muestra lo que encontró y la guardás con un toque.</p>
           <button type="button" class="btn btn-texto" data-r="volver">← Volver</button>`;
         g.after(r);
         r.querySelector('[data-r="pegar"]').onclick = () => R.escaneo.pegarReserva(vi);
         r.querySelector('[data-r="archivo"]').onclick = () => { U.cerrarModal(); R.escaneo.escanearYAbrir(vi); };
+        r.querySelector('[data-r="mano"]').onclick = () => { U.cerrarModal(); location.hash = `#viaje/${vi.id}/reservas`; };
         r.querySelector('[data-r="volver"]').onclick = pintar;
       },
       hacer: salirY(vi => R.itinerario.irAQueHacer(vi)),

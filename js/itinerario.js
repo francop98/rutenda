@@ -196,7 +196,8 @@ R.itinerario = (function () {
   /** Tocar un traslado, un check-in o "dónde dormís" abre sus datos para cambiarlos ahí mismo. */
   function enlazarDatos(cont, v) {
     cont.querySelectorAll('[data-dato]').forEach(b => b.onclick = e => {
-      if (e.target.closest('a, button')) return;
+      const otro = e.target.closest('a, button');
+      if (otro && otro !== b) return;
       editarDato(v, b.dataset.dato);
     });
   }
@@ -631,6 +632,10 @@ R.itinerario = (function () {
         ${R.salida ? R.salida.tarjetaHTML(v) : ''}
         ${R.pasaje ? R.pasaje.html(v) : ''}
         ${R.vuelta ? R.vuelta.tarjetaHTML(v) : ''}
+        ${dm && dm.falta && dm.tareaId && R.db.puedeOrganizar(v) ? `
+          <button type="button" class="hoy-falta" data-dato="${dm.tareaId}">
+            <span>🛏️</span><span class="hf-texto"><strong>¿Dónde dormís esta noche?</strong><small>Cargá el alojamiento: dirección, check-in y la reserva, para tenerlo a mano.</small></span><b>Cargar</b>
+          </button>` : ''}
         ${paraHoy.length ? `
           <section class="bloque hoy-pendiente">
             <h3 class="bloque-titulo">Para hacer hoy</h3>
@@ -652,6 +657,7 @@ R.itinerario = (function () {
             <h3 class="bloque-titulo">Esta noche dormís en</h3>
             <p><strong>${esc(dm.texto)}</strong></p>
             ${dm.direccion ? `<a class="btn btn-suave btn-chico" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dm.direccion)}" target="_blank" rel="noopener">📍 Cómo llegar</a>` : ''}
+            ${dm.tareaId && !dm.falta && R.db.puedeOrganizar(v) ? `<button type="button" class="btn btn-texto btn-chico" data-dato="${dm.tareaId}">Ver o cambiar los datos</button>` : ''}
           </section>` : ''}
 
         <section class="bloque hoy-gastos">
@@ -671,6 +677,7 @@ R.itinerario = (function () {
             ${alertaHTML(manana)}
             ${manana.items.length ? manana.items.slice(0, 3).map(itemHTML).join('') : '<p class="dia-libre">Día libre ☀️</p>'}
           </section>` : ''}
+        ${R.reservas ? `<button type="button" class="rv-fila hoy-reservas" data-a="verReservas"><span class="rv-texto"><strong>🎫 Tus reservas</strong><small>Pasajes, alojamiento, auto y entradas: verlos o cargar datos</small></span><span class="rv-accion">Abrir</span></button>` : ''}
       </div>`;
 
     cont.querySelector('[data-a="gasto"]').onclick = () => R.gastos.nuevo(v);
@@ -689,6 +696,8 @@ R.itinerario = (function () {
     cont.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const [d, id] = b.dataset.plan.split('|'); R.ideas.editar(v, d, id, () => renderHoy(v, cont)); });
     cont.querySelectorAll('[data-evento]').forEach(b => b.onclick = () => editar(v, b.dataset.evento));
     enlazarDatos(cont, v);
+    const bRes = cont.querySelector('[data-a="verReservas"]');
+    if (bRes) bRes.onclick = () => { location.hash = `#viaje/${v.id}/reservas`; };
     cont.querySelectorAll('[data-doc]').forEach(b => b.onclick = e => { e.stopPropagation(); R.documentos.abrir(v.documentos.find(x => x.id === b.dataset.doc), v); });
     // Clima de hoy y de mañana (y aviso si llueve con planes al aire libre)
     cargarClima(v, cont);

@@ -48,6 +48,7 @@ R.viajes = (function () {
   const PESTANAS = [
     { id: 'hoy', nombre: 'Hoy', icono: '☀️', soloViajando: true },
     { id: 'guia', nombre: 'Guía', icono: '🧭' },
+    { id: 'reservas', nombre: 'Reservas', icono: '🎫' },
     { id: 'itinerario', nombre: 'Itinerario', icono: '🗓️' },
     { id: 'quehacer', nombre: 'Qué hacer', icono: '🎟️' },
     { id: 'gastos', nombre: 'Gastos', icono: '💸' },
@@ -948,7 +949,7 @@ R.viajes = (function () {
       </section>
       ${estadoViaje(v) === 'pasado' && !v.ejemplo ? `<div class="aviso-vuelta"><span>🎉 <strong>¡Volviste!</strong> Mirá cómo fue el viaje.</span><button class="btn btn-primario btn-chico" data-a="verResumen">Ver resumen</button></div>` : ''}
       <nav class="pestanas" role="tablist">
-        ${pestanasDe(v).concat(pestanasDe(v).some(p => p.id === pestana) ? [] : PESTANAS.filter(p => p.id === pestana && !p.oculta)).filter(p => (!p.soloViajando || viajando) && !(viajando && p.id === 'guia' && pestana !== 'guia')).map(p => `<a role="tab" href="#viaje/${v.id}/${p.id}" class="pestana ${p.id === pestana ? 'activa' : ''}"><span>${p.icono}</span>${p.nombre}</a>`).join('')}
+        ${pestanasDe(v).concat(pestanasDe(v).some(p => p.id === pestana) ? [] : PESTANAS.filter(p => p.id === pestana && !p.oculta)).filter(p => (!p.soloViajando || viajando)).map(p => `<a role="tab" href="#viaje/${v.id}/${p.id}" class="pestana ${p.id === pestana ? 'activa' : ''}"><span>${p.icono}</span>${p.nombre}</a>`).join('')}
       </nav>
       <section class="contenido-pestana" id="contPestana"></section>`;
 
@@ -967,6 +968,7 @@ R.viajes = (function () {
     const cont = app.querySelector('#contPestana');
     if (pestana === 'hoy') R.itinerario.renderHoy(v, cont);
     else if (pestana === 'guia') R.vistaGuia.render(v, cont);
+    else if (pestana === 'reservas') R.reservas.render(v, cont);
     else if (pestana === 'itinerario') R.itinerario.render(v, cont);
     else if (pestana === 'quehacer') R.ideas.render(v, cont);
     else if (pestana === 'documentos') R.documentos.render(v, cont);
