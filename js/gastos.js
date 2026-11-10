@@ -492,15 +492,15 @@ R.gastos = (function () {
           <label class="campo campo-monto"><span>Monto *</span><input id="mMonto" inputmode="decimal" value="${esc(m.monto)}" placeholder="0"></label>
           <label class="campo"><span>Moneda</span><select id="mMoneda">${U.opcionesMoneda(m.moneda)}</select></label>
         </div>
+        <label class="campo campo-quien"><span>${esGasto ? '¿Quién pagó?' : '¿Quién lo recibió?'}</span>
+          <select id="mPersona">${U.ordenAlfa(v.participantes, p => nombre(p)).map(p => `<option value="${p}" ${m.persona === p ? 'selected' : ''}>${esc(nombre(p))}</option>`).join('')}</select>
+        </label>
         <label class="campo"><span>Concepto ${esGasto ? '<small>(opcional)</small>' : '*'}</span><input id="mConcepto" value="${esc(m.concepto)}" placeholder="${esGasto ? 'Ej: Cena en el centro' : 'Ej: Reintegro de excursión cancelada'}"></label>
         ${esGasto ? `<div class="chips-elegir chips-chicos">${categorias().map(c => `<button type="button" class="chip-op ${m.categoria === c.id ? 'activo' : ''}" data-cat="${c.id}">${c.icono} ${esc(c.nombre)}</button>`).join('')}
           <button type="button" class="chip-op chip-nueva" data-a="nuevaCat">+ Nueva categoría</button></div>
           <div class="fila-agregar oculto" id="filaNuevaCat"><input id="mCatIcono" class="input-emoji" maxlength="2" placeholder="🏷️"><input id="mCatNombre" placeholder="Nombre (ej: Regalos, Nafta)"><button type="button" class="btn btn-suave" data-a="crearCat">Crear</button></div>` : ''}
         <label class="campo"><span>Fecha</span><input type="date" id="mFecha" value="${esc(m.fecha)}"></label>
         ${m.moneda !== v.monedaBase ? `<label class="campo"><span>Cotización: 1 ${esc(m.moneda)} = ? ${esc(v.monedaBase)}</span><input id="mCotiz" inputmode="decimal" value="${esc(m.cotizacion)}" placeholder="Ej: 1200"><small class="ayuda" id="mCotizAyuda"></small></label>` : ''}
-        <label class="campo"><span>${esGasto ? '¿Quién pagó?' : '¿Quién lo recibió?'}</span>
-          <select id="mPersona">${U.ordenAlfa(v.participantes, p => nombre(p)).map(p => `<option value="${p}" ${m.persona === p ? 'selected' : ''}>${esc(nombre(p))}</option>`).join('')}</select>
-        </label>
         ${variosViajeros ? `
           <div class="campo">
             <span>${esGasto ? '¿Entre quiénes se divide?' : '¿A quiénes les corresponde?'}</span>

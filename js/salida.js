@@ -19,11 +19,11 @@ R.salida = (function () {
     return x ? x.seg : null;
   }
 
-  /** ¿Toca mostrar el repaso? (desde el día anterior hasta que salís) */
+  /** ¿Toca mostrar el repaso? (el día que salís, hasta la hora de salida) */
   function aplica(v) {
     if (v.ejemplo || !v.fechaInicio) return false;
     const hoy = U.hoyISO();
-    if (v.fechaInicio !== hoy && v.fechaInicio !== U.sumarDias(hoy, 1)) return false;
+    if (v.fechaInicio !== hoy) return false;   // solo el mismo día que salís
     const s = primerTraslado(v);
     if (v.fechaInicio === hoy && s && s.sale.hora) {
       const ahora = new Date();

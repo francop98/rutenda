@@ -53,9 +53,9 @@ R.recordatorios = (function () {
         lista.slice(0, 3).map(t => t.titulo).join(' · ') + (lista.length > 3 ? '…' : ''), 'guia');
     });
 
-    // Valija una semana antes, repaso el día antes
+    // Valija una semana antes, repaso el mismo día que salís
     if (!R.motor.resuelta(v, 's_valija')) agregar(U.sumarDias(v.fechaInicio, -7), 'valija', `🧳 Falta una semana para ${nombre}`, 'Buen momento para armar la valija con la lista paso a paso.', 'valija');
-    agregar(U.sumarDias(v.fechaInicio, -1), 'manana', `🌅 Mañana empieza ${nombre}`, 'Documentos, pasajes y valija: repasá todo en Rutenda.', 'itinerario');
+    agregar(v.fechaInicio, 'manana', `🌅 Hoy empieza ${nombre}`, 'Documentos, pasajes y valija: el repaso antes de salir está en Rutenda.', 'itinerario');
 
     // Durante el viaje: el resumen de cada día y la valija de vuelta
     R.itinerario.diasDelViaje(v).forEach(f => {

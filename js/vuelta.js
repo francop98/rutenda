@@ -24,7 +24,7 @@ R.vuelta = (function () {
     const s = segVuelta(v);
     if (!s) return false;
     const hoy = U.hoyISO();
-    if (s.sale.fecha !== hoy && s.sale.fecha !== U.sumarDias(hoy, 1)) return false;
+    if (s.sale.fecha !== hoy) return false;   // solo el mismo día que volvés
     if (s.sale.fecha === hoy && s.sale.hora) {
       const a = new Date();
       const hhmm = String(a.getHours()).padStart(2, '0') + ':' + String(a.getMinutes()).padStart(2, '0');

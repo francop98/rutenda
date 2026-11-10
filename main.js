@@ -219,6 +219,9 @@
         </div>
       </section>`}
 
+      ${enCurso.length && destacado ? destacadoHTML(destacado) : ''}
+      ${destacado && R.salida ? R.salida.tarjetaHTML(destacado) : ''}
+
       ${puedeInstalar() && !leerOculto('instalar') ? `
         <div class="aviso-instalar">
           <span class="ai-icono"></span>
@@ -234,8 +237,7 @@
       ${enCurso.map(v => R.itinerario.hoyHTML(v)).join('')}
       ${R.cierre ? R.cierre.inicioHTML() : ''}
 
-      ${destacado ? destacadoHTML(destacado) : ''}
-      ${destacado && R.salida ? R.salida.tarjetaHTML(destacado) : ''}
+      ${!enCurso.length && destacado ? destacadoHTML(destacado) : ''}
 
       ${R.feriados && !enCurso.length ? R.feriados.inicioHTML() : ''}
 
