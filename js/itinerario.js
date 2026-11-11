@@ -677,6 +677,7 @@ R.itinerario = (function () {
             ${alertaHTML(manana)}
             ${manana.items.length ? manana.items.slice(0, 3).map(itemHTML).join('') : '<p class="dia-libre">Día libre ☀️</p>'}
           </section>` : ''}
+        ${R.db.puedeOrganizar(v) ? `<button type="button" class="btn ${d.fecha >= v.fechaFin ? 'btn-primario' : 'btn-suave'} btn-bloque hoy-llegue" data-a="yaLlegue">🏠 Ya llegué: terminar el viaje</button>` : ''}
         ${R.reservas ? `<button type="button" class="rv-fila hoy-reservas" data-a="verReservas"><span class="rv-texto"><strong>🎫 Tus reservas</strong><small>Pasajes, alojamiento, auto y entradas: verlos o cargar datos</small></span><span class="rv-accion">Abrir</span></button>` : ''}
       </div>`;
 
@@ -696,6 +697,8 @@ R.itinerario = (function () {
     cont.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const [d, id] = b.dataset.plan.split('|'); R.ideas.editar(v, d, id, () => renderHoy(v, cont)); });
     cont.querySelectorAll('[data-evento]').forEach(b => b.onclick = () => editar(v, b.dataset.evento));
     enlazarDatos(cont, v);
+    const bLl = cont.querySelector('[data-a="yaLlegue"]');
+    if (bLl) bLl.onclick = () => R.viajes.finalizar(v);
     const bRes = cont.querySelector('[data-a="verReservas"]');
     if (bRes) bRes.onclick = () => { location.hash = `#viaje/${v.id}/reservas`; };
     cont.querySelectorAll('[data-doc]').forEach(b => b.onclick = e => { e.stopPropagation(); R.documentos.abrir(v.documentos.find(x => x.id === b.dataset.doc), v); });

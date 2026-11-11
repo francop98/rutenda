@@ -5,7 +5,7 @@
 window.R = window.R || {};
 
 /** Versión de la app (cambios chicos: 10.1, 10.2…; cambios grandes: 11, 12…). Igual que VERSION en sw.js. */
-window.R.VERSION = '25.1';
+window.R.VERSION = '25.2';
 
 R.util = (function () {
   const pad = n => String(n).padStart(2, '0');
@@ -80,10 +80,58 @@ R.util = (function () {
     if (b < 1048576) return Math.round(b / 1024) + ' KB';
     return (b / 1048576).toFixed(1) + ' MB';
   }
+  /** "12.000,50" → 12000.5 · "12000" → 12000 · "1,5" → 1.5 (también acepta "12000.5") */
   function numero(valor) {
     if (typeof valor === 'number') return valor;
-    const n = parseFloat(String(valor || '').replace(/\s/g, '').replace(',', '.'));
+    const t = String(valor || '').replace(/\s/g, '').replace(/[^\d.,-]/g, '');
+    let x = t;
+    if (t.includes(',')) x = t.replace(/\./g, '').replace(',', '.');
+    else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) x = t.replace(/\./g, '');
+    const n = parseFloat(x);
     return isNaN(n) ? 0 : n;
+  }
+
+  /** Muestra un importe con puntos de miles mientras escribís: 12000 → 12.000 · 1500,5 → 1.500,5 */
+  function conMiles(texto) {
+    let t = String(texto == null ? '' : texto).replace(/[^\d.,]/g, '');
+    if (!t) return '';
+    if (!t.includes(',')) {
+      const m = t.match(/\.(\d{0,2})$/);   // "12.5" o "12." escrito con punto: es la coma decimal
+      if (m && !/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.slice(0, t.length - m[0].length).replace(/\./g, '') + ',' + m[1];
+      else t = t.replace(/\./g, '');
+    } else t = t.replace(/\./g, '');
+    const [ent, ...resto] = t.split(',');
+    const entero = (ent.replace(/^0+(?=\d)/, '') || (resto.length ? '0' : '')).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return resto.length ? entero + ',' + resto.join('').slice(0, 2) : entero;
+  }
+  function formatearInput(el, ev) {
+    if (!el || el.dataset.sinMiles !== undefined) return;
+    const original = el.value;
+    let antes = original;
+    if (ev) {
+      // Mientras escribís: los puntos los pone la app; si tocaste "." es la coma decimal
+      const pos0 = el.selectionStart == null ? antes.length : el.selectionStart;
+      if (ev.data === '.' && !antes.includes(',')) antes = antes.slice(0, pos0 - 1).replace(/\./g, '') + ',' + antes.slice(pos0).replace(/\./g, '');
+      else if (!antes.includes(',')) antes = antes.replace(/\./g, '');
+    }
+    const nuevo = conMiles(antes);
+    if (nuevo === original) return;
+    const pos = el.selectionStart == null ? original.length : el.selectionStart;
+    const significativos = original.slice(0, pos).replace(/[^\d,]/g, '').length + (ev && ev.data === '.' && !original.includes(',') ? 1 : 0);
+    el.value = nuevo;
+    let i = 0, n = 0;
+    while (i < nuevo.length && n < significativos) { if (/[\d,]/.test(nuevo[i])) n++; i++; }
+    try { if (document.activeElement === el) el.setSelectionRange(i, i); } catch (e) { /* tipo sin selección */ }
+  }
+  // Todos los importes de la app (inputmode="decimal") muestran los puntos de miles
+  if (typeof document !== 'undefined') {
+    const SEL = 'input[inputmode="decimal"]';
+    document.addEventListener('input', e => { if (e.target.matches && e.target.matches(SEL)) formatearInput(e.target, e); }, true);
+    const revisar = raiz => { if (raiz.querySelectorAll) raiz.querySelectorAll(SEL).forEach(formatearInput); };
+    if (typeof MutationObserver !== 'undefined') {
+      new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) { if (n.matches(SEL)) formatearInput(n); revisar(n); } })))
+        .observe(document.documentElement, { childList: true, subtree: true });
+    }
   }
 
   /* ---------- Colores e identidad visual ---------- */
@@ -374,7 +422,7 @@ R.util = (function () {
   }
 
   return {
-    conIA, zonaArchivos, enlazarArchivos, repintarArchivos,
+    conIA, conMiles, zonaArchivos, enlazarArchivos, repintarArchivos,
     tema, aplicarTema, letra, aplicarLetra, vacio, alfa, ordenAlfa,
     campoClave, enlazarClaves, sugerirFechas,
     MONEDAS, fondoBloqueado, id, esc, aISO, hoyISO, aFecha, sumarDias, diasEntre, fmtFecha, fmtRango, plural,

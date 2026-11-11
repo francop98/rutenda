@@ -14,6 +14,7 @@ R.cierre = (function () {
   function aplica(v) {
     if (!v || v.ejemplo || v.cerrado || !v.fechaFin) return false;
     const hoy = U.hoyISO();
+    if (v.finalizado) return v.finalizado >= U.sumarDias(hoy, -30);
     return v.fechaFin < hoy && v.fechaFin >= U.sumarDias(hoy, -30);
   }
 

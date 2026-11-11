@@ -2456,3 +2456,4 @@ body.con-visor { overflow: hidden; }
 .hf-texto small { color: var(--tinta-suave); }
 .hoy-falta b { color: var(--mar); }
 .hoy-reservas { margin-top: 16px; }
+.hoy-llegue { margin-top: 16px; }

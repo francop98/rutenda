@@ -95,6 +95,7 @@ R.viajes = (function () {
 
   function estadoViaje(v) {
     const hoy = U.hoyISO();
+    if (v.finalizado) return 'pasado';   // "Ya llegué": lo terminaste antes de que termine el día
     if (v.fechaFin && v.fechaFin < hoy) return 'pasado';
     if (v.fechaInicio && v.fechaInicio <= hoy) return 'en_curso';
     return 'planificando';
@@ -808,6 +809,17 @@ R.viajes = (function () {
   /* ---------------------------------------------------------
      Vista de un viaje
      --------------------------------------------------------- */
+  /** "Ya llegué": da el viaje por terminado sin esperar a la medianoche. */
+  async function finalizar(v) {
+    const ok = await U.confirmar('Damos el viaje por terminado. Los gastos, las cuentas y todo lo que cargaste siguen ahí.', { titulo: '🏠 ¿Ya llegaste?', textoSi: 'Sí, terminar el viaje', textoNo: 'Todavía no' });
+    if (!ok) return;
+    v.finalizado = U.hoyISO();
+    R.db.guardarViaje(v);
+    location.hash = '#inicio';
+    R.app.refrescar();
+    U.toast('¡Bienvenido a casa! 🏠');
+  }
+
   /** Elegir el tipo de viaje: cada uno arma una guía más corta o más completa. */
   function tiposHTML(actual) {
     const t = R.guia.tipoViaje({ tipo: actual });
@@ -888,6 +900,8 @@ R.viajes = (function () {
     ops.push(['viajeros', '👥', 'Viajeros']);
     ops.push(['ruta', '🗺️', 'Ver la ruta en Google Maps']);
     if (estadoViaje(v) === 'en_curso') ops.push(['guia', '🧭', 'Guía de organización']);
+    if (R.db.puedeOrganizar(v) && estadoViaje(v) === 'en_curso') ops.push(['finalizar', '🏠', 'Ya llegué: terminar el viaje']);
+    if (R.db.puedeOrganizar(v) && v.finalizado && (!v.fechaFin || v.fechaFin >= U.hoyISO())) ops.push(['reabrir', '↩️', 'Seguir el viaje (todavía no terminó)']);
     ops.push(['pdf', '📄', 'Descargar itinerario en PDF']);
     if (R.familia && R.db.modo() === 'nube') ops.push(['familia', '👪', v.linkFamilia && v.linkFamilia.activo ? 'Link para la familia (activo)' : 'Link para la familia']);
     if (R.linkCuentas && R.db.modo() === 'nube' && (v.participantes || []).length > 1) ops.push(['linkCuentas', '🔗', v.linkCuentas && v.linkCuentas.activo ? 'Link de cuentas (activo)' : 'Link de cuentas para el grupo']);
@@ -907,6 +921,8 @@ R.viajes = (function () {
       else if (op === 'viajeros') location.hash = `#viaje/${v.id}/viajeros`;
       else if (op.startsWith('tab_')) location.hash = `#viaje/${v.id}/${op.slice(4)}`;
       else if (op === 'guia') location.hash = `#viaje/${v.id}/guia`;
+      else if (op === 'finalizar') finalizar(v);
+      else if (op === 'reabrir') { delete v.finalizado; R.db.guardarViaje(v); R.app.refrescar(); U.toast('Listo, el viaje sigue en curso.'); }
       else if (op === 'pdf') R.itinerarioPdf.descargar(v);
       else if (op === 'resumen') R.resumen.abrir(v);
       else if (op === 'familia') R.familia.abrir(v);
@@ -1073,6 +1089,6 @@ R.viajes = (function () {
   return {
     crearEjemplo, borrarEjemplo,
     TIPOS, PESTANAS, EXTRAS, tipoDe, etiquetaTransporte, estadoViaje, cuentaRegresiva, destinoCompleto, deteccionInternacional, recalcularTramos,
-    abrirAsistente, editarParte, menuEditar, renderViaje, tarjeta, siguienteHTML, marcarRaizResuelta
+    abrirAsistente, editarParte, menuEditar, finalizar, renderViaje, tarjeta, siguienteHTML, marcarRaizResuelta
   };
 })();
