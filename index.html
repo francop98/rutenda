@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Rutenda · Tu viaje, paso a paso</title>
-  <meta name="description" content="Rutenda: organizá tu viaje desde cero con una guía paso a paso que prioriza por vos: pasajes, alojamiento, documentos, itinerario y gastos compartidos.">
+  <title>Rutenda · Tus viajes</title>
+  <meta name="description" content="Rutenda: tu viaje simple. Itinerario, pendientes, gastos compartidos y valija, todo en un lugar.">
   <meta name="theme-color" content="#1F3A36">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
@@ -48,7 +48,7 @@
   <nav class="nav-inferior" aria-label="Navegación principal">
     <a href="#inicio" data-nav="inicio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v11h13V9"/><path d="M10 20v-5.5h4V20"/></svg>Inicio</a>
     <a href="#viajes" data-nav="viajes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>Viajes</a>
-    <button type="button" class="nav-cargar" id="btnCargarNav" aria-label="Cargar un gasto, un documento y más"><span class="nav-cargar-boton"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-2.2-1.4-1.9 1.4-1.9-1.4-1.9 1.4-1.9-1.4L6 20.5z"/><path d="M12 8v6M9 11h6"/></svg></span>Cargar</button>
+    <button type="button" class="nav-cargar" id="btnCargarNav" aria-label="Cargar un gasto, un pendiente y más"><span class="nav-cargar-boton"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h12v17l-2.2-1.4-1.9 1.4-1.9-1.4-1.9 1.4-1.9-1.4L6 20.5z"/><path d="M12 8v6M9 11h6"/></svg></span>Cargar</button>
     <a href="#itinerario" data-nav="itinerario"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3M8 17.2h6"/></svg>Itinerario</a>
     <a href="#valijas" data-nav="valijas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M3.5 6l1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/></svg>Listas</a>
   </nav>
@@ -67,46 +67,29 @@
   <script src="js/almacenamiento.js"></script>
   <script src="js/lugares.js"></script>
   <script src="js/direcciones.js"></script>
-  <script src="js/recorrido.js"></script>
-  <script src="js/clima.js"></script>
+  <script src="js/agenda.js"></script>
   <script src="js/mapa.js"></script>
   <script src="js/gmaps.js"></script>
   <script src="js/cotizacion.js"></script>
   <script src="js/paisajeviaje.js"></script>
   <script src="js/aeropuertosdatos.js"></script>
   <script src="js/aeropuertos.js"></script>
-  <script src="js/requisitosviaje.js"></script>
   <script src="js/feriados.js"></script>
   <script src="js/autenticacion.js"></script>
-  <!-- Inteligencia de la guía -->
-  <script src="js/plantillaguia.js"></script>
-  <script src="js/motorprioridad.js"></script>
-  <script src="js/formulariospasos.js"></script>
-  <!-- Secciones -->
-  <script src="js/cronogramaeditor.js"></script>
   <script src="js/viajes.js"></script>
-  <script src="js/vistaguia.js"></script>
   <script src="js/itinerario.js"></script>
-  <script src="js/ideas.js"></script>
-  <script src="js/reservas.js"></script>
-  <script src="js/salida.js"></script>
+  <script src="js/pendientes.js"></script>
   <script src="js/resumen.js"></script>
-  <script src="js/tour.js"></script>
   <script src="js/menu.js"></script>
   <script src="js/cargar.js"></script>
   <script src="js/compartido.js"></script>
   <script src="js/bandeja.js"></script>
-  <script src="js/preguntar.js"></script>
   <script src="js/quehacersi.js"></script>
   <script src="js/anio.js"></script>
   <script src="js/cierre.js"></script>
-  <script src="js/pasaje.js"></script>
-  <script src="js/vuelta.js"></script>
   <script src="js/ordenar.js"></script>
   <script src="js/linkcuentas.js"></script>
-  <script src="js/presupuesto.js"></script>
   <script src="js/familia.js"></script>
-  <script src="js/costumbres.js"></script>
   <script src="js/emergencias.js"></script>
   <script src="js/itinerariopdf.js"></script>
   <script src="js/documentos.js"></script>
@@ -114,7 +97,7 @@
   <script src="js/participantes.js"></script>
   <script src="js/valija.js"></script>
   <script src="js/lector.js"></script>
-  <script src="js/escaneo.js"></script>
+  <script src="js/importar.js"></script>
   <script src="js/recordatorios.js"></script>
   <script src="js/migracion.js"></script>
   <!-- Arranque -->

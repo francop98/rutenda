@@ -1,5 +1,5 @@
 /* =========================================================
-   Rutenda — emergencias (pestaña Docs)
+   Rutenda — emergencias (en Archivos)
    Todo lo que necesitás si algo sale mal, también sin señal:
    números de emergencia de cada país, tu seguro de viaje,
    el consulado argentino y tu contacto de emergencia.
@@ -47,15 +47,21 @@ R.emergencias = (function () {
     (v.destinos || []).filter(d => d.nombre && d.codigoPais).forEach(d => { if (!vistos.has(d.codigoPais)) vistos.set(d.codigoPais, d.pais || d.codigoPais); });
     return Array.from(vistos.entries()).map(([codigo, nombre]) => ({ codigo, nombre }));
   }
-  function internacional(v) { return !!(v.perfil && v.perfil.internacional); }
+  function internacional(v) { return !!(v.perfil && v.perfil.internacional) || (v.destinos || []).some(d => d.codigoPais && d.codigoPais !== 'AR'); }
 
   function datos(v) { return Object.assign({ consulado: '', consuladoNota: '' }, v.emergencias || {}); }
+  /** El seguro: el que cargaste acá o el de la versión anterior. */
+  function seguro(v) {
+    const e = (v.emergencias || {}).seguro;
+    if (e && (e.compania || e.telefono || e.poliza)) return e;
+    const viejo = ((v.tareas || {}).p_seguro || {}).datos;
+    return viejo && (viejo.compania || viejo.telefono) ? viejo : null;
+  }
   function contacto() { return Object.assign({ nombre: '', telefono: '' }, R.db.prefs().contactoEmergencia || {}); }
 
   function html(v) {
     const ps = paises(v);
-    const seguroEnGuia = R.motor.lista(v).some(t => t.id === 'p_seguro');
-    const seg = ((v.tareas || {}).p_seguro || {}).datos || null;
+    const seg = seguro(v);
     const d = datos(v);
     const c = contacto();
     const inter = internacional(v);
@@ -70,13 +76,10 @@ R.emergencias = (function () {
         ${NUMEROS[p.codigo] ? botonesTel(NUMEROS[p.codigo]) : `<p class="texto-suave">Desde el celular, el 112 funciona en la mayoría de los países (en América, probá el 911).</p>`}`).join('')));
     }
     // 2) Seguro
-    if (seguroEnGuia || seg) {
-      partes.push(fila('🛡️ Seguro de viaje', seg && seg.compania ? `
-        <p><strong>${esc(seg.compania)}</strong>${seg.poliza ? ` · N° ${esc(seg.poliza)}` : ''}</p>
-        ${seg.telefono ? `<a class="btn btn-primario btn-chico" href="${tel(seg.telefono)}">📞 Llamar a asistencia · ${esc(seg.telefono)}</a>` : '<button type="button" class="btn-texto-mini" data-a="emSeguro">Agregar el teléfono de asistencia</button>'}`
-        : `<p class="texto-suave">Cargá tu seguro y el teléfono de asistencia queda acá, a un toque.</p>
-           <button type="button" class="btn btn-suave btn-chico" data-a="emSeguro">Cargar el seguro</button>`));
-    }
+    partes.push(fila('🛡️ Seguro de viaje', seg ? `
+      <p><strong>${esc(seg.compania || 'Seguro')}</strong>${seg.poliza ? ` · N° ${esc(seg.poliza)}` : ''}</p>
+      ${seg.telefono ? `<a class="btn btn-primario btn-chico" href="${tel(seg.telefono)}">📞 Llamar a asistencia · ${esc(seg.telefono)}</a>` : ''}`
+      : '<p class="texto-suave">Si tenés seguro, cargá el teléfono de asistencia y queda acá, a un toque.</p>'));
     // 3) Consulado argentino (si salís del país)
     if (inter) {
       const destinoExt = ps.find(p => p.codigo !== 'AR');
@@ -96,7 +99,7 @@ R.emergencias = (function () {
         <summary><div><h3 class="bloque-titulo">🆘 Emergencias</h3><small>Números, seguro${inter ? ', consulado' : ''} y tu contacto</small></div></summary>
         <div class="plegable-cuerpo">
           ${partes.join('')}
-          <button type="button" class="btn btn-texto btn-chico" data-a="emEditar">✏️ Editar contacto${inter ? ' y consulado' : ''}</button>
+          <button type="button" class="btn btn-texto btn-chico" data-a="emEditar">✏️ Editar contacto, seguro${inter ? ' y consulado' : ''}</button>
         </div>
       </details>`;
   }
@@ -107,13 +110,13 @@ R.emergencias = (function () {
     if (!det) return;
     if (abierto) det.open = true;
     det.addEventListener('toggle', () => { abierto = det.open; });
-    const bSeg = cont.querySelector('[data-a="emSeguro"]');
-    if (bSeg) bSeg.onclick = () => R.formularios.abrir(v, 'p_seguro');
     cont.querySelector('[data-a="emEditar"]').onclick = () => editar(v, alCambiar);
   }
 
   function editar(v, alCambiar) {
     const d = datos(v), c = contacto();
+    const sg = seguro(v) || {};
+    const org = R.db.puedeOrganizar(v);
     const inter = internacional(v);
     U.modal({
       titulo: 'Emergencias',
@@ -124,6 +127,13 @@ R.emergencias = (function () {
           <label class="campo"><span>Teléfono</span><input id="emTel" type="tel" inputmode="tel" value="${esc(c.telefono)}" placeholder="+54 9 291 …"></label>
         </div>
         <small class="ayuda">Queda para todos tus viajes.</small>
+        ${org ? `
+        <h4 class="titulo-paso">🛡️ Seguro de viaje</h4>
+        <div class="grilla-2">
+          <label class="campo"><span>Compañía</span><input id="emSegComp" value="${esc(sg.compania || '')}" placeholder="Ej: Assist Card"></label>
+          <label class="campo"><span>N° de póliza</span><input id="emSegPol" value="${esc(sg.poliza || '')}"></label>
+        </div>
+        <label class="campo"><span>Teléfono de asistencia</span><input id="emSegTel" type="tel" inputmode="tel" value="${esc(sg.telefono || '')}" placeholder="+54 11 …"></label>` : ''}
         ${inter ? `
         <h4 class="titulo-paso">🇦🇷 Consulado argentino</h4>
         <label class="campo"><span>Teléfono de guardia</span><input id="emCons" type="tel" inputmode="tel" value="${esc(d.consulado)}" placeholder="Ej: +34 …"></label>
@@ -132,8 +142,9 @@ R.emergencias = (function () {
         texto: 'Guardar', clase: 'btn-primario', onClick: el => {
           const val = s => { const x = el.querySelector(s); return x ? x.value.trim() : ''; };
           R.db.guardarPrefs({ contactoEmergencia: { nombre: val('#emNombre'), telefono: val('#emTel') } });
-          if (inter && R.db.puedeOrganizar(v)) {
-            v.emergencias = Object.assign({}, v.emergencias, { consulado: val('#emCons'), consuladoNota: val('#emConsNota') });
+          if (org) {
+            v.emergencias = Object.assign({}, v.emergencias, { seguro: { compania: val('#emSegComp'), poliza: val('#emSegPol'), telefono: val('#emSegTel') } });
+            if (inter) Object.assign(v.emergencias, { consulado: val('#emCons'), consuladoNota: val('#emConsNota') });
             R.db.guardarViaje(v);
           }
           abierto = true;

@@ -370,9 +370,7 @@ R.gastos = (function () {
           <label class="campo"><span>Presupuesto total</span><input id="gPres" inputmode="decimal" value="${esc(v.presupuesto || '')}" placeholder="Sin tope"></label>
           <label class="campo"><span>Moneda principal</span><select id="gMoneda" ${conMovs ? 'disabled' : ''}>${U.opcionesMoneda(v.monedaBase)}</select></label>
         </div>
-        ${conMovs ? '<p class="ayuda">La moneda principal no se puede cambiar cuando ya hay gastos cargados.</p>' : ''}
-        ${R.presupuesto && U.conIA() ? '<button type="button" class="btn btn-suave btn-bloque" data-a="sugerirPresupuesto">✨ ¿Cuánto me va a salir? Sugerime un presupuesto</button>' : ''}`,
-      alAbrir: el => { const b = el.querySelector('[data-a="sugerirPresupuesto"]'); if (b) b.onclick = () => { U.cerrarModal(); R.presupuesto.abrir(v); }; },
+        ${conMovs ? '<p class="ayuda">La moneda principal no se puede cambiar cuando ya hay gastos cargados.</p>' : ''}`,
       acciones: [
         { texto: 'Cancelar' },
         {
@@ -487,7 +485,7 @@ R.gastos = (function () {
           <button type="button" data-tipo="gasto" class="${esGasto ? 'activo' : ''}">Gasto</button>
           <button type="button" data-tipo="ingreso" class="${!esGasto ? 'activo' : ''}">Ingreso / reintegro</button>
         </div>
-        ${!existente && esGasto && R.escaneo && R.escaneo.disponible() ? `<label class="btn btn-suave btn-bloque boton-ticket">📷 Sacar foto al ticket<input type="file" accept="image/*,application/pdf" capture="environment" id="mTicket" hidden></label>` : ''}
+        ${!existente && esGasto ? `<label class="btn btn-suave btn-bloque boton-ticket">${m.ticket ? '📷 Ticket listo ✓ ' : '📷 Guardar la foto del ticket'}<input type="file" accept="image/*,application/pdf" capture="environment" id="mTicket" hidden></label>` : ''}
         <div class="grilla-monto grilla-monto-arriba">
           <label class="campo campo-monto"><span>Monto *</span><input id="mMonto" inputmode="decimal" value="${esc(m.monto)}" placeholder="0"></label>
           <label class="campo"><span>Moneda</span><select id="mMoneda">${U.opcionesMoneda(m.moneda)}</select></label>
@@ -591,25 +589,8 @@ R.gastos = (function () {
         const archivo = ticket.files && ticket.files[0];
         if (!archivo) return;
         const etiqueta = ticket.closest('label');
-        etiqueta.classList.add('cargando');
-        etiqueta.firstChild.textContent = 'Leyendo el ticket… ';
-        try {
-          const r = await R.escaneo.leerTicket(archivo);
-          leer();
-          if (Number(r.total) > 0) m.monto = String(r.total);
-          const mon = String(r.moneda || '').toUpperCase();
-          if (U.MONEDAS && U.MONEDAS.some(x => (x.codigo || x) === mon)) m.moneda = mon;
-          if (r.comercio) m.concepto = String(r.comercio).slice(0, 60);
-          if (/^\d{4}-\d{2}-\d{2}$/.test(r.fecha || '')) m.fecha = r.fecha;
-          if (r.categoria && categorias().some(c => c.id === r.categoria)) m.categoria = r.categoria;
-          m.ticket = archivo;
-          pintar();
-          U.toast('Listo: revisá los datos y guardá.');
-        } catch (e) {
-          U.toast(e.message);
-          etiqueta.classList.remove('cargando');
-          etiqueta.firstChild.textContent = '📷 Sacar foto al ticket';
-        }
+        m.ticket = archivo;
+        etiqueta.firstChild.textContent = '📷 Ticket: ' + (archivo.name || 'foto') + ' ';
       };
       const moneda = f.querySelector('#mMoneda');
       moneda.onchange = () => { leer(); pintar(); };
@@ -665,16 +646,13 @@ R.gastos = (function () {
     const ticket = m.ticket;
     delete m.ticket;
     if (ticket) {
-      // La foto del ticket queda en Documentos, por si la necesitás después
+      // La foto del ticket queda en Archivos, por si la necesitás después
       R.documentos.guardarArchivos(v, [ticket], { categoria: 'ticket' }).then(() => R.db.guardarViaje(v)).catch(() => {});
     }
     if (existente) {
       v.movimientos = v.movimientos.map(x => x.id === existente.id ? Object.assign({}, m, { id: existente.id }) : x);
     } else {
       v.movimientos.push(Object.assign({}, m, { id: U.id('mov'), creado: new Date().toISOString() }));
-      if (m.tipo === 'gasto' && R.motor.estado(v, 'r_gastos') === 'pendiente' && R.viajes.estadoViaje(v) !== 'planificando') {
-        R.motor.setEstado(v, 'r_gastos', 'en_curso');
-      }
     }
     R.db.guardarViaje(v);
     R.app.refrescar();

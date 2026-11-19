@@ -30,14 +30,11 @@ R.valija = (function () {
   const categoriasOrdenadas = () => U.ordenAlfa(CATEGORIAS.filter(c => c.id !== 'otros'), 'nombre').concat(CATEGORIAS.filter(c => c.id === 'otros'));
   const opcionesCategoria = sel => categoriasOrdenadas().map(c => `<option value="${c.id}" ${c.id === sel ? 'selected' : ''}>${c.icono} ${c.nombre}</option>`).join('');
 
-  /* ---------- Datos del viaje ---------- */
-  /** La valija de una persona del viaje (por defecto, la tuya). Cada viajero arma la suya. */
-  function valijaDe(v, personaId) {
-    const pid = personaId || R.db.yoEn(v);
+  /* ---------- Datos del viaje: una sola valija para todos ---------- */
+  function valijaDe(v) {
     v.valijas = v.valijas || {};
-    const val = v.valijas[pid] = v.valijas[pid] || { items: [], listas: [] };
+    const val = v.valijas.comun = v.valijas.comun || { items: [] };
     val.items = val.items || [];
-    val.listas = val.listas || [];
     return val;
   }
   function existe(v, texto) { return valijaDe(v).items.some(i => normal(i.texto) === normal(texto)); }
@@ -46,323 +43,96 @@ R.valija = (function () {
     valijaDe(v).items.push({ id: U.id('val'), texto: texto.trim(), categoria: cat || 'otros', hecho: false, origen: origen || null });
     return true;
   }
-  /**
-   * Ida: lo que hay que guardar para salir.
-   * Vuelta: lo que llevaste (y lo que compraste allá) para asegurarte de volver con todo.
-   */
-  function itemsDe(v, modo, personaId) {
-    const items = valijaDe(v, personaId).items;
-    return modo === 'vuelta' ? items.filter(i => i.hecho || i.soloVuelta) : items.filter(i => !i.soloVuelta);
-  }
-  const listo = (i, modo) => modo === 'vuelta' ? (i.vuelta || i.noVuelve) : i.hecho;
-  function progreso(v, modo, personaId) {
-    const m = modo || 'ida';
-    const items = itemsDe(v, m, personaId);
-    const hechos = items.filter(i => listo(i, m)).length;
+  function progreso(v) {
+    const items = valijaDe(v).items;
+    const hechos = items.filter(i => i.hecho).length;
     return { hechos, total: items.length, pct: items.length ? Math.round(hechos / items.length * 100) : 0 };
   }
-  const modoPorViaje = {};
-  function modoDe(v) {
-    if (modoPorViaje[v.id]) return modoPorViaje[v.id];
-    const est = R.viajes.estadoViaje(v);
-    return est === 'planificando' || !itemsDe(v, 'vuelta').length ? 'ida' : 'vuelta';
-  }
 
-  /** Sugerencias pensadas para este viaje (no se agregan solas). */
-  function sugerencias(v) {
-    const r = [];
-    const s = (cat, texto) => { if (!existe(v, texto) && !r.some(x => normal(x[1]) === normal(texto))) r.push([cat, texto]); };
-    const req = R.requisitos.analizar(v);
-    const dias = v.fechaInicio && v.fechaFin ? U.diasEntre(v.fechaInicio, v.fechaFin) + 1 : null;
-    s('documentos', req.necesitaPasaporte ? 'Pasaporte de cada viajero' : 'DNI vigente de cada viajero');
-    s('documentos', 'Tarjetas y efectivo');
-    s('documentos', 'Reservas y pasajes en el celular');
-    if (req.tramites.length) s('documentos', `Comprobante de ${req.tramites.map(t => t.tramite || 'visa').join(' y ')}`);
-    if (req.fiebreAmarilla.length) s('documentos', 'Certificado de vacuna de fiebre amarilla');
-    if (R.motor.estado(v, 'p_seguro') === 'hecha') s('documentos', 'Voucher del seguro de viaje');
-    if (v.perfil.alquilaAuto) s('documentos', 'Licencia de conducir');
-    if (R.recorrido.usaMedio(v, 'avion')) { s('mano', 'Cargador y batería externa (van en la mano)'); s('mano', 'Líquidos en envases de hasta 100 ml'); s('mano', 'Una muda de ropa en la mano'); }
-    if (dias) { s('ropa', `Ropa interior (${dias})`); s('ropa', `Medias (${dias})`); s('ropa', `Remeras (${Math.min(dias, 7)})`); }
-    else { s('ropa', 'Ropa interior'); s('ropa', 'Medias'); s('ropa', 'Remeras'); }
-    s('ropa', 'Pijama');
-    s('calzado', 'Zapatillas cómodas para caminar');
-    s('higiene', 'Cepillo y pasta de dientes'); s('higiene', 'Desodorante');
-    s('salud', 'Medicación habitual (con receta)'); s('salud', 'Analgésicos');
-    s('electronica', 'Celular y cargador');
-    if (v.perfil.internacional) s('electronica', 'Adaptador de enchufe');
-    if (req.dengue) s('salud', 'Repelente de mosquitos');
-
-    // Clima aproximado por latitud y mes del viaje
-    const mes = v.fechaInicio ? U.aFecha(v.fechaInicio).getMonth() + 1 : null;
-    const lats = (v.destinos || []).map(d => d.lat).filter(x => x != null);
-    if (lats.length && mes) {
-      const invernoSur = mes >= 5 && mes <= 9, invernoNorte = mes >= 11 || mes <= 3;
-      if (lats.some(l => (l < -35 && invernoSur) || (l > 40 && invernoNorte))) { s('ropa', 'Campera de abrigo'); s('ropa', 'Gorro, guantes y bufanda'); }
-      if (lats.some(l => l > -30 && l < 30) || lats.some(l => l < -30 && (mes >= 12 || mes <= 2))) { s('ropa', 'Traje de baño'); s('higiene', 'Protector solar'); s('otros', 'Lentes de sol'); }
-    }
-    if (v.perfil.menores) { s('ninos', 'Documentos de los chicos'); s('ninos', 'Entretenimiento para el viaje'); s('ninos', 'Snacks'); }
-    if (v.perfil.viajaConMascota) { s('mascota', 'Transportadora'); s('mascota', 'Comida y platos'); s('mascota', 'Certificado veterinario'); }
-    if (v.perfil.equipamiento) s('otros', 'Equipo y ropa para la actividad');
-    if (v.perfil.eventoEspecial) s('ropa', 'Ropa para el evento especial');
-    if (R.recorrido.usaMedio(v, 'auto')) { s('otros', 'Documentación y seguro del auto'); s('otros', 'Kit de emergencia del auto'); }
-    return r.sort((a, b) => U.alfa(a[1], b[1]));
-  }
+  /** Lo típico de cualquier viaje: aparece solo si lo pedís. */
+  const SUGERIDOS = [
+    ['documentos', 'DNI o pasaporte'], ['documentos', 'Tarjetas y efectivo'], ['documentos', 'Pasajes y reservas en el celular'],
+    ['ropa', 'Ropa interior'], ['ropa', 'Medias'], ['ropa', 'Remeras'], ['ropa', 'Pijama'], ['ropa', 'Abrigo'],
+    ['calzado', 'Zapatillas cómodas'], ['higiene', 'Cepillo y pasta de dientes'], ['higiene', 'Desodorante'], ['higiene', 'Protector solar'],
+    ['salud', 'Medicación habitual'], ['salud', 'Analgésicos'], ['electronica', 'Celular y cargador'], ['electronica', 'Batería externa'],
+    ['mano', 'Auriculares'], ['otros', 'Lentes de sol']
+  ];
+  let verSugeridos = false;
 
   /* ---------- Pestaña del viaje ---------- */
   function render(v, cont) {
     const val = valijaDe(v);
-    const modo = modoDe(v);
-    const ida = modo === 'ida';
-    const prog = progreso(v, modo);
-    const sug = ida ? sugerencias(v) : [];
+    const prog = progreso(v);
     const listas = R.db.listasValija();
-    const items = itemsDe(v, modo);
-    const grupos = categoriasOrdenadas().map(c => ({ c, items: U.ordenAlfa(items.filter(i => i.categoria === c.id), 'texto') })).filter(g => g.items.length);
+    const sug = SUGERIDOS.filter(([, t]) => !existe(v, t));
+    const grupos = categoriasOrdenadas().map(c => ({ c, items: U.ordenAlfa(val.items.filter(i => (i.categoria || 'otros') === c.id), 'texto') })).filter(g => g.items.length);
 
     cont.innerHTML = `
-      <div class="bloque-cab cab-seccion">
-        <div>
-          <h2 class="titulo-seccion">Armador de valija</h2>
-          <p class="texto-suave">${ida
-            ? (prog.total ? `${prog.hechos} de ${prog.total} cosas guardadas para salir.` : 'Sumá lo sugerido para este viaje o escribí lo que quieras.')
-            : (prog.total ? `${prog.hechos} de ${prog.total} cosas listas para volver.` : 'Cuando armes la valija de ida, acá vas a poder chequear que vuelvas con todo.')}</p>
+      <div class="valija2">
+        <div class="valija2-cab">
+          <h2 class="titulo-seccion">Valija</h2>
+          <span class="texto-suave">${prog.total ? `${prog.hechos} de ${prog.total} listos` : 'Vacía'}</span>
         </div>
-        ${prog.total ? `<button class="btn btn-primario" data-a="armar">${ida ? '🧳 Armar paso a paso' : '🏠 Chequear la vuelta'}</button>` : ''}
-      </div>
-      <div class="segmentado segmentado-valija">
-        <button type="button" data-modo-valija="ida" class="${ida ? 'activo' : ''}">🛫 Para ir</button>
-        <button type="button" data-modo-valija="vuelta" class="${!ida ? 'activo' : ''}">🛬 Para volver</button>
-      </div>
-      ${prog.total ? `<div class="barra-progreso barra-valija"><span style="width:${prog.pct}%"></span></div>` : ''}
-      ${otrasValijasHTML(v, modo)}
-
-      <div class="valija-grilla">
-        <div>
-          <div class="bloque">
-            <h3 class="bloque-titulo">${ida ? 'Agregar a esta valija' : 'Algo nuevo que traés'}</h3>
-            <div class="fila-agregar fila-valija">
-              <input id="vjTexto" placeholder="${ida ? 'Agregá algo más' : 'Ej: regalos, artesanías, compras'}">
-              <select id="vjCat">${opcionesCategoria('otros')}</select>
-              <button class="btn btn-primario" data-a="agregar">Agregar</button>
-            </div>
-            <p class="ayuda">${ida ? 'Queda solo en este viaje.' : 'Tocá cada cosa cuando la guardes. Si algo no vuelve (se terminó o lo regalaste), marcá "No vuelve".'}</p>
-            ${ida ? `
-              <div class="valija-mis-listas">
-                <span>O sumá una de tus listas:</span>
-                <div class="chips-listas">${listas.map(l => `<button type="button" class="chip-lista ${val.listas.includes(l.id) ? 'usada' : ''}" data-lista="${l.id}">${val.listas.includes(l.id) ? '✓' : '+'} ${esc(l.nombre)} <small>${l.items.length}</small></button>`).join('')}
-                  <button type="button" class="chip-lista chip-admin" data-a="adminListas">⚙️ ${listas.length ? 'Mis listas' : 'Crear una lista'}</button></div>
-              </div>` : ''}
-          </div>
-
-          ${grupos.length ? grupos.map(g => `
-            <div class="bloque bloque-valija">
-              <h3 class="bloque-titulo">${g.c.icono} ${esc(g.c.nombre)} <span class="contador">${g.items.filter(i => listo(i, modo)).length}/${g.items.length}</span></h3>
-              <ul class="lista-valija checklist">${g.items.map(i => `
-                <li class="${listo(i, modo) ? 'hecho' : ''} ${!ida && i.noVuelve ? 'no-vuelve' : ''}">
-                  <label><input type="checkbox" data-item="${i.id}" ${(ida ? i.hecho : i.vuelta) ? 'checked' : ''} ${!ida && i.noVuelve ? 'disabled' : ''}><span>${esc(i.texto)}${i.soloVuelta ? ' <small class="origen-lista">nuevo</small>' : ''}</span></label>
-                  ${ida ? (i.origen ? `<small class="origen-lista">${esc(nombreLista(i.origen))}</small>` : '') : `<button class="btn-texto-mini" data-no-vuelve="${i.id}">${i.noVuelve ? 'Vuelve' : 'No vuelve'}</button>`}
-                  ${ida || i.soloVuelta ? `<button class="btn-icono" data-borrar="${i.id}" title="Quitar">×</button>` : ''}
-                </li>`).join('')}</ul>
-            </div>`).join('') : `
-            ${ida
-              ? U.vacio({ icono: '🧳', titulo: 'Tu valija está vacía', texto: 'Sumá lo sugerido para este viaje o escribí lo que quieras arriba.', boton: sug.length ? `✨ Sumar lo sugerido (${sug.length})` : '', accion: 'todasSug' })
-              : U.vacio({ icono: '🏠', titulo: 'Nada para chequear todavía', texto: 'Primero armá la valija para ir: eso es lo que después traés de vuelta.', boton: '🛫 Ir a “Para ir”', accion: 'irIda' })}`}
+        ${prog.total ? `<div class="barra-progreso barra-valija"><span style="width:${prog.pct}%"></span></div>` : ''}
+        <form class="fila-agregar fila-valija" data-form="valija">
+          <input id="vjTexto" placeholder="Ej: Campera de lluvia" aria-label="Agregar a la valija" autocomplete="off">
+          <select id="vjCat" aria-label="Categoría">${opcionesCategoria('otros')}</select>
+          <button type="submit" class="btn btn-primario">Agregar</button>
+        </form>
+        <div class="chips-listas">
+          ${listas.map(l => `<button type="button" class="chip-lista" data-lista="${l.id}">+ ${esc(l.nombre)} <small>${l.items.length}</small></button>`).join('')}
+          <a class="chip-lista chip-admin" href="#valijas">${listas.length ? '⚙️ Mis listas' : '+ Guardar mi lista de siempre'}</a>
         </div>
-
-        ${ida ? `<aside class="col-lateral">
-          ${sug.length ? `
-            <div class="bloque">
-              <h4>Sugeridos para este viaje</h4>
-              <p class="texto-suave">Según destino, fechas y transporte.</p>
-              <ul class="lista-sugerencias">${sug.map((x, i) => `<li><span>${categoria(x[0]).icono} ${esc(x[1])}</span><button class="btn-icono" data-sug="${i}" title="Agregar">+</button></li>`).join('')}</ul>
-              <button class="btn btn-suave btn-chico" data-a="todasSug">Agregar todas</button>
-            </div>` : ''}
-        </aside>` : ''}
+        ${grupos.length ? grupos.map(g => `
+          <div class="bloque bloque-valija">
+            <h3 class="bloque-titulo">${g.c.icono} ${esc(g.c.nombre)} <span class="contador">${g.items.filter(i => i.hecho).length}/${g.items.length}</span></h3>
+            <ul class="lista-valija checklist">${g.items.map(i => `
+              <li class="${i.hecho ? 'hecho' : ''}">
+                <label><input type="checkbox" data-item="${i.id}" ${i.hecho ? 'checked' : ''}><span>${esc(i.texto)}</span></label>
+                <button type="button" class="btn-icono" data-borrar="${i.id}" aria-label="Quitar">×</button>
+              </li>`).join('')}</ul>
+          </div>`).join('') : U.vacio({ icono: '🧳', titulo: 'La valija está vacía', texto: listas.length ? 'Sumá tu lista de siempre o escribí lo que quieras arriba.' : 'Escribí lo que llevás. Si guardás tu lista de siempre, la sumás a cada viaje con un toque.', chico: true })}
+        <button type="button" class="btn-texto-mini" data-a="sugeridos">${verSugeridos ? 'Ocultar sugerencias' : '¿Se te olvida algo? Ver sugerencias'}</button>
+        ${verSugeridos ? `<div class="chips-elegir chips-chicos">${sug.map(([c, t], i) => `<button type="button" class="chip-op" data-sug="${i}">+ ${esc(t)}</button>`).join('') || '<span class="texto-suave">Ya tenés todo lo típico.</span>'}</div>` : ''}
       </div>`;
 
-    const guardarYRefrescar = msg => { R.db.guardarViaje(v); revisarCompleta(v); R.app.refrescar(); if (msg) U.toast(msg); };
-    cont.querySelectorAll('[data-modo-valija]').forEach(b => b.onclick = () => { modoPorViaje[v.id] = b.dataset.modoValija; R.app.refrescar(); });
-    const input = cont.querySelector('#vjTexto');
-    const agregar = () => {
-      const t = input.value.trim();
+    const guardar = msg => { R.db.guardarViaje(v); render(v, cont); if (msg) U.toast(msg); };
+    const form = cont.querySelector('[data-form="valija"]');
+    form.onsubmit = e => {
+      e.preventDefault();
+      const t = form.querySelector('#vjTexto').value.trim();
       if (!t) return;
-      if (!agregarItem(v, t, cont.querySelector('#vjCat').value, null)) { U.toast('Eso ya está en la valija.'); return; }
-      if (!ida) { const it = val.items[val.items.length - 1]; it.soloVuelta = true; }
-      guardarYRefrescar();
-      setTimeout(() => { const i = document.getElementById('vjTexto'); if (i) i.focus(); }, 30);
+      if (!agregarItem(v, t, form.querySelector('#vjCat').value, null)) { U.toast('Eso ya está en la valija.'); return; }
+      guardar();
+      const i = cont.querySelector('#vjTexto'); if (i) i.focus();
     };
-    cont.querySelector('[data-a="agregar"]').onclick = agregar;
-    input.onkeydown = e => { if (e.key === 'Enter') agregar(); };
     cont.querySelectorAll('[data-item]').forEach(x => x.onchange = () => {
       const it = val.items.find(i => i.id === x.dataset.item);
-      if (ida) it.hecho = x.checked; else it.vuelta = x.checked;
-      guardarYRefrescar();
+      if (it) it.hecho = x.checked;
+      guardar(prog.total && val.items.every(i => i.hecho) ? '¡Valija lista! 🧳' : '');
     });
-    cont.querySelectorAll('[data-no-vuelve]').forEach(x => x.onclick = () => {
-      const it = val.items.find(i => i.id === x.dataset.noVuelve);
-      it.noVuelve = !it.noVuelve;
-      guardarYRefrescar();
-    });
-    cont.querySelectorAll('[data-borrar]').forEach(x => x.onclick = () => {
-      val.items = val.items.filter(i => i.id !== x.dataset.borrar);
-      guardarYRefrescar();
-    });
-    cont.querySelectorAll('[data-sug]').forEach(x => x.onclick = () => {
-      const [cat, texto] = sug[Number(x.dataset.sug)];
-      agregarItem(v, texto, cat, null);
-      guardarYRefrescar();
-    });
-    const bIda = cont.querySelector('[data-a="irIda"]');
-    if (bIda) bIda.onclick = () => { modoPorViaje[v.id] = 'ida'; R.app.refrescar(); };
-    cont.querySelectorAll('[data-a="todasSug"]').forEach(todas => todas.onclick = () => { sug.forEach(([cat, texto]) => agregarItem(v, texto, cat, null)); guardarYRefrescar(`${U.plural(sug.length, 'sugerencia agregada', 'sugerencias agregadas')}.`); });
+    cont.querySelectorAll('[data-borrar]').forEach(x => x.onclick = () => { val.items = val.items.filter(i => i.id !== x.dataset.borrar); guardar(); });
     cont.querySelectorAll('[data-lista]').forEach(x => x.onclick = () => {
       const l = R.db.listasValija().find(y => y.id === x.dataset.lista);
+      if (!l) return;
       let n = 0;
       l.items.forEach(it => { if (agregarItem(v, it.texto, it.categoria, l.id)) n++; });
-      if (!val.listas.includes(l.id)) val.listas.push(l.id);
-      guardarYRefrescar(n ? `Agregué ${U.plural(n, 'cosa', 'cosas')} de "${l.nombre}".` : `Todo lo de "${l.nombre}" ya estaba en la valija.`);
+      guardar(n ? `Sumé ${U.plural(n, 'cosa', 'cosas')} de "${l.nombre}".` : `Todo lo de "${l.nombre}" ya estaba.`);
     });
-    const bAdmin = cont.querySelector('[data-a="adminListas"]');
-    if (bAdmin) bAdmin.onclick = () => {
-      // Administrar las listas sin salir de la valija
-      const { el } = U.modal({ titulo: 'Mis listas', subtitulo: 'Lo que llevás siempre. Las sumás a cualquier viaje con un toque.', ancho: true, cuerpo: '<div class="listas-en-valija"></div>', alCerrar: () => R.app.refrescar() });
-      const caja = el.querySelector('.listas-en-valija');
-      const pintarListas = () => renderMisListas(caja, pintarListas);
-      pintarListas();
-    };
-    const armar = cont.querySelector('[data-a="armar"]');
-    if (armar) armar.onclick = () => armarPasoAPaso(v, modo);
-    cont.querySelectorAll('[data-ver-valija]').forEach(b => b.onclick = () => verValija(v, b.dataset.verValija, modo));
+    cont.querySelector('[data-a="sugeridos"]').onclick = () => { verSugeridos = !verSugeridos; render(v, cont); };
+    cont.querySelectorAll('[data-sug]').forEach(x => x.onclick = () => { const [c, t] = sug[Number(x.dataset.sug)]; agregarItem(v, t, c, null); guardar(); });
   }
 
-  /** Cómo van las valijas del resto (solo para mirar). */
-  function otrasValijasHTML(v, modo) {
-    const yo = R.db.yoEn(v);
-    const otros = (v.participantes || []).filter(pid => pid !== yo && v.valijas && v.valijas[pid] && (v.valijas[pid].items || []).length);
-    if (!otros.length) return '';
-    return `<div class="otras-valijas"><small>Las valijas del resto:</small>${otros.map(pid => {
-      const p = R.db.persona(pid) || { nombre: 'Viajero' };
-      const pr = progreso(v, modo, pid);
-      return `<button class="chip-persona" data-ver-valija="${pid}">${U.avatar(p, 22)} ${esc(p.nombre)} <small>${pr.hechos}/${pr.total}</small></button>`;
-    }).join('')}</div>`;
-  }
-  function verValija(v, pid, modo) {
-    const p = R.db.persona(pid) || { nombre: 'Viajero' };
-    const items = itemsDe(v, modo, pid);
-    U.modal({
-      titulo: `La valija de ${p.nombre}`,
-      subtitulo: modo === 'vuelta' ? 'Para volver' : 'Para ir',
-      cuerpo: `<ul class="lista-valija checklist">${items.map(i => `<li class="${listo(i, modo) ? 'hecho' : ''}"><label><input type="checkbox" disabled ${listo(i, modo) ? 'checked' : ''}><span>${esc(i.texto)}</span></label></li>`).join('')}</ul>`,
-      acciones: [{ texto: 'Cerrar', clase: 'btn-primario' }]
-    });
-  }
-
-  function nombreLista(id) { const l = R.db.listasValija().find(x => x.id === id); return l ? l.nombre : 'Lista'; }
-
-  /** Si está todo en la valija para ir, el paso queda resuelto; avisa también al completar la vuelta. */
-  let avisoVuelta = {};
-  function revisarCompleta(v) {
-    const p = progreso(v, 'ida');
-    const id = R.motor.idsDe(v, 's_valija')[0];
-    if (id && p.total && p.hechos === p.total && R.motor.estado(v, id) !== 'hecha') {
-      R.motor.setEstado(v, id, 'hecha');
-      R.db.guardarViaje(v);
-      setTimeout(() => U.toast('¡Valija lista para salir! 🧳'), 400);
-    }
-    const pv = progreso(v, 'vuelta');
-    if (pv.total && pv.hechos === pv.total && !avisoVuelta[v.id]) {
-      avisoVuelta[v.id] = true;
-      setTimeout(() => U.toast('¡Volvés con todo! 🏠'), 400);
-    } else if (pv.hechos < pv.total) avisoVuelta[v.id] = false;
-  }
-
-  /* ---------- Armado paso a paso (checklist por categoría) ---------- */
-  function armarPasoAPaso(v, modo) {
-    const ida = modo !== 'vuelta';
-    const val = valijaDe(v);
-    const todos = () => itemsDe(v, modo);
-    const pasos = categoriasOrdenadas().filter(c => todos().some(i => i.categoria === c.id));
-    let paso = Math.max(0, pasos.findIndex(c => todos().some(i => i.categoria === c.id && !listo(i, modo))));
-    const { el } = U.modal({
-      titulo: ida ? 'Armemos la valija' : 'Chequeo para volver',
-      subtitulo: ida ? 'Una categoría a la vez. Tocá lo que ya guardaste.' : 'Revisá que vuelvas con todo lo que llevaste.',
-      ancho: true, cuerpo: '<div id="armado"></div>',
-      alCerrar: () => { revisarCompleta(v); R.app.refrescar(); }
-    });
-    const cont = el.querySelector('#armado');
-
-    function pintar() {
-      const fin = paso >= pasos.length;
-      const p = progreso(v, modo);
-      if (fin) {
-        const faltan = todos().filter(i => !listo(i, modo));
-        cont.innerHTML = `
-          <div class="celebrar">
-            <div class="celebrar-sol">${faltan.length ? (ida ? '🧳' : '🔎') : '🎉'}</div>
-            <h3>${faltan.length ? `Te ${faltan.length === 1 ? 'falta' : 'faltan'} ${U.plural(faltan.length, 'cosa', 'cosas')}` : (ida ? '¡Valija lista!' : '¡Volvés con todo!')}</h3>
-            ${faltan.length ? `<ul class="lista-faltan">${faltan.map(i => `<li>${categoria(i.categoria).icono} ${esc(i.texto)}</li>`).join('')}</ul>` : `<p>${ida ? 'Todo guardado. Buen viaje.' : 'No te olvidás nada. Buen regreso.'}</p>`}
-          </div>
-          <div class="asistente-pie">
-            <button type="button" class="btn btn-suave" data-a="atras">← Volver</button>
-            <button type="button" class="btn btn-primario" data-a="cerrar">Listo</button>
-          </div>`;
-      } else {
-        const c = pasos[paso];
-        const items = U.ordenAlfa(todos().filter(i => i.categoria === c.id), 'texto');
-        cont.innerHTML = `
-          <div class="paso-movil visible"><span>${c.icono} ${paso + 1} de ${pasos.length}</span><strong>${esc(c.nombre)}</strong>
-            <span class="pm-puntos">${pasos.map((x, i) => `<i class="${i < paso ? 'listo' : i === paso ? 'actual' : ''}"></i>`).join('')}</span></div>
-          <div class="barra-progreso barra-valija"><span style="width:${p.pct}%"></span></div>
-          <ul class="lista-valija checklist grande">${items.map(i => `
-            <li class="${listo(i, modo) ? 'hecho' : ''} ${!ida && i.noVuelve ? 'no-vuelve' : ''}"><label><input type="checkbox" data-item="${i.id}" ${(ida ? i.hecho : i.vuelta) ? 'checked' : ''} ${!ida && i.noVuelve ? 'disabled' : ''}><span>${esc(i.texto)}</span></label>
-              ${!ida ? `<button type="button" class="btn-texto-mini" data-no-vuelve="${i.id}">${i.noVuelve ? 'Vuelve' : 'No vuelve'}</button>` : ''}</li>`).join('')}</ul>
-          ${ida ? `<div class="fila-agregar">
-            <input id="arTexto" placeholder="¿Algo más de ${esc(c.nombre.toLowerCase())}?">
-            <button type="button" class="btn btn-suave" data-a="agregar">Agregar</button>
-          </div>` : ''}
-          <div class="asistente-pie">
-            <button type="button" class="btn btn-suave" data-a="atras" ${paso === 0 ? 'style="visibility:hidden"' : ''}>← Atrás</button>
-            <button type="button" class="btn btn-primario" data-a="seguir">${paso === pasos.length - 1 ? 'Terminar' : 'Siguiente →'}</button>
-          </div>`;
-        cont.querySelectorAll('[data-item]').forEach(x => x.onchange = () => {
-          const it = val.items.find(i => i.id === x.dataset.item);
-          if (ida) it.hecho = x.checked; else it.vuelta = x.checked;
-          R.db.guardarViaje(v);
-          x.closest('li').classList.toggle('hecho', x.checked);
-          cont.querySelector('.barra-valija span').style.width = progreso(v, modo).pct + '%';
-        });
-        cont.querySelectorAll('[data-no-vuelve]').forEach(x => x.onclick = () => {
-          const it = val.items.find(i => i.id === x.dataset.noVuelve);
-          it.noVuelve = !it.noVuelve;
-          R.db.guardarViaje(v);
-          pintar();
-        });
-        const inp = cont.querySelector('#arTexto');
-        if (inp) {
-          const agregar = () => { if (agregarItem(v, inp.value, c.id, null)) { R.db.guardarViaje(v); pintar(); cont.querySelector('#arTexto').focus(); } };
-          cont.querySelector('[data-a="agregar"]').onclick = agregar;
-          inp.onkeydown = e => { if (e.key === 'Enter') agregar(); };
-        }
-        cont.querySelector('[data-a="seguir"]').onclick = () => { paso++; pintar(); };
-      }
-      const atras = cont.querySelector('[data-a="atras"]');
-      if (atras) atras.onclick = () => { paso = Math.max(0, paso - 1); pintar(); };
-      const cerrar = cont.querySelector('[data-a="cerrar"]');
-      if (cerrar) cerrar.onclick = () => U.cerrarModal();
-    }
-    pintar();
-  }
-
-  /* ---------- Pantalla "Mis listas" ---------- */
   let creandoLista = false;
   function renderMisListas(app, alCambiar) {
     const refrescar = () => (alCambiar ? alCambiar() : R.app.refrescar());
     const listas = R.db.listasValija();
     app.innerHTML = `
       <section class="encabezado-simple">
-        <h1>Mis listas de valija</h1>
-        <p class="texto-suave">Lo que llevás siempre. En cada viaje la sumás con un toque.</p>
+        <h1>Mis listas</h1>
+        <p class="texto-suave">Lo que llevás siempre y lo que siempre tenés que hacer antes de viajar. En cada viaje las sumás con un toque.</p>
       </section>
+      <h2 class="titulo-seccion listas-sub">🧳 Para la valija</h2>
       <div class="acciones-fila">
         ${creandoLista ? '' : '<button class="btn btn-primario" data-a="nueva">+ Nueva lista</button>'}
       </div>
@@ -390,7 +160,9 @@ R.valija = (function () {
             <button class="btn btn-suave" data-agregar="${l.id}">+</button>
           </div>
         </article>`).join('')}</div>` : `
-        ${creandoLista ? '' : U.vacio({ icono: '📝', titulo: 'Todavía no tenés listas', texto: 'Por ejemplo “Playa” o “Nieve”. Después la sumás a cualquier viaje con un toque.', boton: '+ Crear mi primera lista', accion: 'nueva' })}`}`;
+        ${creandoLista ? '' : U.vacio({ icono: '📝', titulo: 'Todavía no tenés listas', texto: 'Por ejemplo “Playa” o “Nieve”. Después la sumás a cualquier viaje con un toque.', boton: '+ Crear mi primera lista', accion: 'nueva', chico: true })}`}
+      ${pendientesHTML()}`;
+    enlazarPendientes(app, refrescar);
 
     const guardar = l => { R.db.guardarListaValija(l); refrescar(); };
     // Nueva lista: primero el nombre y después "Crear lista" (nada se crea sin confirmar)
@@ -450,6 +222,53 @@ R.valija = (function () {
     });
   }
 
+  /* ---------- Listas de pendientes de siempre ---------- */
+  const listasPend = () => (R.db.prefs().listasPendientes || []).slice();
+  const guardarListasPend = l => R.db.guardarPrefs({ listasPendientes: l });
+  function pendientesHTML() {
+    const ls = listasPend();
+    return `
+      <h2 class="titulo-seccion listas-sub">✅ Pendientes de siempre</h2>
+      <p class="texto-suave">Por ejemplo "Antes de cada viaje": avisar al banco, regar las plantas, sacar el seguro…</p>
+      <div class="grilla-listas">${ls.map(l => `
+        <article class="bloque lista-personal">
+          <div class="bloque-cab">
+            <input class="titulo-lista" data-pren="${l.id}" value="${esc(l.nombre)}" aria-label="Nombre de la lista">
+            <button class="btn-icono" data-pelim="${l.id}" title="Eliminar lista">🗑</button>
+          </div>
+          <ul class="lista-chips">${(l.items || []).map((t, i) => `<li>${esc(t)} <button data-pquitar="${l.id}|${i}" aria-label="Quitar">×</button></li>`).join('') || '<li class="texto-suave">Vacía</li>'}</ul>
+          <form class="fila-agregar" data-pform="${l.id}"><input placeholder="Agregar un pendiente" autocomplete="off"><button class="btn btn-suave" type="submit">+</button></form>
+        </article>`).join('')}</div>
+      <form class="fila-agregar nueva-lista-pend" data-pform="nueva"><input placeholder="Nombre de una lista nueva (ej: Antes de cada viaje)" autocomplete="off"><button class="btn btn-primario" type="submit">+ Crear</button></form>`;
+  }
+  function enlazarPendientes(app, refrescar) {
+    app.querySelectorAll('[data-pform]').forEach(f => f.onsubmit = e => {
+      e.preventDefault();
+      const t = f.querySelector('input').value.trim();
+      if (!t) return;
+      const ls = listasPend();
+      if (f.dataset.pform === 'nueva') ls.push({ id: U.id('lpe'), nombre: t, items: [] });
+      else { const l = ls.find(x => x.id === f.dataset.pform); if (l && !(l.items || []).some(x => normal(x) === normal(t))) l.items = (l.items || []).concat([t]); }
+      guardarListasPend(ls);
+      refrescar();
+      setTimeout(() => { const i = document.querySelector(`[data-pform="${f.dataset.pform === 'nueva' ? ls[ls.length - 1].id : f.dataset.pform}"] input`); if (i) i.focus(); }, 30);
+    });
+    app.querySelectorAll('[data-pquitar]').forEach(b => b.onclick = () => {
+      const [id, i] = b.dataset.pquitar.split('|');
+      const ls = listasPend(); const l = ls.find(x => x.id === id);
+      if (l) { l.items = l.items.filter((_, k) => k !== Number(i)); guardarListasPend(ls); refrescar(); }
+    });
+    app.querySelectorAll('[data-pren]').forEach(x => x.onchange = () => {
+      const ls = listasPend(); const l = ls.find(y => y.id === x.dataset.pren);
+      if (l) { l.nombre = x.value.trim() || 'Lista'; guardarListasPend(ls); U.toast('Nombre guardado.'); }
+    });
+    app.querySelectorAll('[data-pelim]').forEach(b => b.onclick = async () => {
+      const ls = listasPend(); const l = ls.find(y => y.id === b.dataset.pelim);
+      if (!l || !await U.confirmar(`¿Eliminar la lista "${l.nombre}"?`, { textoSi: 'Eliminar', peligro: true })) return;
+      guardarListasPend(ls.filter(y => y.id !== l.id)); refrescar();
+    });
+  }
+
   /** Suma algo a tu valija de un viaje y lo guarda. Devuelve false si ya estaba. */
   function agregar(v, texto, cat) {
     if (!agregarItem(v, texto, cat || 'otros', null)) return false;
@@ -457,5 +276,5 @@ R.valija = (function () {
     return true;
   }
 
-  return { render, renderMisListas, sugerencias, progreso, valijaDe, agregar, CATEGORIAS };
+  return { render, renderMisListas, progreso, valijaDe, agregar, CATEGORIAS };
 })();

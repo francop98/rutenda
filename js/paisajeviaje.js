@@ -215,16 +215,19 @@ R.paisaje = (function () {
    */
   function svg(v, opciones) {
     const op = opciones || {};
-    const transporte = op.transporte || (v && v.perfil && v.perfil.transporte) || 'avion';
+    const transporte = op.transporte || (v && R.agenda && v.agenda && v.agenda.length ? R.agenda.medioPrincipal(v) : '') || (v && v.perfil && v.perfil.transporte) || 'avion';
     let p = op.progreso;
     let hitos = op.hitos || {};
-    if (v && p == null && R.motor) {
-      p = R.motor.progreso(v).pct / 100;
-      const resuelto = base => R.motor.idsDe(v, base).some(id => R.motor.estado(v, id) === 'hecha');
+    if (v && p == null) {
+      // Cuánto tenés armado: pendientes tildados (o la mitad si no anotaste ninguno)
+      const pend = v.pendientes || [];
+      p = pend.length ? pend.filter(x => x.hecho).length / pend.length : 0.5;
+      const items = (v.agenda || []).filter(x => x.fecha);
+      const traslado = x => ['vuelo', 'micro', 'tren', 'barco', 'auto', 'traslado'].includes(x.tipo);
       hitos = {
-        alojamiento: resuelto('a_reserva'),
-        experiencias: resuelto('e_excursiones') || resuelto('e_imperdibles') || resuelto('e_escapada'),
-        transporte: resuelto('t_segmento')
+        alojamiento: (v.alojamientos || []).length > 0,
+        experiencias: items.some(x => !traslado(x)),
+        transporte: items.some(traslado)
       };
     }
     p = Math.max(0, Math.min(1, p == null ? 0.5 : p));

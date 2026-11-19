@@ -147,23 +147,7 @@ R.participantes = (function () {
     R.app.refrescar();
   }
 
-  /** Si el transporte ya estaba resuelto, cambiar viajeros puede afectar pasajes y alojamiento. */
-  function avisarCambioParticipantes(v) {
-    const afecta = ['t_segmento', 'a_reserva'].some(base => R.motor.idsDe(v, base).some(id => R.motor.estado(v, id) === 'hecha'));
-    if (!afecta) return;
-    setTimeout(() => {
-      U.confirmar('Cambiaste los viajeros y ya tenías pasajes o alojamiento resueltos. ¿Querés que te arme un plan para revisar lo afectado?', {
-        titulo: 'Esto puede afectar otras reservas', textoSi: 'Sí, revisar', textoNo: 'No hace falta'
-      }).then(ok => {
-        if (!ok) return;
-        R.motor.replanificar(v, ['participantes'], 'Cambio de viajeros');
-        R.motor.setEstado(v, 'd_participantes', 'hecha');
-        R.db.guardarViaje(v);
-        R.app.refrescar();
-        R.vistaGuia.mostrarPlan(v, R.motor.ordenarPlan(v, R.motor.pasosARevisar(v)));
-      });
-    }, 300);
-  }
+  function avisarCambioParticipantes() { /* sin avisos: los cambios de viajeros no tocan nada más */ }
 
   /* ---------- Sumarse a un viaje ---------- */
   async function renderUnirse(app, codigo) {
@@ -179,7 +163,7 @@ R.participantes = (function () {
       app.innerHTML = `<div class="vacio"><div class="vacio-icono">🔗</div><h3>El enlace no es válido</h3><p>Puede que lo hayan desactivado. Pedile a quien organiza que te mande uno nuevo.</p><a class="btn btn-primario" href="#inicio">Ir al inicio</a></div>`;
       return;
     }
-    if (R.db.viaje(inv.viajeId)) { location.hash = `#viaje/${inv.viajeId}/guia`; return; }
+    if (R.db.viaje(inv.viajeId)) { location.hash = `#viaje/${inv.viajeId}/itinerario`; return; }
     const libres = (inv.personas || []).filter(p => !p.vinculada);
     const yo = R.db.yo();
     const sugerida = libres.find(p => p.nombre.toLowerCase().split(' ')[0] === yo.nombre.toLowerCase().split(' ')[0]);
@@ -209,7 +193,7 @@ R.participantes = (function () {
         // Esperar a que llegue el viaje
         for (let i = 0; i < 40 && !R.db.viaje(inv.viajeId); i++) await new Promise(r => setTimeout(r, 200));
         U.toast('¡Listo! Ya estás en el viaje. 🎉');
-        location.hash = `#viaje/${inv.viajeId}/guia`;
+        location.hash = `#viaje/${inv.viajeId}/itinerario`;
       } catch (e) {
         console.error(e);
         b.disabled = false; b.textContent = 'Sumarme al viaje';

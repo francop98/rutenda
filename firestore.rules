@@ -108,11 +108,11 @@ service cloud.firestore {
           && (esOrganizador() || resource.data.creadoPor == yo());
       }
 
-      // Valija de cada persona: la tilda esa persona (o un organizador)
+      // Valija: la del viaje ('comun') la tilda cualquiera; las viejas, cada uno la suya
       match /valijas/{personaId} {
         allow read: if esMiembro();
         allow write: if esMiembro()
-          && (esOrganizador() || viaje(viajeId).personas[personaId].uid == yo());
+          && (personaId == 'comun' || esOrganizador() || viaje(viajeId).personas[personaId].uid == yo());
       }
 
       // Votos de ideas: cada persona marca lo que le gusta (o un organizador)

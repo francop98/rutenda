@@ -5,7 +5,7 @@
 window.R = window.R || {};
 
 /** Versión de la app (cambios chicos: 10.1, 10.2…; cambios grandes: 11, 12…). Igual que VERSION en sw.js. */
-window.R.VERSION = '25.2';
+window.R.VERSION = '26';
 
 R.util = (function () {
   const pad = n => String(n).padStart(2, '0');
@@ -416,13 +416,8 @@ R.util = (function () {
     enlazarArchivos(raiz, clave, archivos, () => { repintarArchivos(raiz, clave, archivos, texto, chica, alCambiar); if (alCambiar) alCambiar(); });
   }
 
-  /** ¿Están prendidas las ayudas con IA? (Mi cuenta → Ayudas con IA). Necesitan la cuenta en la nube. */
-  function conIA() {
-    try { return R.db.modo() === 'nube' && R.db.prefs().ia !== false; } catch (e) { return false; }
-  }
-
   return {
-    conIA, conMiles, zonaArchivos, enlazarArchivos, repintarArchivos,
+    conMiles, zonaArchivos, enlazarArchivos, repintarArchivos,
     tema, aplicarTema, letra, aplicarLetra, vacio, alfa, ordenAlfa,
     campoClave, enlazarClaves, sugerirFechas,
     MONEDAS, fondoBloqueado, id, esc, aISO, hoyISO, aFecha, sumarDias, diasEntre, fmtFecha, fmtRango, plural,

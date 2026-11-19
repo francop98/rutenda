@@ -8,13 +8,12 @@ window.R = window.R || {};
 
 R.itinerarioPdf = (function () {
   const U = R.util;
-  const C = () => R.recorrido;
   const JSPDF = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 
   // Paleta Rutenda
   const MAR = [31, 58, 54], MAR_OSC = [20, 40, 36], MAR_CLARO = [227, 234, 230], ORO = [176, 138, 67];
   const ARENA = [244, 237, 226], TINTA = [34, 48, 47], SUAVE = [95, 108, 106], TENUE = [142, 152, 150];
-  const TERRA = [217, 130, 91], SOL_CLARO = [252, 241, 216];
+  const TERRA = [217, 130, 91];
 
   function cargar() {
     if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
@@ -88,24 +87,23 @@ R.itinerarioPdf = (function () {
     y = 64;
 
     // ---------- Recorrido ----------
-    const segs = C().todosLosSegmentos(v.recorrido);
+    const segs = R.agenda.segmentos(v);
     if (segs.length) {
       tituloSeccion('Recorrido');
-      segs.forEach(x => {
-        const s = x.seg;
-        const det = R.cronogramaEditor.datosSegmento(v, s);
-        const salida = s.sale.fecha ? `${U.fmtFecha(s.sale.fecha, 'dia')}${s.sale.hora ? ' ' + s.sale.hora : ''}` : 'Fecha a definir';
-        const llega = C().fechaLlega(s) ? `${C().fechaLlega(s) !== s.sale.fecha ? U.fmtFecha(C().fechaLlega(s), 'dia') + ' ' : ''}${s.llega.hora || ''}`.trim() : '';
-        const medioTxt = s.medio === 'otro' && s.medioOtro ? s.medioOtro : MEDIO_TXT[s.medio] || 'Traslado';
-        const ruta = lineas(`${s.desde.nombre} > ${s.hasta.nombre}`, ANCHO - 70);
-        const sub = lineas([det, s.estado === 'confirmado' ? 'Confirmado' : s.estado === 'estimado' ? 'Sin confirmar' : ''].filter(Boolean).join(' · '), ANCHO - 70);
+      segs.forEach(s => {
+        const det = [s.empresa, s.numero, s.codigo ? 'Reserva ' + s.codigo : ''].filter(Boolean).join(' · ');
+        const salida = `${U.fmtFecha(s.sale.fecha, 'dia')}${s.sale.hora ? ' ' + s.sale.hora : ''}`;
+        const llega = s.llega.hora ? `${s.llega.fecha !== s.sale.fecha ? U.fmtFecha(s.llega.fecha, 'dia') + ' ' : ''}${s.llega.hora}` : '';
+        const medioTxt = MEDIO_TXT[s.medio] || 'Traslado';
+        const ruta = lineas(`${s.desde.nombre || '?'} > ${s.hasta.nombre || '?'}`, ANCHO - 70);
+        const sub = lineas(det, ANCHO - 70);
         const alto = 7 + ruta.length * 5 + (sub.length && sub[0] ? sub.length * 4.2 : 0);
         espacio(alto + 2);
         color(ARENA, 'f'); doc.roundedRect(M, y - 4.5, ANCHO, alto, 2, 2, 'F');
         color(MAR, 'f'); doc.roundedRect(M + 3, y - 2, 20, 6, 1.5, 1.5, 'F');
         color([255, 255, 255]); fuente('bold', 7.5); doc.text(limpio(medioTxt).toUpperCase().slice(0, 12), M + 13, y + 2.2, { align: 'center' });
         color(TINTA); fuente('bold', 10.5); doc.text(ruta, M + 27, y + 1.8);
-        let yy = y + 1.8 + ruta.length * 5;
+        const yy = y + 1.8 + ruta.length * 5;
         if (sub.length && sub[0]) { color(SUAVE); fuente('normal', 8.5); doc.text(sub, M + 27, yy - 0.8); }
         color(TINTA); fuente('bold', 9); doc.text(limpio('Sale ' + salida), M + ANCHO - 3, y + 1.8, { align: 'right' });
         if (llega) { color(SUAVE); fuente('normal', 8.5); doc.text(limpio('Llega ' + llega), M + ANCHO - 3, y + 6.3, { align: 'right' }); }
@@ -114,21 +112,20 @@ R.itinerarioPdf = (function () {
     }
 
     // ---------- Dónde dormís ----------
-    const est = C().estadias(v).filter(e => !e.dePaso);
-    if (est.length) {
+    const alojs = (v.alojamientos || []).slice().sort((a, b) => (a.desde || '9').localeCompare(b.desde || '9'));
+    if (alojs.length) {
       tituloSeccion('Dónde dormís');
-      est.forEach(e => {
-        const t = v.tareas && v.tareas['a_reserva__' + e.id];
-        const a = t && t.datos ? t.datos : null;
-        const fechas = e.desde && e.hasta ? `${U.fmtFecha(e.desde, 'corto')} al ${U.fmtFecha(e.hasta, 'corto')} · ${e.noches} ${e.noches === 1 ? 'noche' : 'noches'}` : 'Fechas a definir';
-        const detalle = a ? [a.nombre, a.direccion, a.checkinHora ? 'Check-in ' + a.checkinHora : '', a.checkoutHora ? 'Check-out ' + a.checkoutHora : '', a.codigo ? 'Reserva ' + a.codigo : '', a.contacto].filter(Boolean).join(' · ') : 'Alojamiento a reservar';
-        const lin = lineas(detalle, ANCHO - 8);
-        const alto = 11 + lin.length * 4.3;
+      alojs.forEach(a => {
+        const noches = a.desde && a.hasta ? U.diasEntre(a.desde, a.hasta) : 0;
+        const fechas = a.desde && a.hasta ? `${U.fmtFecha(a.desde, 'corto')} al ${U.fmtFecha(a.hasta, 'corto')} · ${noches} ${noches === 1 ? 'noche' : 'noches'}` : 'Fechas a definir';
+        const detalle = [a.direccion, a.checkin ? 'Check-in ' + a.checkin : '', a.checkout ? 'Check-out ' + a.checkout : '', a.codigo ? 'Reserva ' + a.codigo : '', a.nota].filter(Boolean).join(' · ');
+        const lin = detalle ? lineas(detalle, ANCHO - 8) : [];
+        const alto = 9 + lin.length * 4.3;
         espacio(alto + 2);
-        color(a ? MAR_CLARO : SOL_CLARO, 'f'); doc.roundedRect(M, y - 4.5, ANCHO, alto, 2, 2, 'F');
-        color(TINTA); fuente('bold', 10.5); doc.text(limpio(e.nombre + (e.tipo === 'parada' ? ' (parada)' : '')), M + 4, y + 1.5);
+        color(MAR_CLARO, 'f'); doc.roundedRect(M, y - 4.5, ANCHO, alto, 2, 2, 'F');
+        color(TINTA); fuente('bold', 10.5); doc.text(limpio(a.nombre || 'Alojamiento'), M + 4, y + 1.5);
         color(SUAVE); fuente('normal', 8.5); doc.text(limpio(fechas), M + ANCHO - 4, y + 1.5, { align: 'right' });
-        color(a ? TINTA : [122, 90, 20]); fuente('normal', 9); doc.text(lin, M + 4, y + 6.8);
+        if (lin.length) { color(TINTA); fuente('normal', 9); doc.text(lin, M + 4, y + 6.8); }
         y += alto + 2;
       });
     }

@@ -3,18 +3,16 @@
    Reenviás un mail de reserva a rutendaviajes@gmail.com y un
    script de Google (Apps Script, gratis) que corre en esa casilla
    lo manda acá. Rutenda busca tu cuenta por el mail desde el que
-   lo reenviaste, lo lee con reglas (y con IA solo si con eso no alcanza) y lo deja en
+   lo reenviaste, lo lee con reglas (sin IA) y lo deja en
    tu "Bandeja" para que lo sumes al viaje con un toque.
    POST /api/recibir-mail   (solo el script, con la clave secreta)
    Cabecera: X-Rutenda-Clave: <MAIL_SECRET>
    Cuerpo: { de, asunto, fecha, texto, adjuntos: [{ nombre, tipo, base64 }] }
    Variables de entorno: MAIL_SECRET, FIREBASE_SERVICE_ACCOUNT_JSON,
-   GROQ_API_KEY (opcional: sin ella, igual guarda el mail y los adjuntos),
    FIREBASE_STORAGE_BUCKET (opcional; por defecto rutenda-app.firebasestorage.app).
    ========================================================= */
 const crypto = require('crypto');
 const { app, db, admin } = require('./_lib/firebase');
-const { limpiarJSON } = require('./escanear-reserva');
 const lector = require('../js/lector.js');
 
 /** Aeropuertos para el lector por reglas (el mismo archivo que usa la app). */
@@ -32,7 +30,7 @@ function aeros() {
   } catch (e) { /* sin datos: el lector igual lee lo demás */ }
   return AEROS;
 }
-/** Primero con reglas (gratis); si no alcanza, con IA. */
+/** Se lee con reglas (gratis, sin IA). */
 function leerConReglas(asunto, texto) {
   const A = aeros();
   const r = lector.leer(`${asunto}\n${texto}`, { esAeropuerto: c => c in A, ciudadDe: c => A[c] || '', anio: new Date().getFullYear() });
@@ -41,22 +39,8 @@ function leerConReglas(asunto, texto) {
 
 const LIMITE_DIARIO = 30;
 const MAX_ADJUNTO = 3 * 1024 * 1024;
-const MODELO = process.env.GROQ_MODEL || 'qwen/qwen3.8-27b';
 const BUCKET = process.env.FIREBASE_STORAGE_BUCKET || 'rutenda-app.firebasestorage.app';
 const TIPOS_OK = /^(application\/pdf|image\/(jpeg|png|webp|heic|heif))$/i;
-
-const INSTRUCCIONES = `Leés mails de confirmación de viajes (pasajes, reservas de alojamiento, alquiler de auto, excursiones, seguros, paquetes).
-Devolvé SOLO un objeto JSON (omití lo que no figure, no inventes):
-{ "tipo": "vuelo"|"micro"|"tren"|"barco"|"alojamiento"|"auto"|"excursion"|"seguro"|"paquete"|"otro",
-  "empresa": "", "codigo": "", "pasajeros": [""],
-  "tramos": [{ "desde": "ciudad", "hasta": "ciudad", "desdeAeropuerto": "IATA", "hastaAeropuerto": "IATA", "empresa": "", "numero": "", "fechaSalida": "AAAA-MM-DD", "horaSalida": "HH:MM", "fechaLlegada": "AAAA-MM-DD", "horaLlegada": "HH:MM" }],
-  "equipaje": "", "asientos": "",
-  "alojamiento": { "nombre": "", "ciudad": "", "direccion": "", "telefono": "", "checkinFecha": "AAAA-MM-DD", "checkinHora": "HH:MM", "checkoutFecha": "AAAA-MM-DD", "checkoutHora": "HH:MM", "cancelacionHasta": "AAAA-MM-DD", "desayuno": true },
-  "auto": { "rentadora": "", "vehiculo": "", "retiroLugar": "", "retiroFecha": "AAAA-MM-DD", "retiroHora": "HH:MM", "devolucionLugar": "", "devolucionFecha": "AAAA-MM-DD", "devolucionHora": "HH:MM" },
-  "actividades": [{ "nombre": "", "fecha": "AAAA-MM-DD", "hora": "HH:MM", "lugar": "" }],
-  "seguro": { "compania": "", "poliza": "", "telefono": "", "desde": "AAAA-MM-DD", "hasta": "AAAA-MM-DD" },
-  "costo": { "monto": 0, "moneda": "ARS|USD|EUR|BRL|…" } }
-Si el mail no es de una reserva de viaje, devolvé {"tipo":"otro"}. Cada vuelo o servicio es un tramo. Fechas AAAA-MM-DD.`;
 
 /** Compara la clave sin filtrar información por el tiempo de respuesta. */
 function claveOk(recibida) {
@@ -92,21 +76,6 @@ async function controlarUso(uid) {
     tx.set(ref, { fecha: hoy, cantidad: n + 1 });
     return true;
   });
-}
-
-async function leerConIA(asunto, texto) {
-  if (!process.env.GROQ_API_KEY || String(texto || '').replace(/\s/g, '').length < 120) return null;
-  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + process.env.GROQ_API_KEY },
-    body: JSON.stringify({
-      model: MODELO, temperature: 0.1, max_completion_tokens: 2000, response_format: { type: 'json_object' },
-      messages: [{ role: 'system', content: INSTRUCCIONES }, { role: 'user', content: `Asunto: ${asunto}\n\n${String(texto).slice(0, 15000)}` }]
-    })
-  });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) { console.error('Groq', r.status, JSON.stringify(d).slice(0, 300)); return null; }
-  try { return limpiarJSON(d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content); } catch (e) { return null; }
 }
 
 /** Guarda un adjunto en Storage (o, si es chico y Storage falla, dentro de la bandeja). */
@@ -150,7 +119,6 @@ module.exports = async (req, res) => {
   }
   let datos = null;
   try { datos = leerConReglas(asunto, texto); } catch (e) { datos = null; }
-  if (!datos) { try { datos = await leerConIA(asunto, texto); } catch (e) { console.error(e); } }
   if (datos && datos.tipo === 'otro' && !adjuntos.length) datos = null;
 
   await ref.set({

@@ -2,7 +2,7 @@
    Rutenda — arranque, navegación y pantalla de inicio
    Rutas:
      #inicio                 → mis viajes
-     #viaje/{id}/{pestaña}   → un viaje (guia, itinerario, documentos, viajeros, gastos)
+     #viaje/{id}/{pestaña}   → un viaje (itinerario, pendientes, gastos, valija, documentos, viajeros)
      #personas               → compañeros de viaje
      #valijas                → mis listas de valija
      #unirse/{codigo}        → sumarse a un viaje compartido
@@ -34,7 +34,7 @@
     if (['cargar', 'compartido', 'hoy'].includes(atajo)) {
       if (atajo === 'hoy') {
         const enCurso = R.db.viajes().find(x => R.viajes.estadoViaje(x) === 'en_curso');
-        location.replace(enCurso ? `#viaje/${enCurso.id}/hoy` : '#itinerario');
+        location.replace(enCurso ? `#viaje/${enCurso.id}/itinerario` : '#itinerario');
         return;
       }
       history.replaceState(null, '', '#inicio');
@@ -57,7 +57,7 @@
       document.title = 'Itinerario · Rutenda';
       renderItinerario(id);
     } else if (vista === 'valijas') {
-      document.title = 'Mis listas de valija · Rutenda';
+      document.title = 'Mis listas · Rutenda';
       R.valija.renderMisListas(app);
     } else if (vista === 'viajes') {
       document.title = 'Mis viajes · Rutenda';
@@ -66,7 +66,7 @@
       document.title = 'Compañeros · Rutenda';
       R.participantes.renderPersonas(app);
     } else {
-      document.title = 'Rutenda · Tu viaje, paso a paso';
+      document.title = 'Rutenda · Tus viajes';
       renderInicio();
     }
   }
@@ -118,7 +118,6 @@
     render();
     window.scrollTo(0, 0);
     R.migracion.ofrecer();
-    if (R.tour) R.tour.siCorresponde();
     // Reservas que llegaron por mail
     if (R.bandeja) R.bandeja.cargar().then(l => { if (l.length && /^#?(inicio)?$/.test(location.hash)) refrescar(); }).catch(() => {});
     if (R.recordatorios) { R.recordatorios.actualizar(); R.recordatorios.revisar(); }
@@ -178,7 +177,7 @@
   window.R.app = { render, refrescar, refrescarRemoto, trasCerrarModal, pintarUsuario, puedeInstalar, instalar, exportar, importar };
 
   /* ---------------------------------------------------------
-     Pantalla de inicio
+     Pantalla de inicio: lo que importa hoy, nada más
      --------------------------------------------------------- */
   function renderInicio() {
     const viajes = R.db.viajes().slice();
@@ -187,8 +186,8 @@
     const porEstado = est => viajes.filter(v => R.viajes.estadoViaje(v) === est);
     const enCurso = porEstado('en_curso');
     const planificando = porEstado('planificando').sort((a, b) => (a.fechaInicio || '9999').localeCompare(b.fechaInicio || '9999'));
-    const destacado = enCurso[0] || planificando[0];
-    const otrosProximos = planificando.filter(v => v !== destacado).slice(0, 3);
+    const proximo = planificando[0];
+    const otros = planificando.slice(1, 4);
     const hayViajes = viajes.length > 0;
 
     document.body.classList.toggle('fondo-inicio', hayViajes);
@@ -204,7 +203,7 @@
         <div>
           <p class="fecha-hoy">${esc(new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</p>
           <p class="hero-saludo">${U.saludo()}${esc(nombre)} ☀️</p>
-          <h1>${enCurso.length ? '¡Buen viaje!' : destacado ? '¿Seguimos organizando?' : '¿A dónde vamos?'}</h1>
+          <h1>${enCurso.length ? '¡Buen viaje!' : proximo ? '¿Seguimos organizando?' : '¿A dónde vamos?'}</h1>
         </div>
         <button class="btn btn-suave btn-chico" data-a="nuevo">+ Nuevo viaje</button>
       </section>` : `
@@ -214,13 +213,11 @@
           <p class="hero-saludo">${U.saludo()}${esc(nombre)} ☀️</p>
           <h1>¿A dónde vamos?</h1>
           <p class="hero-frase">${esc(U.frase())}</p>
-          <button class="btn btn-primario btn-grande" data-a="nuevo">+ Planificar un viaje</button>
-          <button class="btn btn-texto hero-ejemplo" data-a="tour">¿Primera vez? Mirá cómo funciona →</button>
+          <button class="btn btn-primario btn-grande" data-a="nuevo">+ Nuevo viaje</button>
         </div>
       </section>`}
 
-      ${enCurso.length && destacado ? destacadoHTML(destacado) : ''}
-      ${destacado && R.salida ? R.salida.tarjetaHTML(destacado) : ''}
+      ${enCurso.map(v => tarjetaViaje(v) + R.itinerario.hoyHTML(v)).join('')}
 
       ${puedeInstalar() && !leerOculto('instalar') ? `
         <div class="aviso-instalar">
@@ -232,51 +229,78 @@
 
       ${R.recordatorios ? R.recordatorios.avisosHTML() : ''}
       ${R.bandeja ? R.bandeja.inicioHTML() : ''}
-
-      ${enCurso.map(v => (R.pasaje ? R.pasaje.html(v) : '') + (R.vuelta ? R.vuelta.tarjetaHTML(v) : '')).join('')}
-      ${enCurso.map(v => R.itinerario.hoyHTML(v)).join('')}
       ${R.cierre ? R.cierre.inicioHTML() : ''}
 
-      ${!enCurso.length && destacado ? destacadoHTML(destacado) : ''}
+      ${proximo ? tarjetaViaje(proximo) : ''}
 
       ${R.feriados && !enCurso.length ? R.feriados.inicioHTML() : ''}
 
       ${!hayViajes ? comoFunciona() : ''}
 
-      ${otrosProximos.length ? `
+      ${otros.length ? `
         <section class="seccion-viajes">
           <div class="cab-seccion-chica"><h2 class="titulo-seccion">También en camino</h2><a href="#viajes" class="btn btn-texto btn-chico">Ver todos →</a></div>
-          <div class="lista-compacta">${otrosProximos.map(filaViaje).join('')}</div>
+          <div class="lista-compacta">${otros.map(filaViaje).join('')}</div>
         </section>` : viajes.length > 1 ? `<p class="ir-viajes"><a href="#viajes" class="btn btn-texto btn-chico">Ver todos mis viajes (${viajes.length}) →</a></p>` : ''}`;
 
-    app.querySelectorAll('[data-a="nuevo"]').forEach(b => b.onclick = () => R.viajes.abrirAsistente());
-    const bTour = app.querySelector('[data-a="tour"]');
-    if (bTour) bTour.onclick = () => R.tour.iniciar();
+    app.querySelectorAll('[data-a="nuevo"]').forEach(b => b.onclick = () => R.viajes.nuevo());
     const bInst = app.querySelector('[data-a="instalar"]');
     if (bInst) bInst.onclick = instalar;
     const bOcultar = app.querySelector('[data-a="ocultarInstalar"]');
     if (bOcultar) bOcultar.onclick = () => { try { localStorage.setItem('rutenda_oculto_instalar', '1'); } catch (e) { /* sin almacenamiento */ } refrescar(); };
-    enCurso.forEach(v => { R.itinerario.enlazarHoy(app, v); if (R.pasaje) R.pasaje.enlazar(app, v); if (R.vuelta) R.vuelta.enlazar(app, v); });
-    if (destacado && R.salida) R.salida.enlazar(app, destacado);
     if (R.recordatorios) R.recordatorios.enlazarAvisos(app);
     if (R.bandeja) R.bandeja.enlazarInicio(app);
     if (R.cierre) R.cierre.enlazar(app);
     if (R.feriados) R.feriados.enlazarInicio(app);
   }
 
-  /** Fila compacta de un viaje (inicio y listas). */
+  /** Lo que tenés por hacer en un viaje, en una línea: pendientes y valija. */
+  function resumenViaje(v) {
+    const faltan = R.pendientes.faltan(v);
+    const prox = (v.pendientes || []).filter(p => !p.hecho && p.fecha).sort((a, b) => a.fecha.localeCompare(b.fecha))[0];
+    const val = R.valija.progreso(v);
+    const partes = [];
+    partes.push(faltan ? `✅ ${U.plural(faltan, 'pendiente', 'pendientes')}` : '✅ Nada pendiente');
+    if (val.total) partes.push(`🧳 ${val.hechos} de ${val.total} en la valija`);
+    return { texto: partes.join(' · '), prox };
+  }
+
+  /** Tarjeta grande del viaje en curso o del próximo. */
+  function tarjetaViaje(v) {
+    const viajando = R.viajes.estadoViaje(v) === 'en_curso';
+    const r = resumenViaje(v);
+    return `
+      <section class="destacado">
+        <article class="destacado-portada" style="background:${R.paisaje.fondo(v)}">
+          ${U.paisaje(v)}
+          <a class="dp-enlace" href="#viaje/${v.id}" aria-label="Abrir ${esc(R.viajes.nombreDe(v))}"></a>
+          <div class="dp-arriba">
+            <span class="etiqueta-clara">${viajando ? 'Viajando ahora' : 'Tu próximo viaje'}</span>
+            <strong class="destacado-cuenta">${esc(R.viajes.cuentaRegresiva(v))}</strong>
+          </div>
+          <h2>${esc(R.viajes.nombreDe(v))}</h2>
+          <p class="dp-meta">${esc(R.viajes.destinoCompleto(v))}${v.fechaInicio ? ' · ' + esc(U.fmtRango(v.fechaInicio, v.fechaFin)) : ''}</p>
+          <div class="dp-pie">
+            <a class="dp-siguiente" href="#viaje/${v.id}/pendientes">
+              <small>${esc(r.texto)}</small>
+              ${r.prox ? `<strong>${esc(r.prox.texto)} · ${esc(U.fmtFecha(r.prox.fecha, 'corto'))}</strong>` : ''}
+            </a>
+          </div>
+        </article>
+      </section>`;
+  }
+
+  /** Fila compacta de un viaje (inicio). */
   function filaViaje(v) {
-    const prog = R.motor.progreso(v);
-    const est = R.viajes.estadoViaje(v);
+    const faltan = R.pendientes.faltan(v);
     return `
       <a class="fila-viaje" href="#viaje/${v.id}">
         <span class="fv-portada" style="background:${R.paisaje.fondo(v)}">${R.paisaje.TEMAS[R.paisaje.tema(v)].icono}</span>
         <span class="fv-texto">
-          <strong>${esc(v.nombre || (v.destinos || []).filter(d => !d.soloDia).map(d => d.nombre).join(' → ') || v.destino)}</strong>
-          <small>${esc(U.fmtRango(v.fechaInicio, v.fechaFin))} · ${esc(R.viajes.cuentaRegresiva(v))}</small>
-          ${R.viajes.siguienteHTML(v)}
+          <strong>${esc(R.viajes.nombreDe(v))}</strong>
+          <small>${esc(v.fechaInicio ? U.fmtRango(v.fechaInicio, v.fechaFin) : 'Sin fechas')} · ${esc(R.viajes.cuentaRegresiva(v))}</small>
         </span>
-        ${est === 'pasado' ? '<span class="fv-estado">✓</span>' : `<span class="fv-pct">${prog.pct}%</span>`}
+        ${faltan ? `<span class="fv-pct">${faltan}</span>` : '<span class="fv-estado">✓</span>'}
       </a>`;
   }
 
@@ -328,15 +352,15 @@
       <div class="vacio">
         <div class="vacio-icono">🧭</div>
         <h3>Tu primer viaje te espera</h3>
-        <p>Cargá a dónde vas y Rutenda te arma la guía paso a paso.</p>
-        <button class="btn btn-primario" data-a="nuevo">+ Planificar un viaje</button>
+        <p>Poné a dónde vas y las fechas. Lo demás lo vas sumando.</p>
+        <button class="btn btn-primario" data-a="nuevo">+ Nuevo viaje</button>
       </div>`}
 
       <footer class="pie">
         <p>${R.db.modo() === 'nube' ? '☁️ Tus datos están guardados en tu cuenta y se sincronizan en tus dispositivos.' : 'Tus datos se guardan en este dispositivo.'} La copia de seguridad está en Mi cuenta.</p>
       </footer>`;
 
-    app.querySelectorAll('[data-a="nuevo"]').forEach(b => b.onclick = () => R.viajes.abrirAsistente());
+    app.querySelectorAll('[data-a="nuevo"]').forEach(b => b.onclick = () => R.viajes.nuevo());
     const bMapa = app.querySelector('[data-a="mapaViajes"]');
     if (bMapa) bMapa.onclick = () => {
       const { el } = U.modal({ titulo: 'Tus viajes en el mapa', subtitulo: '🟢 Próximos · 🟡 Ya fuiste', ancho: true, cuerpo: '<div id="mapaTodos"></div>' });
@@ -347,69 +371,12 @@
 
   function leerOculto(clave) { try { return localStorage.getItem('rutenda_oculto_' + clave) === '1'; } catch (e) { return false; } }
 
-  function destacadoHTML(v) {
-    const prog = R.motor.progreso(v);
-    const prox = R.motor.proximos(v, 1)[0];
-    const viajando = R.viajes.estadoViaje(v) === 'en_curso';
-    // Todo dentro de la tarjeta: portada, cuenta regresiva, avance y lo que sigue
-    return `
-      <section class="destacado">
-        <article class="destacado-portada" style="background:${R.paisaje.fondo(v)}">
-          ${U.paisaje(v)}
-          <a class="dp-enlace" href="#viaje/${v.id}" aria-label="Abrir ${esc(v.nombre || v.destino || 'el viaje')}"></a>
-          <div class="dp-arriba">
-            <span class="etiqueta-clara">${viajando ? 'Viajando ahora' : 'Tu próximo viaje'}</span>
-            <strong class="destacado-cuenta">${esc(R.viajes.cuentaRegresiva(v))}</strong>
-          </div>
-          <h2>${esc(v.nombre || (v.destinos || []).filter(d => !d.soloDia).map(d => d.nombre).join(' → ') || v.destino)}</h2>
-          <p class="dp-meta">${esc(R.viajes.destinoCompleto(v))} · ${esc(U.fmtRango(v.fechaInicio, v.fechaFin))}</p>
-          <div class="dp-pie">
-            <div class="dp-avance">
-              ${U.anillo(prog.pct, 54)}
-              <div><strong>${prog.hechas} de ${prog.total} pasos</strong><small>organizados</small></div>
-            </div>
-            ${prox ? `
-              <div class="dp-siguiente">
-                <small>Lo que sigue</small>
-                <strong>${R.guia.fase(prox.fase).icono} ${esc(prox.titulo)}</strong>
-              </div>
-              <a href="#" class="btn btn-primario btn-chico dp-boton" data-siguiente="${prox.id}" data-viaje="${v.id}">Resolverlo →</a>`
-            : `<div class="dp-siguiente"><strong>¡Nada pendiente por ahora! 🌴</strong></div>`}
-          </div>
-        </article>
-        ${semanaHTML(v)}
-      </section>`;
-  }
-
-  /** Lo que conviene resolver en los próximos 7 días (o que ya está atrasado). */
-  function semanaHTML(v) {
-    if (!R.db.puedeOrganizar(v)) return '';
-    const hoy = U.hoyISO();
-    const tope = U.sumarDias(hoy, 7);
-    const lista = R.motor.analizar(v)
-      .filter(t => !t.rec && !t.resuelta && !t.bloqueada && t.fechaLimite && t.fechaLimite <= tope)
-      .sort((a, b) => a.fechaLimite.localeCompare(b.fechaLimite));
-    if (!lista.length) return '';
-    const cuando = f => { const d = U.diasEntre(hoy, f); return d < 0 ? `atrasado ${U.plural(-d, 'día', 'días')}` : d === 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`; };
-    return `
-      <div class="dp-semana">
-        <div class="dps-cab"><strong>📅 Esta semana</strong><span class="contador">${lista.length}</span></div>
-        ${lista.slice(0, 3).map(t => `
-          <div class="dps-fila ${t.fechaLimite < hoy ? 'atrasado' : ''}">
-            <span class="dps-texto">${R.guia.fase(t.fase).icono} ${esc(t.titulo)}<small>${esc(cuando(t.fechaLimite))}</small></span>
-            <button type="button" class="btn-texto-mini" data-siguiente="${t.id}" data-viaje="${v.id}">Resolver</button>
-          </div>`).join('')}
-        ${lista.length > 3 ? `<a class="dps-mas" href="#viaje/${v.id}/guia">Ver ${U.plural(lista.length - 3, 'cosa más', 'cosas más')} →</a>` : ''}
-      </div>`;
-  }
-
   function comoFunciona() {
     const items = [
-      ['🧭', 'Guía paso a paso', 'Te digo qué resolver primero, qué después y para cuándo, según tu viaje.'],
-      ['🔄', 'Prioridades inteligentes', '¿Cambió algo? Te armo el orden para reorganizar sin estrés.'],
-      ['📁', 'Todo en un lugar', 'Pasajes, reservas y documentos siempre a mano.'],
-      ['💸', 'Cuentas claras', 'Gastos compartidos, quién le debe a quién y el historial con quién viajaste.']
-    ];
+      ['🗓️', 'Itinerario', 'Lo que hacés cada día, dónde dormís y cómo llegás. Lo armás vos.'],
+      ['✅', 'Pendientes', 'Lo que tenés que resolver y lo que querés hacer allá.'],
+      ['💸', 'Gastos', 'Quién pagó, cuánto y quién le debe a quién.'],
+      ['🧳', 'Valija', 'Una lista para tildar, con tus listas de siempre.']    ];
     return `
       <section class="como-funciona">
         ${items.map(([i, t, d]) => `<div class="cf-item"><span>${i}</span><strong>${t}</strong><p>${d}</p></div>`).join('')}
@@ -433,7 +400,7 @@
       app.innerHTML = `
         <section class="encabezado-simple"><h1>Itinerario</h1></section>
         ${U.vacio({ icono: '🗓️', titulo: 'Todavía no tenés viajes', texto: 'Armá uno y acá vas a ver cada día: traslados, alojamiento y lo que vas a hacer.', boton: '+ Nuevo viaje', accion: 'nuevo' })}`;
-      app.querySelector('[data-a="nuevo"]').onclick = () => R.viajes.abrirAsistente();
+      app.querySelector('[data-a="nuevo"]').onclick = () => R.viajes.nuevo();
       return;
     }
     const v = lista.find(x => x.id === idElegido) || lista[0];
@@ -445,13 +412,13 @@
         ${lista.length > 1 ? `<div class="itin-global-viajes" role="tablist" aria-label="Viaje">${lista.map(x => `
           <a href="#itinerario/${x.id}" role="tab" aria-selected="${x.id === v.id}" class="itin-global-viaje ${x.id === v.id ? 'activo' : ''}">
             <span class="punto" style="background:${R.paisaje.fondo(x)}"></span><span><strong>${esc(nombre(x))}</strong><small>${esc(cuando(x))}</small></span></a>`).join('')}</div>` : ''}
-        ${lista.length > 1 ? `<a class="itin-global-link" href="#viaje/${v.id}/guia">Abrir este viaje →</a>`
-          : `<a class="itin-global-ir" href="#viaje/${v.id}/guia"><span class="punto" style="background:${R.paisaje.fondo(v)}"></span><span><strong>${esc(nombre(v))}</strong><small>${esc(U.fmtRango(v.fechaInicio, v.fechaFin))}</small></span><b>Abrir el viaje →</b></a>`}
+        ${lista.length > 1 ? `<a class="itin-global-link" href="#viaje/${v.id}/itinerario">Abrir este viaje →</a>`
+          : `<a class="itin-global-ir" href="#viaje/${v.id}/itinerario"><span class="punto" style="background:${R.paisaje.fondo(v)}"></span><span><strong>${esc(nombre(v))}</strong><small>${esc(U.fmtRango(v.fechaInicio, v.fechaFin))}</small></span><b>Abrir el viaje →</b></a>`}
       </section>
       <div class="itin-global"></div>`;
     R.itinerario.render(v, app.querySelector('.itin-global'));
     // Viajando: arranca en el día de hoy
-    const hoyEl = app.querySelector('.itin-global .dia.hoy');
+    const hoyEl = app.querySelector('.itin-global .dia2.hoy');
     if (hoyEl && !idElegido) setTimeout(() => hoyEl.scrollIntoView({ block: 'start', behavior: 'smooth' }), 150);
   }
 
@@ -488,26 +455,11 @@
     lector.readAsText(archivo);
   }
 
-  /* ---------- "Resolverlo": abre el paso directo desde una tarjeta ---------- */
-  function abrirSiguiente(e) {
-    const sig = e.target.closest && e.target.closest('[data-siguiente]');
-    if (!sig || !app.contains(sig)) return;
-    if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
-    e.preventDefault();
-    e.stopPropagation();
-    const v = R.db.viaje(sig.dataset.viaje);
-    if (!v) return;
-    location.hash = `#viaje/${v.id}/guia`;
-    setTimeout(() => R.vistaGuia.abrirTarea(v, sig.dataset.siguiente), 200);
-  }
-  app.addEventListener('click', abrirSiguiente, true);
-  app.addEventListener('keydown', abrirSiguiente, true);
-
   /* ---------- Arranque ---------- */
   R.db.alCambiar(() => { if (listo && R.auth.usuarioActual()) { refrescarRemoto(); if (R.recordatorios) R.recordatorios.actualizar(); } });
   R.auth.alCambiarUsuario(u => { if (!u) { listo = true; render(); } });
-  document.getElementById('btnNuevoViajeBarra').onclick = () => R.viajes.abrirAsistente();
-  document.getElementById('btnNuevoViajeNav').onclick = () => R.viajes.abrirAsistente();
+  document.getElementById('btnNuevoViajeBarra').onclick = () => R.viajes.nuevo();
+  document.getElementById('btnNuevoViajeNav').onclick = () => R.viajes.nuevo();
   document.getElementById('btnMenu').onclick = () => R.menu.abrir();
   document.getElementById('btnCargarNav').onclick = () => R.cargar.abrir();
   document.getElementById('btnCargarBarra').onclick = () => R.cargar.abrir();

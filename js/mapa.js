@@ -36,7 +36,7 @@ R.mapa = (function () {
     };
     agregar(v.origen, 'origen', `🏠 ${v.origen && v.origen.nombre}`);
     (v.destinos || []).forEach(d => agregar(d, d.soloDia ? 'escapada' : 'destino', `${d.soloDia ? '☀️' : '🏡'} ${d.nombre}`));
-    R.recorrido.todosLosSegmentos(v.recorrido).forEach(x => agregar(x.seg.hasta, 'parada', `📍 ${x.seg.hasta.nombre}`));
+    R.agenda.segmentos(v).forEach(sg => agregar(sg.hasta, 'parada', `📍 ${sg.hasta.nombre}`));
     return r;
   }
 
@@ -61,12 +61,12 @@ R.mapa = (function () {
         .addTo(mapa).bindPopup(p.etiqueta);
     });
     // Líneas de cada traslado (punteadas si es en avión)
-    R.recorrido.todosLosSegmentos(v.recorrido).forEach(x => {
-      const a = x.seg.desde, b = x.seg.hasta;
+    R.agenda.segmentos(v).forEach(sg => {
+      const a = sg.desde, b = sg.hasta;
       if (a.lat == null || b.lat == null) return;
       L.polyline([[a.lat, a.lon], [b.lat, b.lon]], {
-        color: x.seg.medio === 'avion' ? '#466a8f' : '#d9825b', weight: 3, opacity: 0.85, dashArray: x.seg.medio === 'avion' ? '6 8' : null
-      }).addTo(mapa).bindPopup(R.recorrido.etiquetaSegmento(x.seg));
+        color: sg.medio === 'avion' ? '#466a8f' : '#d9825b', weight: 3, opacity: 0.85, dashArray: sg.medio === 'avion' ? '6 8' : null
+      }).addTo(mapa).bindPopup(R.agenda.etiquetaSegmento(sg));
     });
     // Escapadas: línea fina desde su base
     (v.destinos || []).filter(d => d.soloDia && d.lat != null).forEach(d => {

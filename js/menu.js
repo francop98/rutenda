@@ -1,7 +1,7 @@
 /* =========================================================
    Rutenda — menú ☰ (arriba a la izquierda)
    Tu cuenta y lo que se usa de vez en cuando: tus datos,
-   apariencia, copia de seguridad, compañeros, el tour,
+   apariencia, copia de seguridad, compañeros,
    instalar la app y cerrar sesión.
    ========================================================= */
 window.R = window.R || {};
@@ -55,7 +55,6 @@ R.menu = (function () {
             <span class="menu-texto"><strong>Restaurar una copia</strong><small>Suma los viajes del archivo, no borra nada</small></span>
             <input type="file" accept="application/json,.json" id="menuRestaurar" hidden>
           </label>
-          ${op('tour', '🧭', 'Ver el tour de la app')}
           ${R.app.puedeInstalar() ? op('instalar', '📲', 'Instalar Rutenda como app') : ''}
           ${op('salir', '🚪', 'Cerrar sesión', '', 'peligro')}
         </nav>
@@ -99,7 +98,6 @@ R.menu = (function () {
       bandeja: ir(() => R.bandeja.abrir()),
       anio: ir(() => R.anio.abrir()),
       copia: ir(() => R.app.exportar()),
-      tour: ir(() => R.tour.iniciar()),
       instalar: ir(() => R.app.instalar()),
       salir: ir(async () => {
         const ok = await U.confirmar('Vas a salir de tu cuenta en este dispositivo. Tus viajes quedan guardados.', { titulo: 'Cerrar sesión', textoSi: 'Cerrar sesión' });

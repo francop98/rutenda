@@ -58,8 +58,17 @@ R.cierre = (function () {
         location.hash = `#viaje/${v.id}/gastos`;
       } else if (a === 'resumen') R.resumen.abrir(v);
       else if (a === 'notas') {
-        location.hash = `#viaje/${v.id}/guia`;
-        setTimeout(() => { const n = document.getElementById('notasViaje'); if (n) { const d = n.closest('details'); if (d) d.open = true; n.focus(); n.scrollIntoView({ block: 'center' }); } }, 250);
+        U.modal({
+          titulo: '📝 Recuerdos del viaje',
+          subtitulo: 'Lo que te gustó y lo que harías distinto.',
+          cuerpo: `<label class="campo completo"><textarea id="notasViaje" rows="7">${U.esc(v.notasViaje || '')}</textarea></label>`,
+          alAbrir: el => setTimeout(() => el.querySelector('#notasViaje').focus(), 60),
+          acciones: [{ texto: 'Cancelar' }, { texto: 'Guardar', clase: 'btn-primario', onClick: el => {
+            v.notasViaje = el.querySelector('#notasViaje').value.trim();
+            R.db.guardarViaje(v);
+            R.app.refrescar();
+          } }]
+        });
       } else if (a === 'cerrar') {
         v.cerrado = U.hoyISO();
         R.db.guardarViaje(v);

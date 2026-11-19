@@ -1,7 +1,8 @@
 /* =========================================================
    Rutenda — pestaña Documentos
    Pasajes, reservas, seguros, identidad… guardados en el
-   navegador (IndexedDB) y vinculados a pasos de la guía.
+   dispositivo (y en la nube) y, si querés, unidos a algo del
+   itinerario.
    ========================================================= */
 window.R = window.R || {};
 
@@ -28,6 +29,15 @@ R.documentos = (function () {
   function esPDF(d) { return d.tipoMime === 'application/pdf' || /\.pdf$/i.test(d.nombreArchivo || ''); }
   function iconoDoc(d) { return esPDF(d) ? '📄' : esImagen(d) ? '🖼️' : categoria(d.categoria).icono; }
 
+  /** Lo del itinerario (o el alojamiento) al que pertenece un archivo. */
+  function itemDe(v, d) {
+    const buscar = x => R.agenda.item(v, x) || R.agenda.alojamiento(v, x);
+    if (d.itemId) return buscar(d.itemId);
+    const t = String(d.tareaId || '');
+    const viejo = t.startsWith('t_segmento__') ? 'm_' + t.slice(12) : t.startsWith('a_reserva__') ? 'h_' + t.slice(11) : t.startsWith('plan_') ? 'p_' + t.slice(5) : '';
+    return viejo ? buscar(viejo) : null;
+  }
+
   let viajeActual = null;
   function render(v, cont) {
     viajeActual = v.id;
@@ -40,11 +50,10 @@ R.documentos = (function () {
     cont.innerHTML = `
       <div class="bloque-cab cab-seccion">
         <div>
-          <h2 class="titulo-seccion">Documentos del viaje</h2>
+          <h2 class="titulo-seccion">Archivos del viaje</h2>
           <p class="texto-suave">Pasajes, reservas y papeles, todo a mano.</p>
         </div>
         <div class="acciones-fila">
-          ${R.escaneo && R.db.puedeOrganizar(v) ? '<button class="btn btn-suave" data-a="escanear" title="Leo la reserva y la llevo a su lugar en el viaje">🎫 Leer una reserva</button>' : ''}
           ${grupos.length ? '<button class="btn btn-primario" data-a="subir">+ Subir</button>' : ''}
         </div>
       </div>
@@ -55,13 +64,11 @@ R.documentos = (function () {
           <h3 class="bloque-titulo">${g.c.icono} ${esc(g.c.nombre)} <span class="contador">${g.docs.length}</span></h3>
           <div class="grilla-docs">${g.docs.map(d => tarjetaDoc(v, d)).join('')}</div>
         </div>`).join('') : `
-        ${U.vacio({ icono: '📁', titulo: 'Todavía no hay documentos', texto: 'Subí pasajes, reservas y seguro para tenerlos a mano, también sin señal.', boton: '+ Subir el primero', accion: 'subir2' })}`}`;
+        ${U.vacio({ icono: '📁', titulo: 'Todavía no hay archivos', texto: 'Subí pasajes, reservas y seguro para tenerlos a mano, también sin señal.', boton: '+ Subir el primero', accion: 'subir2' })}`}`;
 
     cont.querySelectorAll('[data-a="subir"],[data-a="subir2"]').forEach(b => b.onclick = () => subir(v));
     if (R.emergencias) R.emergencias.enlazar(cont, v, () => render(v, cont));
     if (R.queHacerSi) R.queHacerSi.enlazar(cont);
-    const esc1 = cont.querySelector('[data-a="escanear"]');
-    if (esc1) esc1.onclick = () => R.escaneo.escanearYAbrir(v);
     cont.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => abrir(v.documentos.find(d => d.id === b.dataset.abrir)));
     cont.querySelectorAll('[data-descargar]').forEach(b => b.onclick = () => descargar(v.documentos.find(d => d.id === b.dataset.descargar)));
     cont.querySelectorAll('[data-borrar]').forEach(b => b.onclick = () => borrar(v, b.dataset.borrar));
@@ -84,7 +91,8 @@ R.documentos = (function () {
   }
 
   function tarjetaDoc(v, d) {
-    const tarea = d.tareaId ? R.motor.nombre(v, d.tareaId) : '';
+    const it = itemDe(v, d);
+    const tarea = it ? (it.titulo || it.nombre || '') : '';
     return `
       <div class="doc">
         <button class="doc-vista" data-abrir="${d.id}" aria-label="Abrir ${esc(d.nombre)}">
@@ -94,7 +102,7 @@ R.documentos = (function () {
         <div class="doc-info">
           <strong title="${esc(d.nombre)}">${esc(d.nombre)}</strong>
           <small>${U.fmtTamano(d.tamano)} · ${U.fmtFecha((d.fecha || '').slice(0, 10), 'corto')}</small>
-          ${tarea ? `<small class="doc-tarea">🧭 ${esc(tarea)}</small>` : ''}
+          ${tarea ? `<small class="doc-tarea">🗓️ ${esc(tarea)}</small>` : ''}
           ${d.nota ? `<small class="doc-nota">${esc(d.nota)}</small>` : ''}
         </div>
         <div class="doc-acciones">
@@ -105,24 +113,25 @@ R.documentos = (function () {
   }
 
   /**
-   * Abre el formulario para subir. opciones: { tareaId, categoria, alTerminar }
+   * Abre el formulario para subir. opciones: { itemId, categoria, alTerminar }
    */
   function subir(v, opciones) {
     const op = opciones || {};
-    const tareas = R.motor.lista(v);
-    const catInicial = op.categoria || (op.tareaId ? (tareas.find(t => t.id === op.tareaId) || {}).docCategoria : '') || 'pasaje';
+    const opciones2 = R.agenda.items(v).filter(x => x.fecha).sort((a, b) => (a.fecha + (a.hora || '')).localeCompare(b.fecha + (b.hora || '')))
+      .map(x => ({ id: x.id, texto: `${U.fmtFecha(x.fecha, 'corto')} · ${x.titulo}` }))
+      .concat((v.alojamientos || []).map(a => ({ id: a.id, texto: `🛏️ ${a.nombre}` })));
+    const catInicial = op.categoria || 'pasaje';
 
     const { el } = U.modal({
-      titulo: 'Subir documento',
+      titulo: 'Subir archivos',
       cuerpo: `
         ${U.zonaArchivos('docs', [], '')}
         <label class="campo"><span>Nombre</span><input id="dNombre" placeholder="Se completa con el nombre del archivo"></label>
         <div class="grilla-2">
           <label class="campo"><span>Categoría</span><select id="dCategoria">${U.ordenAlfa(CATEGORIAS.filter(c => c.id !== 'otro'), 'nombre').concat(CATEGORIAS.filter(c => c.id === 'otro')).map(c => `<option value="${c.id}" ${c.id === catInicial ? 'selected' : ''}>${c.icono} ${c.nombre}</option>`).join('')}</select></label>
-          <label class="campo"><span>Paso de la guía</span><select id="dTarea"><option value="">Ninguno</option>${tareas.map(t => `<option value="${t.id}" ${t.id === op.tareaId ? 'selected' : ''}>${esc(t.titulo)}</option>`).join('')}</select></label>
+          <label class="campo"><span>Es de… <small>(opcional)</small></span><select id="dTarea"><option value="">Nada en particular</option>${opciones2.map(t => `<option value="${t.id}" ${t.id === op.itemId ? 'selected' : ''}>${esc(t.texto)}</option>`).join('')}</select></label>
         </div>
-        <label class="campo"><span>Nota (opcional)</span><input id="dNota" placeholder="Ej: código de reserva ABC123"></label>
-        <label class="check" id="dMarcarFila"><input type="checkbox" id="dMarcar" checked> Marcar ese paso como hecho</label>`,
+        <label class="campo"><span>Nota (opcional)</span><input id="dNota" placeholder="Ej: código de reserva ABC123"></label>`,
       acciones: [
         { texto: 'Cancelar' },
         { texto: 'Guardar', clase: 'btn-primario', onClick: el2 => { guardarSubida(v, el2, op); return false; } }
@@ -139,24 +148,6 @@ R.documentos = (function () {
       if (n > 1) nombre.value = '';
     };
     U.enlazarArchivos(el, 'docs', elegidos, () => { U.repintarArchivos(el, 'docs', elegidos, '', false, alCambiarArchivos); alCambiarArchivos(); });
-    const selCat = el.querySelector('#dCategoria');
-    const selTarea = el.querySelector('#dTarea');
-    const filaMarcar = el.querySelector('#dMarcarFila');
-    const actualizarMarcar = () => {
-      const id = selTarea.value;
-      filaMarcar.style.display = id && !R.motor.resuelta(v, id) ? '' : 'none';
-    };
-    selCat.onchange = () => {
-      if (op.tareaId) return;
-      const base = categoria(selCat.value).tarea;
-      const sugerida = base ? (tareas.find(t => t.base === base && !R.motor.resuelta(v, t.id)) || tareas.find(t => t.base === base)) : null;
-      if (sugerida) selTarea.value = sugerida.id;
-      else selTarea.value = '';
-      actualizarMarcar();
-    };
-    selTarea.onchange = actualizarMarcar;
-    if (!op.tareaId) selCat.onchange();
-    actualizarMarcar();
   }
 
   async function guardarSubida(v, el, op) {
@@ -167,19 +158,17 @@ R.documentos = (function () {
 
     const nombreManual = el.querySelector('#dNombre').value.trim();
     const cat = el.querySelector('#dCategoria').value;
-    const tareaId = el.querySelector('#dTarea').value;
+    const itemId = el.querySelector('#dTarea').value;
     const nota = el.querySelector('#dNota').value.trim();
-    const marcar = el.querySelector('#dMarcar').checked && el.querySelector('#dMarcarFila').style.display !== 'none';
     const boton = el.querySelector('.modal-pie .btn-primario');
     boton.disabled = true;
     boton.textContent = 'Guardando…';
 
     try {
-      await guardarArchivos(v, archivos, { categoria: cat, tareaId, nota, nombre: archivos.length === 1 ? nombreManual : '' });
-      if (marcar && tareaId) R.motor.setEstado(v, tareaId, 'hecha');
+      await guardarArchivos(v, archivos, { categoria: cat, itemId, nota, nombre: archivos.length === 1 ? nombreManual : '' });
       R.db.guardarViaje(v);
       U.cerrarModal();
-      U.toast(archivos.length > 1 ? `${archivos.length} documentos guardados.` : 'Documento guardado.');
+      U.toast(archivos.length > 1 ? `${archivos.length} archivos guardados.` : 'Archivo guardado.');
       R.app.refrescar();
       if (op.alTerminar) op.alTerminar();
     } catch (e) {
@@ -202,6 +191,7 @@ R.documentos = (function () {
         nombreArchivo: a.name,
         categoria: op.categoria || 'otro',
         tareaId: op.tareaId || '',
+        itemId: op.itemId || '',
         nota: op.nota || '',
         archivoId,
         viajeId: v.id,
@@ -280,7 +270,7 @@ R.documentos = (function () {
 
   async function pintarPdf(caja, blob, url) {
     try {
-      const pdfjs = await R.escaneo.cargarPdfJs();
+      const pdfjs = await R.importar.cargarPdfJs();
       const pdf = await pdfjs.getDocument(blob ? { data: await blob.arrayBuffer() } : { url }).promise;
       caja.innerHTML = '';
       const ancho = Math.min(caja.clientWidth || window.innerWidth, 900);

@@ -2,7 +2,7 @@
    Rutenda — reservas que llegaron por mail
    Reenviás la reserva a rutendaviajes@gmail.com desde el mail
    de tu cuenta y aparece acá. Con un toque se suma al viaje:
-   completa el paso de la guía y guarda el PDF en Documentos.
+   la suma al itinerario y guarda el PDF en Archivos.
    usuarios/{uid}/bandeja/{id}: { asunto, de, recibido, datos, adjuntos[], estado }
    ========================================================= */
 window.R = window.R || {};
@@ -149,25 +149,21 @@ R.bandeja = (function () {
     try { await col().doc(it.id).update({ estado, usado: new Date().toISOString() }); } catch (e) { /* se reintenta al volver a abrir */ }
   }
 
-  /** Suma la reserva al viaje: completa el paso que corresponde y guarda el archivo. */
+  /** Suma la reserva al viaje: te muestra lo leído para guardarlo en el itinerario, o guarda el archivo. */
   async function sumar(it, v) {
     if (!v) throw new Error('Elegí el viaje.');
     const archivo = await archivoDe(it);
-    let datos = it.datos;
-    if ((!datos || datos.tipo === 'otro') && archivo) {
-      try { datos = await R.escaneo.leerArchivoSinIA(archivo, v); } catch (e) { datos = null; }
-      if (!datos) datos = await R.escaneo.analizar(archivo, it.asunto);
-    }
+    let datos = it.datos && it.datos.tipo !== 'otro' ? it.datos : null;
+    if (!datos && archivo) { try { datos = await R.importar.leerArchivo(archivo, v); } catch (e) { datos = null; } }
     await marcar(it, 'usado');
-    if (datos && await R.escaneo.llevarAlViaje(v, datos, archivo, { sinGuardarSuelto: true, aviso: 'Llegó por mail: completé lo que pude leer. Revisalo antes de guardar.' })) return;
+    U.cerrarModal();
+    if (datos && R.importar.llevar(v, datos, archivo, { aviso: 'Llegó por mail. Revisalo antes de guardar.' })) return;
     if (archivo) {
       await R.documentos.guardarArchivos(v, [archivo], { categoria: 'otro' });
       R.db.guardarViaje(v);
-      U.cerrarModal();
-      U.toast('No encontré a qué paso corresponde: lo guardé en Documentos del viaje.');
+      U.toast('No pude leer los datos: lo guardé en Archivos del viaje.');
       return;
     }
-    U.cerrarModal();
     U.toast('Ese mail no tenía datos de reserva ni archivos para guardar.');
   }
 

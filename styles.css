@@ -2457,3 +2457,134 @@ body.con-visor { overflow: hidden; }
 .hoy-falta b { color: var(--mar); }
 .hoy-reservas { margin-top: 16px; }
 .hoy-llegue { margin-top: 16px; }
+
+/* =========================================================
+   Rutenda 26 — menos es más
+   ========================================================= */
+.titulo-pagina { font-size: 2rem; margin: 0; }
+.sub-vista-cab { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; margin: 16px 0 6px; }
+.sub-vista-cab .titulo-seccion { margin: 0; }
+.pestanas-4 .pestana { position: relative; flex-direction: column; gap: 1px; font-size: .82rem; padding: 8px 6px; border-radius: 14px; }
+.pestanas-4 .pestana > span { font-size: 1.15rem; line-height: 1; }
+.pestana-num { position: absolute; top: -3px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--terracota); color: #fff; font-size: .7rem; font-style: normal; font-weight: 700; display: grid; place-items: center; }
+
+/* Crear viaje */
+.form-viaje .fv-destinos { display: grid; gap: 8px; }
+.fv-destino { display: flex; align-items: center; gap: 6px; }
+.fv-destino > div { flex: 1; min-width: 0; }
+.fv-viajeros { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.form-viaje .fila-agregar { margin-top: 8px; }
+
+/* Itinerario */
+.itin2 { display: grid; gap: 14px; padding-bottom: 12px; }
+.itin2-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+.itin2-ideas { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 16px; border: 1px dashed var(--terracota); border-radius: var(--radio-chico); background: var(--terracota-claro); color: var(--tinta); text-align: left; font: inherit; cursor: pointer; }
+.itin2-ideas > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.itin2-ideas small { color: var(--tinta-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.itin2-ideas b { color: var(--terracota-oscuro); font-size: .88rem; }
+.itin2-ayuda { text-align: center; }
+.dia2 { background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio); box-shadow: var(--sombra); overflow: hidden; scroll-margin-top: 80px; }
+.dia2.hoy { border-color: var(--mar); box-shadow: 0 0 0 2px var(--mar-claro), var(--sombra); }
+.dia2.pasado { opacity: .72; }
+.dia2-cab { display: flex; align-items: baseline; gap: 10px; padding: 12px 16px 6px; }
+.dia2-cab strong { font-family: var(--fuente-titulo); font-size: 1.1rem; font-weight: 600; }
+.dia2-cab strong::first-letter { text-transform: uppercase; }
+.dia2-cab span { color: var(--tinta-tenue); font-size: .82rem; }
+.dia2-hoy { margin-left: auto; font-style: normal; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; background: var(--mar); color: var(--sobre-mar); padding: 3px 8px; border-radius: 999px; }
+.dia2-items { display: grid; padding: 0 8px; }
+.dia2-libre { color: var(--tinta-tenue); font-size: .9rem; padding: 4px 8px 8px; margin: 0; }
+.it2 { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 10px 8px; border: 0; border-radius: var(--radio-chico); background: transparent; color: var(--tinta); font: inherit; text-align: left; cursor: pointer; -webkit-touch-callout: none; user-select: none; }
+.it2:hover { background: var(--arena); }
+.it2 + .it2 { border-top: 1px solid var(--linea); border-radius: 0; }
+.it2-hora { flex: none; width: 44px; font-weight: 700; font-size: .86rem; color: var(--mar); padding-top: 2px; font-variant-numeric: tabular-nums; }
+.it2-ico { flex: none; width: 30px; height: 30px; border-radius: 9px; background: var(--mar-claro); display: grid; place-items: center; font-size: .95rem; }
+.ev-traslado .it2-ico { background: var(--sol-claro); }
+.ev-aloj .it2-ico { background: var(--salvia-claro); }
+.it2-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.it2-texto strong { font-weight: 600; }
+.it2-texto small { color: var(--tinta-suave); font-size: .84rem; }
+.it2-nota { font-style: italic; }
+.it2-checkin { color: var(--terracota-oscuro) !important; font-weight: 600; }
+.it2-docs { flex: none; font-size: .85rem; color: var(--tinta-suave); padding-top: 2px; }
+.dia2 .dia-ruta { padding: 0 16px; }
+.dia2-pie { display: flex; align-items: center; gap: 8px; padding: 8px 10px 10px; border-top: 1px solid var(--linea); background: var(--arena); }
+.dia2-noche { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 0; border-radius: 10px; background: transparent; color: var(--mar-oscuro); font: inherit; font-size: .9rem; text-align: left; cursor: pointer; }
+button.dia2-noche:hover { background: var(--mar-claro); }
+.dia2-noche.sin { color: var(--tinta-suave); }
+.dia2-mas { flex: none; border: 1px solid var(--linea); background: var(--papel); color: var(--mar); font: inherit; font-weight: 700; font-size: .84rem; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.dia2-mas:hover { border-color: var(--mar); }
+.chips-dias { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.chip-dia { border: 1px solid var(--linea); background: var(--papel); color: var(--tinta); padding: 8px 12px; border-radius: 999px; font: inherit; font-size: .88rem; cursor: pointer; }
+.chip-dia::first-letter { text-transform: uppercase; }
+.chip-dia.activo { background: var(--mar); border-color: var(--mar); color: var(--sobre-mar); }
+
+/* Formulario de algo del itinerario */
+.tipos-item { margin-bottom: 12px; }
+.form-item .si-traslado { display: none; }
+.form-item.es-traslado .si-traslado { display: block; }
+.form-item.es-traslado .grilla-2.si-traslado { display: grid; }
+.form-item.es-traslado .no-traslado { display: none; }
+.form-item.solo-ver .tipos-item .chip-op:not(.activo) { display: none; }
+.docs-item { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.chip-doc { border: 1px solid var(--linea); background: var(--arena); color: var(--tinta); padding: 6px 10px; border-radius: 999px; font: inherit; font-size: .84rem; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Hoy (inicio) */
+.hoy2 { background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio); box-shadow: var(--sombra); padding: 12px 14px; margin: 12px 0; }
+.hoy2-cab { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.hoy2-cab a { color: var(--mar); font-weight: 600; font-size: .88rem; }
+.hoy2-fila { display: flex; align-items: center; gap: 10px; padding: 8px 4px; color: var(--tinta); border-top: 1px solid var(--linea); }
+.hoy2-fila:first-of-type { border-top: 0; }
+.hoy2-noche { margin: 8px 0 0; padding: 8px 10px; border-radius: 10px; background: var(--mar-claro); color: var(--mar-oscuro); font-size: .9rem; }
+.hoy2-noche a { color: inherit; font-weight: 600; }
+
+/* Pendientes */
+.pend2 { display: grid; gap: 16px; padding-bottom: 12px; }
+.pend2-bloque { margin: 0; }
+.pend2-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.pend2-cab .titulo-seccion { margin: 0; font-size: 1.3rem; }
+.pend2-nuevo { display: flex; gap: 8px; margin-bottom: 10px; }
+.pend2-nuevo input { flex: 1; min-width: 0; padding: 12px 14px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--papel); color: var(--tinta); font: inherit; }
+.pend2-nuevo input:focus { outline: none; border-color: var(--mar); box-shadow: 0 0 0 3px var(--mar-claro); }
+.pend2-nuevo .btn { min-width: 48px; font-size: 1.2rem; padding: 0 14px; }
+.pend2-lista { display: grid; }
+.pend2-fila { display: flex; align-items: center; gap: 4px; border-top: 1px solid var(--linea); }
+.pend2-fila:first-child { border-top: 0; }
+.pend2-check { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: transparent; cursor: pointer; }
+.pend2-check svg { width: 24px; height: 24px; padding: 3px; border: 2px solid var(--tinta-tenue); border-radius: 8px; fill: none; stroke: transparent; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; transition: all .15s; }
+.pend2-fila.hecho .pend2-check svg { background: var(--salvia); border-color: var(--salvia); stroke: #fff; }
+.pend2-texto { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 10px 4px; border: 0; background: transparent; color: var(--tinta); font: inherit; text-align: left; cursor: pointer; }
+.pend2-texto small { color: var(--tinta-suave); font-size: .82rem; }
+.pend2-texto small::first-letter { text-transform: uppercase; }
+.pend2-fila.hecho .pend2-texto span { text-decoration: line-through; color: var(--tinta-tenue); }
+.pend2-fila.vencido .pend2-texto small { color: var(--alerta); font-weight: 600; }
+.pend2-vacio { margin: 4px 0 8px; }
+.pend2-hechos { margin-top: 6px; }
+.pend2-extras { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.pend2-sug { margin-top: 10px; margin-bottom: 0; }
+.pend2-ayuda { margin: -4px 0 10px; font-size: .88rem; }
+.pend2-ideas { display: grid; gap: 8px; }
+.idea2 { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 4px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--papel); }
+.idea2-texto { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 6px; border: 0; background: transparent; color: var(--tinta); font: inherit; text-align: left; cursor: pointer; }
+.idea2-texto > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.idea2-texto small { color: var(--tinta-suave); font-size: .82rem; }
+
+/* Valija y Mis listas */
+.valija2 { padding-bottom: 12px; }
+.valija2-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 6px 0 8px; }
+.valija2-cab .titulo-seccion { margin: 0; font-size: 1.3rem; }
+.bloque-valija { margin-top: 12px; }
+.listas-sub { margin: 22px 0 10px; font-size: 1.25rem; }
+.nueva-lista-pend { margin-top: 16px; }
+
+/* Leer una reserva */
+.imp-vista { display: grid; gap: 8px; margin-bottom: 12px; }
+.imp-fila { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--arena); }
+.imp-fila > span:last-child { display: flex; flex-direction: column; min-width: 0; }
+.imp-fila small { color: var(--tinta-suave); font-size: .84rem; }
+.imp-fila small::first-letter { text-transform: uppercase; }
+.cargar-texto { margin-top: 6px; }
+.mapa-viaje { min-height: 320px; }
+.mapa-viaje .mapa-lienzo { height: 60vh; min-height: 320px; border-radius: var(--radio-chico); }
+.modal .form-item { padding: 0; border: 0; background: none; }
+.modal .form-item .campo input, .modal .form-item .campo select, .modal .form-item .campo textarea { background: var(--arena); }
+.pend2-nuevo .btn { font-size: 1.5rem; line-height: 1; font-weight: 500; }

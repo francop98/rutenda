@@ -72,7 +72,6 @@ R.db = (function () {
     v.tareasPropias = v.tareasPropias || [];
     v.votos = v.votos || {};
     v.planes = v.planes || {};
-    if (v.ideas && R.ideas) R.ideas.migrar(v);
     v.itinerario = v.itinerario || [];
     v.documentos = v.documentos || [];
     v.movimientos = v.movimientos || [];
@@ -84,14 +83,12 @@ R.db = (function () {
       if (!v.valijas[mia] && (v.valija.items || []).length) v.valijas[mia] = v.valija;
       delete v.valija;
     }
-    if (R.recorrido) {
-      if (!Array.isArray(v.recorrido)) v.recorrido = R.recorrido.construir(v.origen, v.destinos, [], v.perfil.transporte, { soloIda: !!v.perfil.soloIda });
-      v.recorrido.forEach(t => (t.segmentos || []).forEach(R.recorrido.normalizarSegmento));
-      if (v.recorrido.length) {
-        v.perfil.transporte = R.recorrido.medioPrincipal(v.recorrido);
-        R.recorrido.recalcular(v);
-      }
-    }
+    // Rutenda 26: itinerario, alojamientos y pendientes que escribís vos (los viajes viejos se pasan solos, sin borrar nada)
+    if (!v.v2 && R.agenda) R.agenda.migrar(v);
+    v.agenda = Array.isArray(v.agenda) ? v.agenda : [];
+    v.alojamientos = Array.isArray(v.alojamientos) ? v.alojamientos : [];
+    v.pendientes = Array.isArray(v.pendientes) ? v.pendientes : [];
+    if (!v.valijas.comun) v.valijas.comun = { items: [] };
     v.monedaBase = v.monedaBase || 'ARS';
     return v;
   }

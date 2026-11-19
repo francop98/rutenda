@@ -20,8 +20,9 @@ R.resumen = (function () {
   }
 
   function datos(v) {
-    const segs = R.recorrido.todosLosSegmentos(v.recorrido || []).map(x => x.seg);
-    const kms = Math.round(segs.reduce((a, s) => a + km(s.desde, s.hasta), 0));
+    const segs = R.agenda.segmentos(v);
+    const par = R.agenda.paradas(v);
+    const kms = Math.round(par.slice(1).reduce((a, p, i) => a + km(par[i], p), 0));
     const dias = v.fechaInicio && v.fechaFin ? U.diasEntre(v.fechaInicio, v.fechaFin) + 1 : 0;
     const lugares = (v.destinos || []).filter(d => d.nombre).map(d => d.nombre);
     const medios = {};

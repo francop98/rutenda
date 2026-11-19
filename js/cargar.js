@@ -1,7 +1,7 @@
 /* =========================================================
    Rutenda — "Cargar" (botón del medio, abajo)
    Lo que más se carga, a un toque y sin entrar al viaje:
-   un gasto, un ingreso, un documento, algo para la valija…
+   un gasto, un pendiente, una idea, algo para la valija…
    - Si estás viajando (o mirando un viaje), ya viene elegido.
    - Si tenés varios viajes, elegís a cuál va.
    ========================================================= */
@@ -61,15 +61,16 @@ R.cargar = (function () {
       <div class="cargar-grilla">
         ${boton('gasto', '−', 'Gasto', 'cg-gasto')}
         ${boton('ingreso', '+', 'Ingreso o reintegro', 'cg-ingreso')}
-        ${org ? boton('reserva', '🎫', 'Una reserva o pasaje', 'cg-reserva') : ''}
-        ${boton('doc', '📄', 'Documento')}
+        ${org ? boton('pendiente', '✅', 'Un pendiente') : ''}
+        ${org ? boton('idea', '💡', 'Algo que quiero hacer') : ''}
+        ${org ? boton('itinerario', '🗓️', 'Algo en un día') : ''}
+        ${org ? boton('reserva', '🎫', 'Una reserva', 'cg-reserva') : ''}
         ${boton('valija', '🧳', 'Algo para la valija')}
-        ${org ? boton('hacer', '📝', 'Algo para hacer') : ''}
-        ${org ? boton('actividad', '🗓️', 'Actividad en un día') : ''}
+        ${boton('doc', '📄', 'Un archivo')}
       </div>
-      <form class="cargar-valija" data-form="cargarValija" hidden>
-        <label class="campo"><span>¿Qué sumás a tu valija?</span><input id="cvTexto" placeholder="Ej: cargador" maxlength="80" autocomplete="off"></label>
-        <div class="acciones-fila"><button type="button" class="btn btn-texto" data-a="cvCancelar">Cancelar</button><button type="submit" class="btn btn-primario">✓ Agregar</button></div>
+      <form class="cargar-texto" data-form="cargarTexto" hidden>
+        <label class="campo"><span id="ctPregunta"></span><input id="ctTexto" maxlength="120" autocomplete="off"></label>
+        <div class="acciones-fila"><button type="button" class="btn btn-texto" data-a="ctCancelar">Cancelar</button><button type="submit" class="btn btn-primario">✓ Agregar</button></div>
       </form>`;
   }
 
@@ -80,7 +81,7 @@ R.cargar = (function () {
         titulo: 'Cargar',
         cuerpo: U.vacio({ icono: '🧳', titulo: 'Primero armá un viaje', texto: 'Después cargás gastos, documentos y todo lo demás desde acá.', boton: '+ Nuevo viaje', accion: 'nuevoViaje' })
       });
-      el.querySelector('[data-a="nuevoViaje"]').onclick = () => { U.cerrarModal(); R.viajes.abrirAsistente(); };
+      el.querySelector('[data-a="nuevoViaje"]').onclick = () => { U.cerrarModal(); R.viajes.nuevo(); };
       return;
     }
     // Si no hay uno obvio, no adivinamos: elegís vos el viaje
@@ -95,48 +96,55 @@ R.cargar = (function () {
     caja.querySelectorAll('[data-viaje]').forEach(b => b.onclick = () => { elegido = b.dataset.viaje; pintar(); });
     const v = () => lista.find(x => x.id === elegido);
     const salirY = fn => () => { const vi = v(); if (!vi) return; U.cerrarModal(); fn(vi); };
+    let modo = '';
+    const f = caja.querySelector('[data-form="cargarTexto"]');
+    const PREGUNTAS = {
+      pendiente: ['¿Qué tenés que hacer?', 'Ej: Sacar el seguro'],
+      idea: ['¿Qué querés hacer allá?', 'Ej: Cerro Catedral'],
+      valija: ['¿Qué sumás a la valija?', 'Ej: Cargador']
+    };
+    const pedirTexto = m => () => {
+      if (!v()) return;
+      modo = m;
+      f.hidden = false;
+      caja.querySelector('.cargar-grilla').hidden = true;
+      f.querySelector('#ctPregunta').textContent = PREGUNTAS[m][0];
+      const i = f.querySelector('#ctTexto');
+      i.placeholder = PREGUNTAS[m][1];
+      i.focus();
+    };
     const acciones = {
       gasto: salirY(vi => R.gastos.nuevo(vi)),
       ingreso: salirY(vi => R.gastos.nuevoIngreso(vi)),
       doc: salirY(vi => R.documentos.subir(vi)),
-      reserva: () => {
-        const vi = v(); if (!vi) return;
-        const g = caja.querySelector('.cargar-grilla');
-        g.hidden = true;
-        const r = document.createElement('div');
-        r.className = 'cargar-reserva';
-        r.innerHTML = `<p class="cargar-pregunta">¿Cómo la tenés?</p>
-          <button type="button" class="btn btn-suave btn-bloque" data-r="pegar">📋 Pegar el mail de confirmación</button>
-          <button type="button" class="btn btn-suave btn-bloque" data-r="archivo">📄 Subir el PDF o una foto</button>
-          <button type="button" class="btn btn-suave btn-bloque" data-r="mano">✍️ Escribir los datos (pasaje, alojamiento…)</button>
-          <p class="ayuda">Rutenda la lee, te muestra lo que encontró y la guardás con un toque.</p>
-          <button type="button" class="btn btn-texto" data-r="volver">← Volver</button>`;
-        g.after(r);
-        r.querySelector('[data-r="pegar"]').onclick = () => R.escaneo.pegarReserva(vi);
-        r.querySelector('[data-r="archivo"]').onclick = () => { U.cerrarModal(); R.escaneo.escanearYAbrir(vi); };
-        r.querySelector('[data-r="mano"]').onclick = () => { U.cerrarModal(); location.hash = `#viaje/${vi.id}/reservas`; };
-        r.querySelector('[data-r="volver"]').onclick = pintar;
-      },
-      hacer: salirY(vi => R.itinerario.irAQueHacer(vi)),
-      actividad: salirY(vi => R.itinerario.editar(vi, null, R.viajes.estadoViaje(vi) === 'en_curso' ? U.hoyISO() : (vi.fechaInicio || ''))),
-      valija: () => {
-        const f = caja.querySelector('[data-form="cargarValija"]');
-        f.hidden = false;
-        caja.querySelector('.cargar-grilla').hidden = true;
-        f.querySelector('#cvTexto').focus();
-      }
+      reserva: salirY(vi => R.importar.elegir(vi)),
+      itinerario: salirY(vi => R.itinerario.editarItem(vi, null, { fecha: R.viajes.estadoViaje(vi) === 'en_curso' ? U.hoyISO() : (vi.fechaInicio || '') })),
+      pendiente: pedirTexto('pendiente'),
+      idea: pedirTexto('idea'),
+      valija: pedirTexto('valija')
     };
     caja.querySelectorAll('[data-cargar]').forEach(b => b.onclick = acciones[b.dataset.cargar]);
-    const f = caja.querySelector('[data-form="cargarValija"]');
     f.onsubmit = e => {
       e.preventDefault();
       const vi = v();
-      const texto = f.querySelector('#cvTexto').value.trim();
-      if (!vi || !texto) { f.querySelector('#cvTexto').focus(); return; }
-      if (R.valija.agregar(vi, texto)) { U.cerrarModal(); U.toast(`Sumado a tu valija de ${nombreViaje(vi)}.`); R.app.refrescar(); }
-      else U.toast('Ya estaba en tu valija.');
+      const texto = f.querySelector('#ctTexto').value.trim();
+      if (!vi || !texto) { f.querySelector('#ctTexto').focus(); return; }
+      if (modo === 'valija') {
+        if (!R.valija.agregar(vi, texto)) { U.toast('Ya estaba en la valija.'); return; }
+        U.toast(`Sumado a la valija de ${nombreViaje(vi)}.`);
+      } else if (modo === 'pendiente') {
+        R.pendientes.sumar(vi, texto);
+        R.db.guardarViaje(vi);
+        U.toast(`Sumado a Pendientes de ${nombreViaje(vi)}.`);
+      } else {
+        R.agenda.guardarItem(vi, R.agenda.nuevoItem({ titulo: texto, fecha: '' }));
+        R.db.guardarViaje(vi);
+        U.toast('Anotado en "Quiero hacer allá". Elegí el día cuando sepas.');
+      }
+      U.cerrarModal();
+      R.app.refrescar();
     };
-    f.querySelector('[data-a="cvCancelar"]').onclick = pintar;
+    f.querySelector('[data-a="ctCancelar"]').onclick = pintar;
   }
 
   return { abrir, viajesActivos, predeterminado };

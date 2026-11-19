@@ -310,8 +310,7 @@ R.auth = (function () {
                 <div class="grilla-2">
                   <label class="campo"><span>Nombre</span><input id="acNombre" autocomplete="given-name" required></label>
                   <label class="campo"><span>Apellido</span><input id="acApellido" autocomplete="family-name"></label>
-                </div>
-                <label class="campo"><span>Nacionalidad de tu documento</span><select id="acNac">${R.requisitos.NACIONALIDADES.map(([c, n]) => `<option value="${c}" ${c === 'AR' ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : `
+                </div>` : `
                 <h2>¡Hola de nuevo!</h2>
                 <p class="texto-suave">Ingresá para seguir con tus viajes.</p>`}
               <label class="campo"><span>Mail</span><input id="acEmail" type="email" autocomplete="email" inputmode="email" value="${esc(recordado().email)}" required></label>
@@ -359,7 +358,7 @@ R.auth = (function () {
           await recordarme(recordar, val('acEmail'));
           if (modo === 'registro') {
             if (val('acClave') !== val('acClave2')) throw new Error('Las contraseñas no coinciden.');
-            await registrar({ nombre: val('acNombre'), apellido: val('acApellido'), email: val('acEmail'), clave: val('acClave'), nacionalidad: val('acNac') });
+            await registrar({ nombre: val('acNombre'), apellido: val('acApellido'), email: val('acEmail'), clave: val('acClave'), nacionalidad: 'AR' });
           } else {
             await ingresar(val('acEmail'), val('acClave'));
           }
@@ -413,22 +412,14 @@ R.auth = (function () {
           <label class="campo"><span>Nombre</span><input id="mcNombre" value="${esc(u.nombre)}"></label>
           <label class="campo"><span>Apellido</span><input id="mcApellido" value="${esc(u.apellido)}"></label>
         </div>
-        <label class="campo"><span>Nacionalidad de tu documento</span><select id="mcNac">${R.requisitos.NACIONALIDADES.map(([c, n]) => `<option value="${c}" ${c === u.nacionalidad ? 'selected' : ''}>${n}</option>`).join('')}</select>
-          <small class="ayuda">Con esto Rutenda sabe qué documentación y visas te piden en cada destino.</small></label>
-        <label class="campo"><span>Tu pasaporte vence el <small>(opcional)</small></span><input id="mcPasaporte" type="date" value="${esc(R.db.prefs().pasaporteVence || '')}">
-          <small class="ayuda">Te aviso si no te alcanza para algún viaje: muchos países piden 3 a 6 meses de vigencia.</small></label>
         <label class="campo"><span>Alias o CBU para cobrar <small>(opcional)</small></span><input id="mcAlias" value="${esc(u.alias || '')}" placeholder="Ej: mi.alias.mp" autocomplete="off">
           <small class="ayuda">Va en el mensaje cuando le pedís a alguien que te pague su parte.</small></label>
         <div class="bloque-interno">
           <strong>🔔 Recordatorios</strong>
-          <p class="texto-suave">${push === 'activo' ? 'Activados en este dispositivo.' : push === 'bloqueado' ? 'El navegador bloqueó las notificaciones: habilitalas en los ajustes del sitio.' : push === 'no' ? 'Este navegador no permite notificaciones (en iPhone, instalá la app primero).' : 'Te avisamos del check-in, lo que se acerca y el día a día del viaje.'}</p>
+          <p class="texto-suave">${push === 'activo' ? 'Activados en este dispositivo.' : push === 'bloqueado' ? 'El navegador bloqueó las notificaciones: habilitalas en los ajustes del sitio.' : push === 'no' ? 'Este navegador no permite notificaciones (en iPhone, instalá la app primero).' : 'Te avisamos el día que elijas para un pendiente ("Avisame ese día").'}</p>
           ${push === 'disponible' ? '<button type="button" class="btn btn-suave btn-chico" data-a="push">Activar recordatorios</button>' : ''}
           ${push === 'activo' ? '<button type="button" class="btn btn-texto btn-chico" data-a="pushNo">Desactivar en este dispositivo</button>' : ''}
         </div>
-        ${enNube() ? `<div class="bloque-interno">
-          <label class="check"><input type="checkbox" id="mcIA" ${R.db.prefs().ia !== false ? 'checked' : ''}> <strong>💡 Ayudas con IA</strong></label>
-          <p class="texto-suave">Pedir ideas de qué hacer, ver cómo es el destino, estimar el presupuesto, leer fotos de pasajes y tickets, y preguntarle a Rutenda. Siempre solo cuando lo tocás. Si lo apagás, la app funciona igual: todo se carga a mano o leyendo el mail con reglas.</p>
-        </div>` : ''}
         ${u.conClave === false ? `<p class="ayuda">${u.conGoogle ? '🔐 Entrás con tu cuenta de Google.' : ''}</p>` : `<details class="detalle-plegable">
           <summary>Cambiar contraseña</summary>
           <div class="grilla-2">
@@ -453,11 +444,7 @@ R.auth = (function () {
           texto: 'Guardar', clase: 'btn-primario', onClick: el => {
             const nombre = el.querySelector('#mcNombre').value.trim();
             if (!nombre) { U.toast('El nombre no puede quedar vacío.'); return false; }
-            const pv = el.querySelector('#mcPasaporte');
-            if (pv) R.db.guardarPrefs({ pasaporteVence: pv.value || '' });
-            const ia = el.querySelector('#mcIA');
-            if (ia) R.db.guardarPrefs({ ia: ia.checked });
-            actualizarPerfil({ nombre, apellido: el.querySelector('#mcApellido').value, nacionalidad: el.querySelector('#mcNac').value, alias: el.querySelector('#mcAlias').value })
+            actualizarPerfil({ nombre, apellido: el.querySelector('#mcApellido').value, alias: el.querySelector('#mcAlias').value })
               .then(() => {
                 R.db.guardarPersona(Object.assign(R.db.yo(), { nombre }));
                 const vc = id => { const x = el.querySelector(id); return x ? x.value : ''; };

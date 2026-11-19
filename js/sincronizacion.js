@@ -6,7 +6,7 @@
      viajes/{viajeId}                  organización del viaje (cronograma, guía, itinerario, personas…)
        ./movimientos/{id}              gastos, ingresos y pagos (cada uno carga los suyos)
        ./documentos/{id}               datos de cada archivo (el archivo va a Storage)
-       ./valijas/{personaId}           la valija de cada viajero
+       ./valijas/comun                  la valija del viaje (una para todos)
      invitaciones/{codigo}             enlace para sumarse a un viaje
    Storage: viajes/{viajeId}/archivos/{archivoId}
    Los cambios se envían agrupados (cada ~0,5 s) y solo lo que cambió.
@@ -260,7 +260,7 @@ R.nube = (function () {
     Object.keys(v.valijas || {}).forEach(pid => {
       const json = JSON.stringify(limpio(v.valijas[pid]));
       if (p.ultimo.valijas[pid] === json) return;
-      if (!organiza && !mias.has(pid)) return;
+      if (!organiza && !mias.has(pid) && pid !== 'comun') return;   // la valija común la tilda cualquiera del viaje
       lote.set(ref.collection('valijas').doc(pid), limpio(v.valijas[pid]));
       p.ultimo.valijas[pid] = json; operaciones++;
     });

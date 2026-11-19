@@ -1,8 +1,8 @@
 {
   "name": "rutenda",
-  "version": "7.0.0",
+  "version": "26.0.0",
   "private": true,
-  "description": "Rutenda: organizá tu viaje paso a paso.",
+  "description": "Rutenda: tus viajes, simples.",
   "dependencies": {
     "firebase-admin": "^12.7.0",
     "web-push": "^3.6.7"

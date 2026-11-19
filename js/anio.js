@@ -9,7 +9,6 @@ window.R = window.R || {};
 R.anio = (function () {
   const U = R.util;
   const { esc } = U;
-  const C = () => R.recorrido;
   let anioElegido = null;
 
   function viajesDe(anio) {
@@ -37,8 +36,9 @@ R.anio = (function () {
         lugares.add(x.nombre.toLowerCase());
         if (x.codigoPais) paises.set(x.codigoPais, x.pais || x.codigoPais);
       });
-      const segs = C().todosLosSegmentos(v.recorrido || []).map(x => x.seg);
-      segs.forEach(s => { kms += R.resumen.km(s.desde, s.hasta); medios[s.medio] = (medios[s.medio] || 0) + 1; traslados++; });
+      const par = R.agenda.paradas(v);
+      par.slice(1).forEach((p, i) => { kms += R.resumen.km(par[i], p); });
+      R.agenda.segmentos(v).forEach(s => { medios[s.medio] = (medios[s.medio] || 0) + 1; traslados++; });
       const t = R.gastos.totales(v);
       if (t.neto) gasto[v.monedaBase] = (gasto[v.monedaBase] || 0) + t.neto;
       const yo = R.db.yoEn(v);

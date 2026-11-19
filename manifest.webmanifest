@@ -1,7 +1,7 @@
 {
-  "name": "Rutenda · Tu viaje, paso a paso",
+  "name": "Rutenda · Tus viajes",
   "short_name": "Rutenda",
-  "description": "Organizá tu viaje paso a paso: pasajes, alojamiento, documentos, valija y gastos compartidos.",
+  "description": "Tu viaje simple: itinerario, pendientes, gastos compartidos y valija.",
   "lang": "es-AR",
   "start_url": "./index.html#inicio",
   "scope": "./",
@@ -40,7 +40,7 @@
     {
       "name": "Cargar un gasto",
       "short_name": "Gasto",
-      "description": "Cargá un gasto, un documento o algo para la valija",
+      "description": "Cargá un gasto, un pendiente o algo para la valija",
       "url": "./index.html#cargar",
       "icons": [
         {

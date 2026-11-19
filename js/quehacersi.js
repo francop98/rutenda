@@ -54,7 +54,7 @@ R.queHacerSi = (function () {
     ] }
   ];
 
-  function datosSeguro(v) { return ((v.tareas || {}).p_seguro || {}).datos || {}; }
+  function datosSeguro(v) { const e = (v.emergencias || {}).seguro; return e && e.telefono ? e : ((v.tareas || {}).p_seguro || {}).datos || {}; }
 
   function texto(paso, v) {
     const seg = datosSeguro(v);
@@ -65,7 +65,7 @@ R.queHacerSi = (function () {
       .replace(/\s+\./g, '.').replace(/\s{2,}/g, ' ');
   }
 
-  /** Bloque para la pestaña Documentos. */
+  /** Bloque para Archivos. */
   function html(v) {
     return `
       <details class="bloque plegable que-hacer-si" data-que-hacer-si>

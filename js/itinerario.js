@@ -1,720 +1,452 @@
 /* =========================================================
-   Rutenda — pestaña Itinerario
-   - Cronograma del viaje (con avisos) y su editor.
-   - Día por día: dónde amanecés, traslados con horarios,
-     check-in / check-out, escapadas, actividades, clima y
-     dónde dormís.
-   - Mapa, compartir (WhatsApp / PDF) y agregar al calendario.
-   - "Hoy" para el modo viaje.
+   Rutenda — Itinerario
+   Los días del viaje, uno abajo del otro. En cada día:
+   lo que hacés (con hora), check-in y check-out, y dónde
+   dormís esa noche. Todo lo pone el usuario: tocás algo para
+   verlo o cambiarlo, lo mantenés apretado para pasarlo a otro
+   día, y "+ Agregar" en cada día.
    ========================================================= */
 window.R = window.R || {};
 
 R.itinerario = (function () {
   const U = R.util;
   const { esc } = U;
-  const C = () => R.recorrido;
+  const A = () => R.agenda;
 
-  const TIPOS = [
-    { id: 'actividad', nombre: 'Actividad', icono: '🌄' },
-    { id: 'comida', nombre: 'Comida', icono: '🍽️' },
-    { id: 'traslado', nombre: 'Traslado', icono: '🚕' },
-    { id: 'alojamiento', nombre: 'Alojamiento', icono: '🏡' },
-    { id: 'vuelo', nombre: 'Viaje', icono: '✈️' },
-    { id: 'otro', nombre: 'Otro', icono: '📌' }
-  ];
-  function tipo(id) { return TIPOS.find(t => t.id === id) || TIPOS[TIPOS.length - 1]; }
+  /* ---------------------------------------------------------
+     Un día, armado (también lo usan el PDF, la familia y Google Maps)
+     --------------------------------------------------------- */
+  function diasDelViaje(v) { return A().dias(v); }
 
-  function diasDelViaje(v) {
-    if (!v.fechaInicio) return [];
-    const fin = v.fechaFin || v.fechaInicio;
-    const total = Math.min(Math.max(0, U.diasEntre(v.fechaInicio, fin)), 120);
-    const r = [];
-    for (let i = 0; i <= total; i++) r.push(U.sumarDias(v.fechaInicio, i));
-    return r;
+  function detalleItem(it) {
+    const t = A().tipo(it.tipo);
+    const partes = [];
+    if (t.traslado) {
+      if (it.horaLlegada) partes.push(`llega ${it.fechaLlegada && it.fechaLlegada !== it.fecha ? U.fmtFecha(it.fechaLlegada, 'dia') + ' ' : ''}${it.horaLlegada}`);
+      if (it.numero || it.empresa) partes.push([it.empresa, it.numero].filter(Boolean).join(' '));
+    }
+    if (it.codigo) partes.push('Cód. ' + it.codigo);
+    if (!t.traslado && it.lugar) partes.push(it.lugar);
+    return partes.join(' · ');
   }
 
-  function datosAloj(v, estadiaId) {
-    const t = v.tareas && v.tareas['a_reserva__' + estadiaId];
-    return t && t.datos ? t.datos : null;
+  /** Dónde estás ese día (para el PDF y el link de la familia): adonde llegaste con el último traslado, o el único destino. */
+  function ciudadDe(v, fecha) {
+    const segs = A().segmentos(v).filter(s => s.sale.fecha <= fecha && s.hasta.nombre);
+    if (segs.length) {
+      const ult = segs[segs.length - 1];
+      const casa = v.origen && v.origen.nombre && ult.hasta.nombre.toLowerCase() === v.origen.nombre.toLowerCase();
+      return casa && fecha > ult.sale.fecha ? '' : ult.hasta.nombre;
+    }
+    const ds = (v.destinos || []).filter(d => d.nombre && !d.soloDia);
+    return ds.length === 1 ? ds[0].nombre : '';
   }
-  const normal = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  // ¿Es algo al aire libre? (para avisar si llueve)
-  const AIRE_LIBRE = /cerro|playa|parque|caminata|trekking|treking|sendero|excursi|paseo|cataratas|navegaci|kayak|bici|mirador|glaciar|isla|lago|r[ií]o\b|cascada|rafting|cabalgata|safari|picnic|bosque|monta[ñn]a|volc[aá]n|jard[ií]n|aire libre|city ?tour|bote|lancha|surf|snorkel|esqu[ií]/i;
-  function esAireLibre(tipoId, titulo) {
-    if (['naturaleza', 'aventura', 'excursion'].includes(tipoId)) return true;
-    if (['gastronomia', 'compras', 'noche', 'comida', 'alojamiento', 'vuelo', 'traslado'].includes(tipoId)) return false;
-    return AIRE_LIBRE.test(titulo || '');
-  }
-  function documentosDe(v, tareaId) { return (v.documentos || []).filter(d => d.tareaId === tareaId); }
-
-  /**
-   * Arma un día: { fecha, numero, amaneces, dormis, items[], lugarPrincipal, clima }
-   * items: { hora, icono, titulo, sub, clase, evento?, docs[] }
-   */
-  /** Eventos que el itinerario ya arma solo (traslados y check-in/out): no se repiten. */
-  const aparte = e => /^(t_segmento__|a_reserva)/.test(e.origen || '');
 
   function diaDe(v, fecha) {
-    const segs = C().todosLosSegmentos(v.recorrido);
-    const est = C().estadias(v);
+    const dias = A().dias(v);
+    const numero = dias.indexOf(fecha) + 1;
+    const anoche = A().nocheDe(v, U.sumarDias(fecha, -1));
+    const noche = A().nocheDe(v, fecha);
     const items = [];
-    const enEstadia = est.find(e => e.desde && e.hasta && e.desde < fecha && fecha <= e.hasta);
-    const durmiendo = est.find(e => e.desde && e.hasta && e.desde <= fecha && fecha < e.hasta);
-    // Para Google Maps: cada lugar con su ciudad, así se encuentra bien
-    const ciudad = (durmiendo || enEstadia || {}).nombre || '';
-    const conCiudad = (x, c) => x ? (c && !normal(x).includes(normal(c)) ? `${x}, ${c}` : x) : '';
-    const lugarAloj = (a, e) => a && (a.direccion || a.nombre) ? conCiudad(a.direccion || a.nombre, e.nombre) : '';
-
-    segs.forEach(x => {
-      const s = x.seg;
-      const m = C().medio(s.medio);
-      const det = R.cronogramaEditor.datosSegmento(v, s);
-      const tareaId = 't_segmento__' + s.id;
-      const docs = documentosDe(v, tareaId);
-      if (s.sale.fecha === fecha) {
-        const llega = C().fechaLlega(s);
-        items.push({
-          hora: s.sale.hora, icono: m.icono, clase: 'ev-traslado',
-          titulo: `${s.desde.nombre} → ${s.hasta.nombre}`,
-          sub: [`${m.nombre}${s.medio === 'otro' && s.medioOtro ? ' (' + s.medioOtro + ')' : ''}`, llega && llega !== fecha ? `llega ${U.fmtFecha(llega, 'dia')}${s.llega.hora ? ' ' + s.llega.hora : ''}` : (s.llega.hora ? `llega ${s.llega.hora}` : ''), det, s.estado !== 'confirmado' ? 'sin confirmar' : ''].filter(Boolean).join(' · '),
-          docs, tareaId
-        });
-      } else if (C().fechaLlega(s) === fecha && s.sale.fecha && s.sale.fecha !== fecha) {
-        items.push({ hora: s.llega.hora, icono: s.medio === 'avion' ? '🛬' : '📍', clase: 'ev-traslado', titulo: `Llegás a ${s.hasta.nombre}`, sub: `${m.icono} desde ${s.desde.nombre}`, docs: [], tareaId });
-      }
-    });
-
-    est.forEach(e => {
-      const a = datosAloj(v, e.id);
-      if (a && a.checkinFecha === fecha) items.push({ hora: a.checkinHora, icono: '🏨', clase: 'ev-aloj', titulo: `Check-in · ${a.nombre || e.nombre}`, sub: [a.direccion, a.codigo ? 'Cód. ' + a.codigo : ''].filter(Boolean).join(' · '), docs: documentosDe(v, 'a_reserva__' + e.id), lugar: lugarAloj(a, e), tareaId: 'a_reserva__' + e.id });
-      if (a && a.checkoutFecha === fecha) items.push({ hora: a.checkoutHora, icono: '🧳', clase: 'ev-aloj', titulo: `Check-out · ${a.nombre || e.nombre}`, sub: a.direccion || '', docs: [], lugar: lugarAloj(a, e), tareaId: 'a_reserva__' + e.id });
-    });
-
-    (v.destinos || []).filter(d => d.soloDia && d.nombre && d.fecha === fecha && !d.fechaPendiente).forEach(d => {
-      items.push({ hora: '', icono: '☀️', clase: 'ev-escapada', aire: true, titulo: `Paseo de un día a ${d.nombre}`, sub: 'Volvés en el día', docs: documentosDe(v, 'e_escapada__' + d.id), lugar: R.gmaps ? R.gmaps.textoLugar(d) : d.nombre });
-    });
-
-    (v.itinerario || []).filter(e => e.fecha === fecha && !aparte(e)).forEach(e => {
-      items.push({ hora: e.hora, icono: tipo(e.tipo).icono, clase: 'ev-propio', titulo: e.titulo, sub: [e.lugar && '📍 ' + e.lugar, e.confirmacion && 'Cód. ' + e.confirmacion, e.notas].filter(Boolean).join(' · '), evento: e.id, origen: e.origen, docs: [], lugar: conCiudad(e.lugar, ciudad), aire: esAireLibre(e.tipo, e.titulo + ' ' + (e.lugar || '')) });
-    });
-
-    // Lo que decidiste hacer ese día (desde "Qué hacer")
-    if (R.ideas) R.ideas.delDia(v, fecha).forEach(p => items.push({ hora: p.hora, icono: R.ideas.ICONOS[p.tipo] || '📍', clase: 'ev-plan', titulo: p.titulo, sub: [p.zona && '📍 ' + p.zona, p.reservado ? `✓ reservado${p.codigo ? ' · ' + p.codigo : ''}` : p.reserva ? '🎟️ falta reservar' : '', p.nota].filter(Boolean).join(' · '), plan: p.destId + '|' + p.id, aire: esAireLibre(p.tipo, p.titulo + ' ' + (p.lugar || '')), docs: R.ideas.docsDe ? R.ideas.docsDe(v, p.id) : [], lugar: conCiudad(p.lugar || p.titulo, ((v.destinos || []).find(x => x.id === p.destId) || {}).nombre || ciudad) }));
-
-    items.sort((a, b) => (a.hora || '99:99').localeCompare(b.hora || '99:99'));
-
-    // Dónde amanecés y dónde dormís
-    let amaneces = '';
-    if (fecha === v.fechaInicio) amaneces = v.origen && v.origen.nombre ? `Arrancás en casa (${v.origen.nombre})` : '';
-    else if (enEstadia) amaneces = `Amanecés en ${enEstadia.nombre}`;
-    else {
-      const nocturno = segs.find(x => x.seg.sale.fecha && x.seg.sale.fecha < fecha && C().fechaLlega(x.seg) >= fecha);
-      if (nocturno) amaneces = `Amanecés viajando en ${C().medio(nocturno.seg.medio).nombre.toLowerCase()}`;
-    }
-    let dormis = null;
-    if (durmiendo) {
-      const a = datosAloj(v, durmiendo.id);
-      const casa = !a && R.guia.tipoViaje(v).sinAlojamiento;
-      dormis = { icono: casa ? '🏠' : '🛏️', texto: a && a.nombre ? `${a.nombre}, ${durmiendo.nombre}` : casa ? `${durmiendo.nombre} · en casa de familia o amigos` : `${durmiendo.nombre} · alojamiento a reservar`, direccion: a && a.direccion ? a.direccion : '', falta: !a && !casa, tareaId: casa ? '' : 'a_reserva__' + durmiendo.id };
-    } else {
-      const nocheViajando = segs.find(x => x.seg.sale.fecha && x.seg.sale.fecha <= fecha && C().fechaLlega(x.seg) > fecha);
-      if (nocheViajando) dormis = { icono: '🌙', texto: `Noche viajando en ${C().medio(nocheViajando.seg.medio).nombre.toLowerCase()}`, direccion: '' };
-      else if (fecha === v.fechaFin && (v.recorrido || []).some(t => t.tipo === 'vuelta')) dormis = { icono: '🏠', texto: 'En casa', direccion: '' };
-    }
-    const lugarPrincipal = durmiendo ? durmiendo.lugar : (enEstadia ? enEstadia.lugar : null);
-    // Dónde arranca y termina el día (para el recorrido en Google Maps)
-    const inicioLugar = enEstadia ? lugarAloj(datosAloj(v, enEstadia.id), enEstadia) : '';
-    const finLugar = durmiendo ? lugarAloj(datosAloj(v, durmiendo.id), durmiendo) : '';
-    return { fecha, numero: v.fechaInicio ? U.diasEntre(v.fechaInicio, fecha) + 1 : null, amaneces, dormis, items, lugar: lugarPrincipal, lugarNombre: (durmiendo || enEstadia || {}).nombre || '', inicioLugar, finLugar };
-  }
-
-  /* ---------------------------------------------------------
-     Render
-     --------------------------------------------------------- */
-
-  function render(v, cont) {
-    if (R.ideas) R.ideas.migrar(v);
-    const dias = diasDelViaje(v);
-    const avisos = C().validar(v).filter(a => a.nivel !== 'info' || /Faltan|Falta/.test(a.texto));
-    const hoy = U.hoyISO();
-    const fuera = (v.itinerario || []).filter(e => !aparte(e) && (!e.fecha || !dias.includes(e.fecha)));
-    const sinDia = R.ideas ? R.ideas.sinDia(v) : [];
-
-    cont.innerHTML = `
-      <div class="itin-cab">
-        <div class="itin-titulo">
-          <h2 class="titulo-seccion">Itinerario</h2>
-          <p class="texto-suave">${dias.length ? U.plural(dias.length, 'día', 'días') + ' de viaje' : 'Cargá las fechas y te armo los días.'}</p>
-        </div>
-        <div class="itin-acciones">
-          <button class="itin-accion" data-a="pdf"><span>📄</span>PDF</button>
-          <button class="itin-accion" data-a="compartir"><span>↗</span>Compartir</button>
-          <button class="itin-accion" data-a="ics"><span>📆</span>Calendario</button>
-          <button class="itin-accion" data-a="mapa"><span>🗺️</span>Mapa</button>
-        </div>
-      </div>
-
-      ${avisos.length ? `<div class="cr-avisos bloque">${avisos.map(a => `<p class="cr-aviso cr-${a.nivel}">${a.nivel === 'error' ? '⛔' : a.nivel === 'aviso' ? '⚠️' : 'ℹ️'} ${esc(a.texto)}</p>`).join('')}
-        <button class="btn btn-texto btn-chico solo-org" data-a="cronograma2">Corregir las fechas →</button></div>` : ''}
-      <div class="acciones-fila itin-crear solo-org">
-        <button class="btn btn-primario btn-chico" data-a="nuevo">+ Actividad</button>
-        <button class="btn btn-suave btn-chico" data-a="cronograma">📅 Fechas y traslados</button>
-      </div>
-      ${dias.length ? `<div class="linea-tiempo">${agruparDias(v, dias, hoy)}</div>` : ''}
-      ${fuera.length || sinDia.length ? `<section class="dia fuera"><header class="dia-cab"><div><strong>Para hacer, sin día</strong><small>Tocá cada una para elegirle el día</small></div></header>
-        ${sinDia.map(p => itemHTML({ hora: p.hora, icono: (R.ideas.ICONOS[p.tipo] || '📍'), titulo: p.titulo, sub: [p.zona, p.nota].filter(Boolean).join(' · '), plan: p.destId + '|' + p.id, docs: [] })).join('')}
-        ${fuera.map(e => itemHTML({ hora: e.hora, icono: tipo(e.tipo).icono, titulo: e.titulo, sub: [e.fecha ? U.fmtFecha(e.fecha, 'corto') : '', e.lugar].filter(Boolean).join(' · '), evento: e.id, docs: [] })).join('')}</section>` : ''}
-      ${!dias.length && !fuera.length && !sinDia.length ? `
-        <div class="vacio vacio-chico">
-          <div class="vacio-icono">🗓️</div>
-          <p>Cargá las fechas y acá aparece cada día del viaje.</p>
-          <button class="btn btn-primario solo-org" data-a="cronograma3">Cargar las fechas</button>
-        </div>` : ''}
-      ${R.ideas && R.ideas.cuenta(v) === 0 && dias.length ? `<p class="itin-que"><a href="#viaje/${v.id}/quehacer">🎟️ ¿Excursiones o lugares para visitar? Anotalos en Qué hacer →</a></p>` : ''}`;
-
-    cont.querySelectorAll('[data-a^="cronograma"]').forEach(b => b.onclick = () => editarCronograma(v));
-    const bNuevo = cont.querySelector('[data-a="nuevo"]');
-    if (bNuevo) bNuevo.onclick = () => editar(v);
-    cont.querySelector('[data-a="compartir"]').onclick = () => compartir(v);
-    cont.querySelector('[data-a="pdf"]').onclick = () => R.itinerarioPdf.descargar(v);
-    cont.querySelector('[data-a="ics"]').onclick = () => descargarICS(v);
-    cont.querySelector('[data-a="mapa"]').onclick = () => {
-      const { el } = U.modal({ titulo: 'Mapa del recorrido', ancho: true, cuerpo: `<div class="mapa-cont"></div>${R.gmaps && R.gmaps.paradasViaje(v).length > 1 ? '<button type="button" class="btn btn-suave btn-bloque mapa-gm" data-a="gmRuta">🗺️ Ver la ruta en Google Maps</button>' : ''}` });
-      R.mapa.mostrar(el.querySelector('.mapa-cont'), v);
-      const bGm = el.querySelector('[data-a="gmRuta"]');
-      if (bGm) bGm.onclick = () => { U.cerrarModal(); R.gmaps.abrirRutaViaje(v); };
-    };
-    cont.querySelectorAll('[data-agregar]').forEach(b => b.onclick = () => editar(v, null, b.dataset.agregar));
-    cont.querySelectorAll('[data-evento]').forEach(b => b.onclick = () => editar(v, b.dataset.evento));
-    enlazarDatos(cont, v);
-    cont.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const [d, id] = b.dataset.plan.split('|'); R.ideas.editar(v, d, id, () => render(v, cont)); });
-    cont.querySelectorAll('[data-doc]').forEach(b => b.onclick = e => { e.stopPropagation(); R.documentos.abrir(v.documentos.find(d => d.id === b.dataset.doc), v); });
-    if (R.ordenar) R.ordenar.enlazar(cont, v);
-    cargarClima(v, cont); cargarFeriados(v, cont);
-  }
-
-  /** Tocar un traslado, un check-in o "dónde dormís" abre sus datos para cambiarlos ahí mismo. */
-  function enlazarDatos(cont, v) {
-    cont.querySelectorAll('[data-dato]').forEach(b => b.onclick = e => {
-      const otro = e.target.closest('a, button');
-      if (otro && otro !== b) return;
-      editarDato(v, b.dataset.dato);
-    });
-  }
-  function editarDato(v, id) {
-    if (!R.db.puedeOrganizar(v)) return;
-    const t = R.motor.lista(v).find(x => x.id === id);
-    if (t && R.formularios.tiene(t)) R.formularios.abrir(v, id);
-    else if (/^t_segmento__/.test(id)) editarCronograma(v);
-  }
-
-  /** Abre la sección "Qué hacer" del viaje. */
-  function irAQueHacer(v) {
-    location.hash = `#viaje/${v.id}/quehacer`;
-  }
-
-  function itemHTML(it) {
-    return `
-      <article class="evento ${it.clase || ''} ${it.tareaId ? 'ev-editable' : ''}" ${it.evento ? `data-evento="${it.evento}"` : ''} ${it.plan ? `data-plan="${it.plan}"` : ''} ${it.tareaId ? `data-dato="${it.tareaId}"` : ''}>
-        <span class="ev-hora">${esc(it.hora || '—')}</span>
-        <span class="ev-icono">${it.icono}</span>
-        <div class="ev-texto">
-          <strong>${esc(it.titulo)}</strong>
-          ${it.sub ? `<small>${esc(it.sub)}</small>` : ''}
-          ${it.lugar && R.gmaps ? R.gmaps.enlaceItemHTML(it.lugar) : ''}
-          ${it.docs && it.docs.length ? `<span class="ev-docs">${it.docs.map(d => `<button class="doc-mini" data-doc="${d.id}">${R.documentos.iconoDoc(d)} ${esc(d.nombre)}</button>`).join('')}</span>` : ''}
-        </div>
-      </article>`;
-  }
-
-  /**
-   * Días seguidos sin nada en el mismo lugar se muestran juntos ("Días 2 a 4 · Iguazú").
-   * El alojamiento aparece una vez por lugar, no todos los días.
-   */
-  function agruparDias(v, dias, hoy) {
-    const ds = dias.map(f => diaDe(v, f));
-    const libre = d => !d.items.length && d.fecha !== hoy && d.lugarNombre && (!d.amaneces || d.amaneces === 'Amanecés en ' + d.lugarNombre);
-    const html = [];
-    let ultimoDormis = '';
-    for (let i = 0; i < ds.length; i++) {
-      const d = ds[i];
-      const dormisTxt = d.dormis ? d.dormis.texto : '';
-      const mostrarDormis = dormisTxt && dormisTxt !== ultimoDormis;
-      if (libre(d)) {
-        let j = i;
-        while (j + 1 < ds.length && libre(ds[j + 1]) && ds[j + 1].lugarNombre === d.lugarNombre && (ds[j + 1].dormis || {}).texto === dormisTxt) j++;
-        if (j > i) {
-          html.push(grupoHTML(d, ds[j], mostrarDormis ? d.dormis : null));
-          ultimoDormis = dormisTxt;
-          i = j;
-          continue;
-        }
-      }
-      html.push(diaHTML(v, d, d.fecha === hoy, mostrarDormis));
-      ultimoDormis = dormisTxt || ultimoDormis;
-    }
-    return html.join('');
-  }
-
-  function dormisHTML(dm) {
-    return dm ? `<p class="dia-linea dia-dormis ${dm.falta ? 'falta' : ''} ${dm.tareaId ? 'ev-editable' : ''}" ${dm.tareaId ? `data-dato="${dm.tareaId}"` : ''}>${dm.icono} ${esc(dm.texto)}${dm.direccion ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dm.direccion)}" target="_blank" rel="noopener">${esc(dm.direccion)}</a>` : ''}</p>` : '';
-  }
-
-  function grupoHTML(a, b, dormis) {
-    return `
-      <section class="dia dia-grupo" id="dia-${a.fecha}">
-        <header class="dia-cab">
-          <div>
-            <strong>Días ${a.numero} a ${b.numero} · ${esc(a.lugarNombre)}</strong>
-            <small>${U.fmtRango(a.fecha, b.fecha)} · días libres ☀️</small>
-          </div>
-          <button class="btn-icono solo-org" data-agregar="${a.fecha}" title="Agregar una actividad">+</button>
-        </header>
-        ${dormisHTML(dormis)}
-      </section>`;
-  }
-
-  function diaHTML(v, d, esHoy, mostrarDormis) {
-    return `
-      <section class="dia ${esHoy ? 'hoy' : ''}" id="dia-${d.fecha}">
-        <header class="dia-cab">
-          <div>
-            <strong>Día ${d.numero}${d.lugarNombre ? ' · ' + esc(d.lugarNombre) : ''}</strong>${esHoy ? ' <span class="chip chip-sol">Hoy</span>' : ''}
-            <small>${U.fmtFecha(d.fecha, 'largo')}</small>
-          </div>
-          <span class="dia-clima" data-clima-dia="${d.fecha}"></span>
-          <button class="btn-icono solo-org" data-agregar="${d.fecha}" title="Agregar a este día">+</button>
-        </header>
-        ${d.amaneces && d.amaneces !== 'Amanecés en ' + d.lugarNombre ? `<p class="dia-linea">🌅 ${esc(d.amaneces)}</p>` : ''}
-        ${enArgentina(v, d) ? `<p class="dia-linea dia-feriado" data-feriado-dia="${d.fecha}" hidden></p>` : ''}
-        ${alertaHTML(d)}
-        ${d.items.length ? d.items.map(itemHTML).join('') : '<p class="dia-libre">Día libre ☀️</p>'}
-        ${R.gmaps ? R.gmaps.enlaceDiaHTML(d) : ''}
-        ${mostrarDormis === false ? '' : dormisHTML(d.dormis)}
-      </section>`;
-  }
-
-  /** El día transcurre en Argentina (para marcar feriados). */
-  function enArgentina(v, d) {
-    const pais = d.lugar && d.lugar.codigoPais ? d.lugar.codigoPais : ((v.origen || {}).codigoPais || 'AR');
-    return pais === 'AR';
-  }
-  /** Marca los feriados de Argentina en los días del viaje. */
-  function cargarFeriados(v, cont) {
-    if (!R.feriados || !v.fechaInicio || !cont.querySelector('[data-feriado-dia]')) return;
-    R.feriados.entre(v.fechaInicio, v.fechaFin || v.fechaInicio).then(lista => lista.forEach(f => {
-      const x = cont.querySelector(`[data-feriado-dia="${f.fecha}"]`);
-      if (!x) return;
-      x.textContent = /puente/i.test(f.nombre) ? '📌 Día no laborable (puente turístico): puede haber comercios cerrados.' : `📌 Feriado: ${f.nombre}. Puede haber comercios cerrados.`;
-      x.hidden = false;
+    (v.alojamientos || []).filter(a => a.hasta === fecha).forEach(a => items.push({
+      id: a.id, alojamiento: true, hora: a.checkout || '', orden: a.checkout || '00', icono: '🛏️', titulo: `Check-out · ${a.nombre || 'alojamiento'}`, sub: '', lugar: a.direccion || '', clase: 'ev-aloj'
     }));
-  }
-
-  /** Lugar para el aviso de lluvia (se completa cuando llega el pronóstico). */
-  function alertaHTML(d) {
-    const aire = d.items.filter(i => i.aire);
-    if (!aire.length) return '';
-    const mover = aire.find(i => i.evento || i.plan);
-    return `<div class="dia-alerta" data-clima-alerta="${d.fecha}" data-que="${esc(aire.map(i => i.titulo).slice(0, 2).join(' y '))}" hidden>
-      <p></p>${mover ? `<button type="button" class="btn-texto-mini solo-org" ${mover.evento ? `data-evento="${mover.evento}"` : `data-plan="${mover.plan}"`}>Cambiar de día</button>` : ''}</div>`;
-  }
-  /** ¿Ese día se espera lluvia de verdad? (solo con pronóstico, no con la referencia del año pasado) */
-  function llueve(d) { return d && ((d.lluvia != null && d.lluvia >= 4) || (d.codigo != null && ((d.codigo >= 61 && d.codigo <= 67) || (d.codigo >= 80 && d.codigo <= 99)))); }
-
-  /** Completa el clima de cada día cuando llega (sin redibujar la pantalla). */
-  function cargarClima(v, cont) {
-    C().estadias(v).forEach(e => {
-      if (!e.desde || !e.hasta || e.lugar.lat == null) return;
-      R.clima.obtener(e.lugar.lat, e.lugar.lon, e.desde, e.hasta).then(datos => {
-        if (!datos) return;
-        datos.dias.forEach(d => {
-          const x = cont.querySelector(`[data-clima-dia="${d.fecha}"]`);
-          if (x && !x.textContent) x.innerHTML = `${R.clima.icono(d.codigo, d.lluvia)} ${d.max != null ? d.max + '°' : ''}<small>${d.min != null ? d.min + '°' : ''}</small>${datos.tipo === 'referencia' ? '<i title="Referencia: mismas fechas del año pasado">*</i>' : ''}`;
-          // Lluvia pronosticada + algo al aire libre: avisar
-          const al = cont.querySelector(`[data-clima-alerta="${d.fecha}"]`);
-          if (al && datos.tipo === 'pronostico' && llueve(d)) {
-            al.querySelector('p').textContent = `${d.codigo >= 95 ? '⛈️ Se esperan tormentas' : '🌧️ Se espera lluvia'}${d.lluvia ? ` (${Math.round(d.lluvia)} mm)` : ''} y tenés ${al.dataset.que} al aire libre. ¿Lo pasás a otro día o vas con piloto?`;
-            al.hidden = false;
-          }
-        });
+    A().delDia(v, fecha).forEach(it => {
+      const t = A().tipo(it.tipo);
+      items.push({
+        id: it.id, hora: it.hora || '', icono: t.icono, titulo: it.titulo || t.nombre, sub: detalleItem(it), nota: it.nota || '',
+        lugar: t.traslado ? '' : (it.lugar || ''), clase: t.traslado ? 'ev-traslado' : '', tipo: it.tipo,
+        docs: A().docsDe(v, it.id).length, checkin: it.fecha >= U.hoyISO() ? A().checkin(it) : null
       });
     });
-  }
-
-  /* ---------------------------------------------------------
-     Editor del cronograma (modal)
-     --------------------------------------------------------- */
-  function editarCronograma(v, opciones) {
-    const op = opciones || {};
-    const b = JSON.parse(JSON.stringify({ origen: v.origen, destinos: v.destinos, recorrido: v.recorrido }));
-    b.recorrido = C().construir(b.origen, b.destinos, b.recorrido, v.perfil.transporte);
-    const firma = r => C().todosLosSegmentos(r).map(x => `${x.seg.id}:${x.seg.sale.fecha}|${C().fechaLlega(x.seg)}|${x.seg.medio}|${x.seg.noche}`).join(',');
-    const antes = firma(v.recorrido);
-    U.modal({
-      titulo: 'Cronograma del viaje',
-      subtitulo: 'Fechas y horas de cada traslado. Las noches se calculan solas.',
-      ancho: true,
-      cuerpo: '<div id="editorCrono"></div>',
-      alAbrir: el => R.cronogramaEditor.montar(el.querySelector('#editorCrono'), b, { tareas: v.tareas }),
-      acciones: [
-        { texto: 'Cancelar' },
-        {
-          texto: 'Guardar', clase: 'btn-primario', onClick: () => {
-            const errores = C().validar({ recorrido: b.recorrido, destinos: b.destinos, tareas: v.tareas }).filter(a => a.nivel === 'error');
-            if (errores.length) { U.toast(errores[0].texto); return false; }
-            const confirmadosAntes = C().todosLosSegmentos(v.recorrido).filter(x => x.seg.estado === 'confirmado').map(x => x.seg.id);
-            v.recorrido = b.recorrido;
-            v.destinos = b.destinos;
-            v.perfil.transporte = C().medioPrincipal(v.recorrido);
-            C().recalcular(v);
-            R.db.guardarViaje(v);
-            R.app.refrescar();
-            const cambio = antes !== firma(v.recorrido);
-            const tocados = C().todosLosSegmentos(v.recorrido).filter(x => confirmadosAntes.includes(x.seg.id) && x.seg.estado !== 'confirmado');
-            if (op.alGuardar) { op.alGuardar(); return; }
-            if (!cambio) return;
-            if (tocados.length) {
-              setTimeout(() => U.confirmar(`Cambiaste ${U.plural(tocados.length, 'un traslado que ya estaba confirmado', 'traslados que ya estaban confirmados')}. ¿Armo un plan para revisar pasajes, alojamientos y reservas?`, {
-                titulo: 'Esto afecta reservas', textoSi: 'Sí, reorganizar', textoNo: 'No hace falta'
-              }).then(ok => {
-                if (!ok) return;
-                R.motor.replanificar(v, ['fechas'], 'Cambio en el cronograma');
-                R.db.guardarViaje(v);
-                R.app.refrescar();
-                R.vistaGuia.mostrarPlan(v, R.motor.ordenarPlan(v, R.motor.pasosARevisar(v)));
-              }), 300);
-            } else {
-              U.toast('Cronograma actualizado.');
-            }
-          }
-        }
-      ]
-    });
-  }
-
-  /* ---------------------------------------------------------
-     Compartir, imprimir y calendario
-     --------------------------------------------------------- */
-  function textoItinerario(v) {
-    const lineas = [`🧳 ${v.nombre || R.viajes.destinoCompleto(v)}`, U.fmtRango(v.fechaInicio, v.fechaFin), ''];
-    diasDelViaje(v).forEach(f => {
-      const d = diaDe(v, f);
-      lineas.push(`📅 Día ${d.numero} · ${U.fmtFecha(f, 'dia')}${d.lugarNombre ? ' · ' + d.lugarNombre : ''}`);
-      d.items.forEach(it => lineas.push(`• ${it.hora ? it.hora + ' ' : ''}${it.icono} ${it.titulo}${it.sub ? ' (' + it.sub + ')' : ''}`));
-      if (d.dormis) lineas.push(`${d.dormis.icono} ${d.dormis.texto}${d.dormis.direccion ? ' — ' + d.dormis.direccion : ''}`);
-      lineas.push('');
-    });
-    if (!diasDelViaje(v).length) {
-      C().todosLosSegmentos(v.recorrido).forEach(x => lineas.push(`• ${C().etiquetaSegmento(x.seg)}`));
-    }
-    lineas.push('Armado con Rutenda');
-    return lineas.join('\n');
-  }
-
-  function compartir(v) {
-    const texto = textoItinerario(v);
-    const { el } = U.modal({
-      titulo: 'Compartir itinerario',
-      cuerpo: `
-        <div class="opciones-compartir">
-          ${R.familia && R.db.modo() === 'nube' ? `<button class="btn btn-primario btn-bloque" data-a="familia">👪 Link para la familia${v.linkFamilia && v.linkFamilia.activo ? ' · activo' : ''}</button>` : ''}
-          <button class="btn ${R.familia && R.db.modo() === 'nube' ? 'btn-suave' : 'btn-primario'} btn-bloque" data-a="nativo">↗ Mandar el itinerario como texto</button>
-          <button class="btn btn-suave btn-bloque" data-a="copiar">📋 Copiar texto</button>
-          <button class="btn btn-suave btn-bloque" data-a="pdf">📄 Descargar PDF</button>
-          ${navigator.canShare ? '<button class="btn btn-suave btn-bloque" data-a="pdfCompartir">📤 Compartir el PDF</button>' : ''}
-          <button class="btn btn-suave btn-bloque" data-a="ics">📆 Agregar al calendario</button>
-        </div>
-        <pre class="vista-texto">${esc(texto)}</pre>`
-    });
-    const bFam = el.querySelector('[data-a="familia"]');
-    if (bFam) bFam.onclick = () => { U.cerrarModal(); R.familia.abrir(v); };
-    el.querySelector('[data-a="nativo"]').onclick = async () => {
-      if (navigator.share) {
-        try { await navigator.share({ title: v.nombre || 'Itinerario', text: texto }); } catch (e) { /* cancelado */ }
-      } else {
-        window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
-      }
+    (v.alojamientos || []).filter(a => a.desde === fecha).forEach(a => items.push({
+      id: a.id, alojamiento: true, hora: a.checkin || '', orden: a.checkin || '98', icono: '🛏️', titulo: `Check-in · ${a.nombre || 'alojamiento'}`,
+      sub: [a.direccion, a.codigo ? 'Cód. ' + a.codigo : ''].filter(Boolean).join(' · '), lugar: a.direccion || '', clase: 'ev-aloj', docs: A().docsDe(v, a.id).length
+    }));
+    // Sin hora: el check-out va primero, el check-in al final del día
+    items.sort((a, b) => (a.orden || a.hora || '99').localeCompare(b.orden || b.hora || '99'));
+    const lugarDe = a => a ? (a.direccion || a.nombre || '') : '';
+    return {
+      fecha, numero, items,
+      dormis: noche ? { icono: '🛏️', texto: noche.nombre || 'Alojamiento', direccion: noche.direccion || '', id: noche.id } : null,
+      amaneces: null, lugarNombre: ciudadDe(v, fecha), soloDia: false,
+      inicioLugar: lugarDe(anoche), finLugar: lugarDe(noche),
+      lugar: R.direcciones ? R.direcciones.cercaDe(v, null) : null
     };
-    el.querySelector('[data-a="copiar"]').onclick = async () => {
-      try { await navigator.clipboard.writeText(texto); U.toast('Itinerario copiado.'); } catch (e) { U.toast('No se pudo copiar.'); }
-    };
-    el.querySelector('[data-a="pdf"]').onclick = () => R.itinerarioPdf.descargar(v);
-    const pc = el.querySelector('[data-a="pdfCompartir"]');
-    if (pc) pc.onclick = () => R.itinerarioPdf.descargar(v, { compartir: true });
-    el.querySelector('[data-a="ics"]').onclick = () => descargarICS(v);
-  }
-
-  function imprimir(v) {
-    const marco = document.createElement('div');
-    marco.className = 'solo-impresion';
-    marco.innerHTML = `<h1>${esc(v.nombre || R.viajes.destinoCompleto(v))}</h1><p>${esc(U.fmtRango(v.fechaInicio, v.fechaFin))}</p>
-      ${R.cronogramaEditor.resumenHTML(v)}
-      ${diasDelViaje(v).map(f => diaHTML(v, diaDe(v, f), false)).join('')}`;
-    document.body.appendChild(marco);
-    document.body.classList.add('imprimiendo');
-    const limpiar = () => { document.body.classList.remove('imprimiendo'); marco.remove(); window.removeEventListener('afterprint', limpiar); };
-    window.addEventListener('afterprint', limpiar);
-    setTimeout(() => { window.print(); setTimeout(limpiar, 1500); }, 100);
-  }
-
-  function icsFecha(fecha, hora) { return fecha.replace(/-/g, '') + (hora ? 'T' + hora.replace(':', '') + '00' : ''); }
-  function icsTexto(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;'); }
-
-  /** Archivo .ics con traslados, check-in/out, escapadas y actividades. */
-  function generarICS(v) {
-    const ev = [];
-    const agregar = (fecha, hora, horaFin, fechaFin, zona, titulo, desc, lugar) => {
-      if (!fecha) return;
-      const uid = `${U.id('ics')}@rutenda`;
-      const lineas = ['BEGIN:VEVENT', `UID:${uid}`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)}Z`];
-      if (hora) {
-        const tz = zona ? `;TZID=${zona}` : '';
-        lineas.push(`DTSTART${tz}:${icsFecha(fecha, hora)}`);
-        if (horaFin) lineas.push(`DTEND${tz}:${icsFecha(fechaFin || fecha, horaFin)}`);
-        else lineas.push(`DURATION:PT1H`);
-      } else {
-        lineas.push(`DTSTART;VALUE=DATE:${icsFecha(fecha)}`, `DTEND;VALUE=DATE:${icsFecha(U.sumarDias(fechaFin || fecha, fechaFin && fechaFin !== fecha ? 0 : 1))}`);
-      }
-      lineas.push(`SUMMARY:${icsTexto(titulo)}`);
-      if (desc) lineas.push(`DESCRIPTION:${icsTexto(desc)}`);
-      if (lugar) lineas.push(`LOCATION:${icsTexto(lugar)}`);
-      lineas.push('END:VEVENT');
-      ev.push(lineas.join('\r\n'));
-    };
-    C().todosLosSegmentos(v.recorrido).forEach(x => {
-      const s = x.seg;
-      agregar(s.sale.fecha, s.sale.hora, s.llega.hora && C().fechaLlega(s) === s.sale.fecha ? s.llega.hora : '', '', s.desde.zona,
-        `${C().medio(s.medio).icono} ${s.desde.nombre} → ${s.hasta.nombre}`, R.cronogramaEditor.datosSegmento(v, s), s.desde.nombre);
-    });
-    C().estadias(v).forEach(e => {
-      const a = datosAloj(v, e.id);
-      if (a && a.checkinFecha) agregar(a.checkinFecha, a.checkinHora, '', '', e.lugar.zona, `🏨 Check-in ${a.nombre || e.nombre}`, a.codigo ? 'Código ' + a.codigo : '', a.direccion || e.nombre);
-      if (a && a.checkoutFecha) agregar(a.checkoutFecha, a.checkoutHora, '', '', e.lugar.zona, `🧳 Check-out ${a.nombre || e.nombre}`, '', a.direccion || e.nombre);
-    });
-    (v.destinos || []).filter(d => d.soloDia && d.fecha && !d.fechaPendiente).forEach(d => agregar(d.fecha, '', '', '', '', `☀️ Paseo de un día a ${d.nombre}`, '', d.nombre));
-    (v.itinerario || []).filter(e => e.fecha && !aparte(e)).forEach(e => agregar(e.fecha, e.hora, '', '', '', e.titulo, [e.confirmacion && 'Código ' + e.confirmacion, e.notas].filter(Boolean).join(' · '), e.lugar));
-    if (v.fechaInicio && v.fechaFin) agregar(v.fechaInicio, '', '', U.sumarDias(v.fechaFin, 1), '', `🧳 Viaje: ${v.nombre || R.viajes.destinoCompleto(v)}`, '', '');
-    return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Rutenda//ES', 'CALSCALE:GREGORIAN', `X-WR-CALNAME:${icsTexto(v.nombre || 'Rutenda')}`].concat(ev).concat(['END:VCALENDAR']).join('\r\n');
-  }
-
-  function descargarICS(v) {
-    const blob = new Blob([generarICS(v)], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `rutenda-${(v.nombre || v.destino || 'viaje').toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.ics`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-    U.toast('Abrí el archivo para sumarlo a tu calendario.');
   }
 
   /* ---------------------------------------------------------
-     Actividades propias
+     Vista
      --------------------------------------------------------- */
-  function editar(v, id, fechaSugerida) {
-    const existente = id ? v.itinerario.find(e => e.id === id) : null;
-    const e = existente || { fecha: fechaSugerida || v.fechaInicio || U.hoyISO(), hora: '', tipo: 'actividad', titulo: '', lugar: '', confirmacion: '', notas: '' };
-    const acciones = [{ texto: 'Cancelar' }];
-    if (existente) acciones.unshift({
-      texto: 'Eliminar', clase: 'btn-texto peligro', onClick: () => {
-        v.itinerario = v.itinerario.filter(x => x.id !== id);
-        R.db.guardarViaje(v);
-        R.app.refrescar();
-        U.toast('Eliminado del itinerario.');
-      }
-    });
-    acciones.push({
-      texto: 'Guardar', clase: 'btn-primario', onClick: el => {
-        const titulo = el.querySelector('#iTitulo').value.trim();
-        if (!titulo) { U.toast('Poné un título.'); return false; }
-        const nuevo = Object.assign({}, e, {
-          id: e.id || U.id('evt'),
-          fecha: el.querySelector('#iFecha').value,
-          hora: el.querySelector('#iHora').value,
-          tipo: el.querySelector('#iTipo').value,
-          titulo,
-          lugar: el.querySelector('#iLugar').value.trim(),
-          confirmacion: el.querySelector('#iConf').value.trim(),
-          notas: el.querySelector('#iNotas').value.trim()
-        });
-        if (existente) v.itinerario = v.itinerario.map(x => x.id === nuevo.id ? nuevo : x);
-        else v.itinerario.push(nuevo);
-        R.db.guardarViaje(v);
-        R.app.refrescar();
-        U.toast(existente ? 'Itinerario actualizado.' : 'Agregado al itinerario.');
-      }
-    });
-
-    U.modal({
-      titulo: existente ? 'Editar' : 'Agregar al itinerario',
-      cuerpo: `
-        ${existente && existente.origen ? `<p class="aviso-suave">🧭 Lo cargó el paso "${esc(R.motor.nombre(v, existente.origen))}". Si volvés a guardar ese paso, se actualiza.</p>` : ''}
-        <div class="chips-elegir" id="iTipos">${TIPOS.map(t => `<button type="button" class="chip-op ${e.tipo === t.id ? 'activo' : ''}" data-tipo="${t.id}">${t.icono} ${t.nombre}</button>`).join('')}</div>
-        <input type="hidden" id="iTipo" value="${esc(e.tipo)}">
-        <label class="campo"><span>Título *</span><input id="iTitulo" value="${esc(e.titulo)}" placeholder="Ej: visita guiada, cena especial"></label>
-        <div class="grilla-2">
-          <label class="campo"><span>Fecha</span><input type="date" id="iFecha" value="${esc(e.fecha)}" min="${esc(v.fechaInicio || '')}" max="${esc(v.fechaFin || '')}"></label>
-          <label class="campo"><span>Hora</span><input type="time" id="iHora" value="${esc(e.hora)}"></label>
-        </div>
-        <label class="campo"><span>Lugar</span><input id="iLugar" value="${esc(e.lugar)}" placeholder="Escribí el lugar y elegí de la lista"></label>
-        <label class="campo"><span>Código de reserva <small>(opcional)</small></span><input id="iConf" value="${esc(e.confirmacion)}"></label>
-        <label class="campo"><span>Notas</span><textarea id="iNotas" rows="2">${esc(e.notas)}</textarea></label>`,
-      acciones,
-      alAbrir: el => {
-        if (R.direcciones) {
-          const est = C().estadias(v).find(x => x.desde && x.desde <= e.fecha && e.fecha <= (x.hasta || x.desde));
-          R.direcciones.enlazar(el.querySelector('#iLugar'), { cerca: R.direcciones.cercaDe(v, est && est.lugar) });
-        }
-        el.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => {
-          el.querySelector('#iTipo').value = b.dataset.tipo;
-          el.querySelectorAll('[data-tipo]').forEach(x => x.classList.toggle('activo', x === b));
-        });
-      }
-    });
-  }
-
-  /* ---------------------------------------------------------
-     Modo viaje: el día de hoy
-     --------------------------------------------------------- */
-  /** "🕒 Hora local 15:30 · en casa 10:30" (solo si hay diferencia). */
-  function horaLocalHTML(v, d) {
-    const lugar = d.lugar;
-    const dif = C().difConCasa(v, lugar, d.fecha);
-    if (!dif) return '';
-    return `<p class="hora-local">🕒 Hora local <strong>${C().horaEn(lugar.zona)}</strong> · en casa ${C().horaEn(C().zonaCasa(v))} (${C().fmtDif(-dif)})</p>`;
-  }
-
-  function hoyHTML(v) {
-    const hoy = U.hoyISO();
-    if (!v.fechaInicio || hoy < v.fechaInicio || (v.fechaFin && hoy > v.fechaFin)) return '';
-    const d = diaDe(v, hoy);
-    const manana = v.fechaFin && hoy < v.fechaFin ? diaDe(v, U.sumarDias(hoy, 1)) : null;
-    const proximo = manana && manana.items.find(i => i.clase === 'ev-traslado');
+  function itemHTML(v, d, it) {
+    const ck = it.checkin;
     return `
-      <section class="modo-viaje bloque">
-        <div class="mv-cab">
-          <div><span class="etiqueta">Hoy en el viaje</span><h3>Día ${d.numero}${d.lugarNombre ? ' · ' + esc(d.lugarNombre) : ''}</h3><small>${U.fmtFecha(hoy, 'largo')}</small>${horaLocalHTML(v, d)}</div>
-          <span class="dia-clima" data-clima-dia="${hoy}"></span>
+      <button type="button" class="it2 ${it.clase || ''}" ${it.alojamiento ? `data-aloj="${it.id}"` : `data-item="${it.id}"`} data-dia="${d.fecha}">
+        <span class="it2-hora">${esc(it.hora || '')}</span>
+        <span class="it2-ico" aria-hidden="true">${it.icono}</span>
+        <span class="it2-texto">
+          <strong>${esc(it.titulo)}</strong>
+          ${it.sub ? `<small>${esc(it.sub)}</small>` : ''}
+          ${it.nota ? `<small class="it2-nota">${esc(it.nota)}</small>` : ''}
+          ${ck ? `<small class="it2-checkin">Check-in online desde el ${esc(U.fmtFecha(ck.fecha, 'dia'))}${ck.hora ? ' a las ' + esc(ck.hora) : ''}</small>` : ''}
+        </span>
+        ${it.docs ? `<span class="it2-docs" aria-label="${it.docs} archivos">📎${it.docs > 1 ? it.docs : ''}</span>` : ''}
+      </button>`;
+  }
+
+  function diaHTML(v, fecha, hoy, puede) {
+    const d = diaDe(v, fecha);
+    const ultimo = v.fechaFin && fecha >= v.fechaFin;
+    const enRango = !v.fechaInicio || (fecha >= v.fechaInicio && (!v.fechaFin || fecha <= v.fechaFin));
+    const ruta = R.gmaps ? R.gmaps.enlaceDiaHTML(d) : '';
+    return `
+      <section class="dia2 ${fecha === hoy ? 'hoy' : ''} ${fecha < hoy ? 'pasado' : ''}" id="dia-${fecha}" data-fecha="${fecha}">
+        <header class="dia2-cab">
+          <strong>${esc(U.fmtFecha(fecha, 'dia'))}</strong>
+          <span>${enRango ? 'Día ' + d.numero : 'Fuera de las fechas'}</span>
+          ${fecha === hoy ? '<em class="dia2-hoy">Hoy</em>' : ''}
+        </header>
+        <div class="dia2-items">
+          ${d.items.length ? d.items.map(it => itemHTML(v, d, it)).join('') : '<p class="dia2-libre">Día libre</p>'}
         </div>
-        ${d.items.length ? d.items.map(itemHTML).join('') : '<p class="dia-libre">Día libre ☀️ Disfrutalo.</p>'}
-          ${R.gmaps ? R.gmaps.enlaceDiaHTML(d) : ''}
-        ${d.dormis ? `<p class="dia-linea dia-dormis">${d.dormis.icono} ${esc(d.dormis.texto)}${d.dormis.direccion ? ` · <a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.dormis.direccion)}" target="_blank" rel="noopener">Cómo llegar</a>` : ''}</p>` : ''}
-        ${proximo ? `<p class="mv-manana">Mañana: ${proximo.icono} ${proximo.hora ? proximo.hora + ' · ' : ''}${esc(proximo.titulo)}</p>` : ''}
-        <a class="btn btn-suave btn-chico" href="#viaje/${v.id}/itinerario">Ver todo el itinerario →</a>
+        ${ruta}
+        <footer class="dia2-pie">
+          ${d.dormis
+            ? `<button type="button" class="dia2-noche" data-aloj="${d.dormis.id}"><span aria-hidden="true">🛏️</span><span>Dormís en <strong>${esc(d.dormis.texto)}</strong></span></button>`
+            : ultimo ? '<span class="dia2-noche sin"><span aria-hidden="true">🏠</span><span>Volvés a casa</span></span>'
+            : puede ? `<button type="button" class="dia2-noche sin" data-noche="${fecha}"><span aria-hidden="true">🛏️</span><span>¿Dónde dormís esta noche?</span></button>` : '<span></span>'}
+          ${puede ? `<button type="button" class="dia2-mas" data-agregar="${fecha}">+ Agregar</button>` : ''}
+        </footer>
       </section>`;
   }
 
-  /* ---------------------------------------------------------
-     Pestaña "Hoy": lo útil del día mientras viajás
-     --------------------------------------------------------- */
-  function renderHoy(v, cont) {
+  function render(v, cont) {
+    const puede = R.db.puedeOrganizar(v);
     const hoy = U.hoyISO();
-    const dias = diasDelViaje(v);
-    const d = diaDe(v, hoy);
-    const ultimo = v.fechaFin === hoy;
-    const manana = !ultimo && v.fechaFin ? diaDe(v, U.sumarDias(hoy, 1)) : null;
-    const gastoHoy = v.movimientos.filter(m => m.fecha === hoy).reduce((a, m) => a + (m.tipo === 'gasto' ? R.gastos.montoBase(v, m) : m.tipo === 'ingreso' ? -R.gastos.montoBase(v, m) : 0), 0);
-    // Lo de la guía que conviene hacer hoy (por ejemplo, el check-in que se habilitó)
-    const paraHoy = R.motor.analizar(v).filter(t => !t.resuelta && !t.esperaVentana && !t.rec && t.fechaLimite && t.fechaLimite >= hoy && t.fechaLimite <= U.sumarDias(hoy, 1)).slice(0, 3);
-    const dm = d.dormis;
+    const dias = A().dias(v);
+    const ideas = A().ideas(v);
     cont.innerHTML = `
-      <div class="hoy-vista">
-        <section class="hoy-cab">
-          <div>
-            <span class="etiqueta">Día ${d.numero} de ${dias.length}</span>
-            <h2>${d.lugarNombre ? esc(d.lugarNombre) : 'Hoy'}</h2>
-            <small>${U.fmtFecha(hoy, 'largo')}</small>
-            ${horaLocalHTML(v, d)}
-          </div>
-          <span class="dia-clima hoy-clima" data-clima-dia="${hoy}"></span>
-        </section>
-
-        ${R.salida ? R.salida.tarjetaHTML(v) : ''}
-        ${R.pasaje ? R.pasaje.html(v) : ''}
-        ${R.vuelta ? R.vuelta.tarjetaHTML(v) : ''}
-        ${dm && dm.falta && dm.tareaId && R.db.puedeOrganizar(v) ? `
-          <button type="button" class="hoy-falta" data-dato="${dm.tareaId}">
-            <span>🛏️</span><span class="hf-texto"><strong>¿Dónde dormís esta noche?</strong><small>Cargá el alojamiento: dirección, check-in y la reserva, para tenerlo a mano.</small></span><b>Cargar</b>
+      <div class="itin2">
+        ${puede ? `<div class="itin2-acciones">
+          <button type="button" class="btn btn-primario btn-chico" data-agregar="">+ Agregar</button>
+          ${R.importar ? '<button type="button" class="btn btn-suave btn-chico" data-a="pegar">🎫 Reserva</button>' : ''}
+          <button type="button" class="btn btn-suave btn-chico" data-a="nuevoAloj">🛏️ Alojamiento</button>
+        </div>` : ''}
+        ${ideas.length ? `
+          <button type="button" class="itin2-ideas" data-a="ideas">
+            <span><strong>${ideas.length === 1 ? '1 idea sin día' : ideas.length + ' ideas sin día'}</strong><small>${esc(ideas.slice(0, 4).map(i => i.titulo).join(' · '))}</small></span>
+            <b>Ubicar</b>
           </button>` : ''}
-        ${paraHoy.length ? `
-          <section class="bloque hoy-pendiente">
-            <h3 class="bloque-titulo">Para hacer hoy</h3>
-            ${paraHoy.map(t => `<button class="fila-siguiente" data-tarea-hoy="${t.id}"><span class="num">${R.guia.fase(t.fase).icono}</span><span class="fs-texto"><strong>${esc(t.titulo)}</strong></span></button>`).join('')}
-          </section>` : ''}
-
-        <section class="bloque">
-          <h3 class="bloque-titulo">Hoy</h3>
-          ${d.amaneces && d.amaneces !== 'Amanecés en ' + d.lugarNombre ? `<p class="dia-linea">🌅 ${esc(d.amaneces)}</p>` : ''}
-          ${enArgentina(v, d) ? `<p class="dia-linea dia-feriado" data-feriado-dia="${d.fecha}" hidden></p>` : ''}
-          ${alertaHTML(d)}
-          ${d.items.length ? d.items.map(itemHTML).join('') : '<p class="dia-libre">Día libre ☀️ Disfrutalo.</p>'}
-          ${R.gmaps ? R.gmaps.enlaceDiaHTML(d) : ''}
-          <button class="btn btn-texto btn-chico solo-org" data-a="actividad">+ Agregar algo a hoy</button>
-        </section>
-
-        ${dm ? `
-          <section class="bloque hoy-dormis ${dm.falta ? 'falta' : ''}">
-            <h3 class="bloque-titulo">Esta noche dormís en</h3>
-            <p><strong>${esc(dm.texto)}</strong></p>
-            ${dm.direccion ? `<a class="btn btn-suave btn-chico" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(dm.direccion)}" target="_blank" rel="noopener">📍 Cómo llegar</a>` : ''}
-            ${dm.tareaId && !dm.falta && R.db.puedeOrganizar(v) ? `<button type="button" class="btn btn-texto btn-chico" data-dato="${dm.tareaId}">Ver o cambiar los datos</button>` : ''}
-          </section>` : ''}
-
-        <section class="bloque hoy-gastos">
-          <div><small>Gastado hoy</small><strong>${U.fmtMoneda(gastoHoy, v.monedaBase)}</strong></div>
-          <button class="btn btn-primario" data-a="gasto">− Cargar gasto</button>
-        </section>
-        <button type="button" class="btn btn-texto btn-chico hoy-algo-mal" data-a="algoMal">🧭 ¿Algo salió mal? Qué hacer si…</button>
-
-        ${ultimo && !(R.vuelta && R.vuelta.aplica(v)) ? `
-          <section class="bloque">
-            <h3 class="bloque-titulo">🏠 Hoy volvés</h3>
-            <p class="texto-suave">Revisá que no quede nada en el alojamiento.</p>
-            <a class="btn btn-suave btn-chico" href="#viaje/${v.id}/valija">🧳 Valija de vuelta</a>
-          </section>` : manana ? `
-          <section class="bloque hoy-manana">
-            <h3 class="bloque-titulo">Mañana${manana.lugarNombre && manana.lugarNombre !== d.lugarNombre ? ' · ' + esc(manana.lugarNombre) : ''}</h3>
-            ${alertaHTML(manana)}
-            ${manana.items.length ? manana.items.slice(0, 3).map(itemHTML).join('') : '<p class="dia-libre">Día libre ☀️</p>'}
-          </section>` : ''}
-        ${R.db.puedeOrganizar(v) ? `<button type="button" class="btn ${d.fecha >= v.fechaFin ? 'btn-primario' : 'btn-suave'} btn-bloque hoy-llegue" data-a="yaLlegue">🏠 Ya llegué: terminar el viaje</button>` : ''}
-        ${R.reservas ? `<button type="button" class="rv-fila hoy-reservas" data-a="verReservas"><span class="rv-texto"><strong>🎫 Tus reservas</strong><small>Pasajes, alojamiento, auto y entradas: verlos o cargar datos</small></span><span class="rv-accion">Abrir</span></button>` : ''}
+        ${dias.length ? dias.map(f => diaHTML(v, f, hoy, puede)).join('') : `
+          ${U.vacio({ icono: '🗓️', titulo: 'Poné las fechas del viaje', texto: 'Con la ida y la vuelta se arman los días. Después cargás qué hacés cada día.', boton: puede ? 'Poner las fechas' : '', accion: 'fechas' })}`}
+        ${puede && dias.length ? '<p class="ayuda itin2-ayuda">Tocá algo para verlo o cambiarlo. Mantenelo apretado para pasarlo a otro día.</p>' : ''}
       </div>`;
-
-    cont.querySelector('[data-a="gasto"]').onclick = () => R.gastos.nuevo(v);
-    const bPreg = cont.querySelector('[data-a="preguntar"]');
-    if (bPreg) bPreg.onclick = () => R.preguntar.abrir(v);
-    const bMal = cont.querySelector('[data-a="algoMal"]');
-    if (bMal) bMal.onclick = () => R.queHacerSi.ir(v);
-    if (R.salida) R.salida.enlazar(cont, v);
-    if (R.pasaje) R.pasaje.enlazar(cont, v);
-    if (R.ordenar) R.ordenar.enlazar(cont, v);
-    if (R.vuelta) R.vuelta.enlazar(cont, v);
-    cargarFeriados(v, cont);
-    const bAct = cont.querySelector('[data-a="actividad"]');
-    if (bAct) bAct.onclick = () => editar(v, null, hoy);
-    cont.querySelectorAll('[data-tarea-hoy]').forEach(b => b.onclick = () => R.vistaGuia.abrirTarea(v, b.dataset.tareaHoy));
-    cont.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => { const [d, id] = b.dataset.plan.split('|'); R.ideas.editar(v, d, id, () => renderHoy(v, cont)); });
-    cont.querySelectorAll('[data-evento]').forEach(b => b.onclick = () => editar(v, b.dataset.evento));
-    enlazarDatos(cont, v);
-    const bLl = cont.querySelector('[data-a="yaLlegue"]');
-    if (bLl) bLl.onclick = () => R.viajes.finalizar(v);
-    const bRes = cont.querySelector('[data-a="verReservas"]');
-    if (bRes) bRes.onclick = () => { location.hash = `#viaje/${v.id}/reservas`; };
-    cont.querySelectorAll('[data-doc]').forEach(b => b.onclick = e => { e.stopPropagation(); R.documentos.abrir(v.documentos.find(x => x.id === b.dataset.doc), v); });
-    // Clima de hoy y de mañana (y aviso si llueve con planes al aire libre)
-    cargarClima(v, cont);
+    enlazar(v, cont);
+    // Viajando: arranca en el día de hoy
+    const hoyEl = cont.querySelector('.dia2.hoy');
+    if (hoyEl && !render._yaFue) { render._yaFue = v.id; setTimeout(() => hoyEl.scrollIntoView({ block: 'start', behavior: 'smooth' }), 120); }
   }
 
-  function enlazarHoy(cont, v) {
-    cont.querySelectorAll('.modo-viaje [data-doc]').forEach(b => b.onclick = () => R.documentos.abrir(v.documentos.find(d => d.id === b.dataset.doc), v));
-    const e = C().estadias(v).find(x => x.desde <= U.hoyISO() && U.hoyISO() <= x.hasta);
-    if (e && e.lugar.lat != null) R.clima.obtener(e.lugar.lat, e.lugar.lon, e.desde, e.hasta).then(datos => {
-      const d = datos && datos.dias.find(x => x.fecha === U.hoyISO());
-      const x = cont.querySelector(`.modo-viaje [data-clima-dia]`);
-      if (d && x) x.innerHTML = `${R.clima.icono(d.codigo, d.lluvia)} ${d.max}°<small>${d.min}°</small>`;
+  function enlazar(v, cont) {
+    const puede = R.db.puedeOrganizar(v);
+    const repintar = () => R.app.refrescar();
+    cont.querySelectorAll('[data-agregar]').forEach(b => b.onclick = () => editarItem(v, null, { fecha: b.dataset.agregar }));
+    cont.querySelectorAll('[data-noche]').forEach(b => b.onclick = () => elegirNoche(v, b.dataset.noche));
+    cont.querySelectorAll('[data-aloj]').forEach(b => b.onclick = () => editarAlojamiento(v, b.dataset.aloj));
+    const bp = cont.querySelector('[data-a="pegar"]');
+    if (bp) bp.onclick = () => R.importar.elegir(v);
+    const ba = cont.querySelector('[data-a="nuevoAloj"]');
+    if (ba) ba.onclick = () => editarAlojamiento(v, null, {});
+    const bi = cont.querySelector('[data-a="ideas"]');
+    if (bi) bi.onclick = () => { location.hash = `#viaje/${v.id}/pendientes`; };
+    const bf = cont.querySelector('[data-a="fechas"]');
+    if (bf) bf.onclick = () => R.viajes.editar(v);
+    if (R.ordenar) R.ordenar.enlazar(cont, v);
+    // Tocar: ver o cambiar. Mantener apretado: pasar a otro día.
+    cont.querySelectorAll('[data-item]').forEach(b => {
+      let reloj = null, largo = false;
+      const cancelar = () => { clearTimeout(reloj); reloj = null; };
+      b.addEventListener('pointerdown', () => {
+        largo = false;
+        if (!puede) return;
+        reloj = setTimeout(() => { largo = true; if (navigator.vibrate) navigator.vibrate(15); mover(v, b.dataset.item, repintar); }, 520);
+      });
+      ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => b.addEventListener(ev, cancelar));
+      b.addEventListener('contextmenu', e => e.preventDefault());
+      b.onclick = () => { if (largo) { largo = false; return; } editarItem(v, b.dataset.item); };
     });
   }
 
-  return { TIPOS, render, renderHoy, irAQueHacer, editar, editarCronograma, diaDe, diasDelViaje, hoyHTML, enlazarHoy, textoItinerario, generarICS, compartir };
+  /* ---------------------------------------------------------
+     Pasar algo a otro día (o devolverlo a "Quiero hacer")
+     --------------------------------------------------------- */
+  function opcionesDias(v, actual) {
+    return A().dias(v).map(f => `<button type="button" class="chip-dia ${f === actual ? 'activo' : ''}" data-mover="${f}">${esc(U.fmtFecha(f, 'dia'))}</button>`).join('');
+  }
+  function mover(v, id, alTerminar) {
+    const it = A().item(v, id);
+    if (!it) return;
+    const { el } = U.modal({
+      titulo: 'Pasar a otro día',
+      subtitulo: it.titulo,
+      cuerpo: `<div class="chips-dias">${opcionesDias(v, it.fecha)}</div>
+        <button type="button" class="btn btn-texto" data-mover="">↩︎ Sin día (vuelve a "Quiero hacer")</button>`
+    });
+    el.querySelectorAll('[data-mover]').forEach(b => b.onclick = () => {
+      it.fecha = b.dataset.mover;
+      A().guardarItem(v, it);
+      R.db.guardarViaje(v);
+      U.cerrarModal();
+      U.toast(it.fecha ? `Pasó al ${U.fmtFecha(it.fecha, 'dia')}.` : 'Volvió a "Quiero hacer".');
+      if (alTerminar) alTerminar(); else R.app.refrescar();
+    });
+  }
+
+  /* ---------------------------------------------------------
+     Agregar o cambiar algo del itinerario
+     --------------------------------------------------------- */
+  const CATEGORIA = { vuelo: 'transporte', micro: 'transporte', tren: 'transporte', barco: 'transporte', auto: 'transporte', traslado: 'transporte', comida: 'comida', paseo: 'actividades', excursion: 'actividades', entrada: 'actividades', otro: 'otros' };
+
+  /** El gasto que se cargó junto con algo del itinerario o un alojamiento. */
+  function gastoDe(v, id) { return (v.movimientos || []).find(m => m.origenItem === id) || null; }
+  function costoHTML(v, id) {
+    const g = gastoDe(v, id);
+    const varios = (v.participantes || []).length > 1;
+    const yo = R.db.yoEn(v);
+    const quien = g ? g.persona : yo;
+    return `
+      <div class="grilla-2">
+        <label class="campo"><span>Cuánto salió <small>(opcional)</small></span><input id="cMonto" inputmode="decimal" value="${g ? esc(g.monto) : ''}" placeholder="$ 0"></label>
+        ${varios ? `<label class="campo"><span>¿Quién pagó?</span><select id="cQuien">${v.participantes.map(p => `<option value="${p}" ${p === quien ? 'selected' : ''}>${esc((R.db.persona(p) || {}).nombre || 'Viajero')}</option>`).join('')}</select></label>` : ''}
+      </div>
+      <p class="ayuda">Se suma solo a Gastos${varios ? ', dividido entre todos' : ''}.</p>`;
+  }
+  function guardarCosto(v, el, id, concepto, categoria) {
+    const monto = U.numero((el.querySelector('#cMonto') || {}).value);
+    const g = gastoDe(v, id);
+    if (!monto) { if (g) v.movimientos = v.movimientos.filter(m => m !== g); return; }
+    const persona = (el.querySelector('#cQuien') || {}).value || (g && g.persona) || R.db.yoEn(v);
+    const nuevo = Object.assign(g || { id: U.id('mov'), tipo: 'gasto', fecha: U.hoyISO(), creado: new Date().toISOString(), moneda: v.monedaBase, cotizacion: 1, division: { modo: 'igual', entre: v.participantes.slice(), montos: {} } }, {
+      origenItem: id, concepto, categoria, monto, persona
+    });
+    if (!g) v.movimientos.push(nuevo);
+  }
+  function datalist(id, lista) { return `<datalist id="${id}">${lista.map(x => `<option value="${esc(x)}">`).join('')}</datalist>`; }
+
+  function editarItem(v, id, op) {
+    const o = op || {};
+    const puede = R.db.puedeOrganizar(v);
+    const existente = id ? A().item(v, id) : null;
+    const it = existente ? Object.assign({}, existente) : A().nuevoItem({ fecha: o.fecha || '', tipo: o.tipo || 'paseo', titulo: o.titulo || '' });
+    const archivos = [];
+    const docs = existente ? A().docsDe(v, it.id) : [];
+    const dias = A().dias(v);
+    const tiposBtn = A().ORDEN_TIPOS.filter(k => A().TIPOS_A_LA_VISTA.includes(k) || k === it.tipo).map(k => `<button type="button" class="chip-op ${it.tipo === k ? 'activo' : ''}" data-tipo="${k}">${A().TIPOS[k].icono} ${A().TIPOS[k].nombre}</button>`).join('');
+    const { el } = U.modal({
+      titulo: existente ? (puede ? 'Cambiar' : 'Detalle') : 'Agregar al itinerario',
+      cuerpo: `
+        <div class="form-item ${puede ? '' : 'solo-ver'}">
+          <div class="chips-elegir chips-chicos tipos-item">${tiposBtn}</div>
+          <div class="si-traslado">
+            <div class="grilla-2">
+              <label class="campo"><span>Desde</span><input id="iDesde" value="${esc(it.desde || '')}" placeholder="Ej: Buenos Aires"></label>
+              <label class="campo"><span>Hasta</span><input id="iHasta" value="${esc(it.hasta || '')}" placeholder="Ej: Bariloche"></label>
+            </div>
+          </div>
+          <label class="campo no-traslado"><span>¿Qué?</span><input id="iTitulo" value="${esc(it.titulo || '')}" placeholder="Ej: Cerro Campanario"></label>
+          <div class="grilla-2">
+            <label class="campo"><span>Día</span><select id="iFecha">
+              <option value="">Sin día (Quiero hacer)</option>
+              ${dias.map(f => `<option value="${f}" ${f === it.fecha ? 'selected' : ''}>${esc(U.fmtFecha(f, 'dia'))}</option>`).join('')}
+              ${it.fecha && !dias.includes(it.fecha) ? `<option value="${it.fecha}" selected>${esc(U.fmtFecha(it.fecha, 'dia'))}</option>` : ''}
+            </select></label>
+            <label class="campo"><span class="lbl-hora">Hora</span><input type="time" id="iHora" value="${esc(it.hora || '')}"></label>
+          </div>
+          <div class="si-traslado grilla-2">
+            <label class="campo"><span>Llega</span><input type="time" id="iLlega" value="${esc(it.horaLlegada || '')}"></label>
+            <label class="campo"><span>N° <small>(vuelo, servicio)</small></span><input id="iNumero" value="${esc(it.numero || '')}" autocapitalize="characters" placeholder="Ej: AR1672"></label>
+          </div>
+          <label class="campo no-traslado"><span>Dónde</span><input id="iLugar" value="${esc(it.lugar || '')}" placeholder="Escribí el lugar y elegí de la lista"></label>
+          <details class="mas-datos" ${it.empresa || it.codigo || it.nota || it.fechaLlegada || gastoDe(v, it.id) || docs.length ? 'open' : ''}>
+            <summary>Más datos <small>(opcional)</small></summary>
+            <div class="grilla-2 si-traslado">
+              <label class="campo"><span>Empresa</span><input id="iEmpresa" value="${esc(it.empresa || '')}" list="dlEmpresas" autocomplete="off"></label>
+              <label class="campo"><span>Llega otro día</span><input type="date" id="iFechaLlega" value="${esc(it.fechaLlegada && it.fechaLlegada !== it.fecha ? it.fechaLlegada : '')}"></label>
+            </div>
+            <label class="campo"><span>Código de reserva</span><input id="iCodigo" value="${esc(it.codigo || '')}" autocapitalize="characters"></label>
+            <label class="campo"><span>Notas</span><textarea id="iNota" rows="2" placeholder="Ej: llevar efectivo, asientos 14A y 14B">${esc(it.nota || '')}</textarea></label>
+            ${puede ? costoHTML(v, it.id) : ''}
+            ${docs.length ? `<div class="docs-item">${docs.map(d => `<button type="button" class="chip-doc" data-doc="${d.id}">📎 ${esc(d.nombre)}</button>`).join('')}</div>` : ''}
+            ${puede ? U.zonaArchivos('item', archivos, 'Sumar el pasaje, voucher o entrada', true) : ''}
+          </details>
+          ${datalist('dlEmpresas', A().usados('empresa'))}
+        </div>`,
+      acciones: puede ? [
+        ...(existente ? [{ texto: 'Borrar', clase: 'btn-texto peligro', onClick: () => { borrar(v, existente); return false; } }] : []),
+        { texto: 'Cancelar' },
+        { texto: 'Guardar', clase: 'btn-primario', onClick: el2 => guardar(el2) }
+      ] : [{ texto: 'Cerrar' }]
+    });
+    const form = el.querySelector('.form-item');
+    const pintarTipo = () => {
+      const tr = A().tipo(it.tipo).traslado;
+      form.classList.toggle('es-traslado', !!tr);
+      el.querySelector('.lbl-hora').textContent = tr ? 'Sale' : 'Hora';
+      el.querySelectorAll('[data-tipo]').forEach(b => b.classList.toggle('activo', b.dataset.tipo === it.tipo));
+    };
+    pintarTipo();
+    el.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => { if (!puede) return; it.tipo = b.dataset.tipo; pintarTipo(); });
+    const num = el.querySelector('#iNumero'), emp = el.querySelector('#iEmpresa');
+    num.addEventListener('change', () => { const a = A().aerolineaDe(num.value); if (a && !emp.value.trim()) emp.value = a; });
+    el.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => R.documentos.abrir((v.documentos || []).find(d => d.id === b.dataset.doc), v));
+    if (puede) U.enlazarArchivos(el, 'item', archivos, () => U.repintarArchivos(el, 'item', archivos, 'Sumar el pasaje, voucher o entrada', true));
+    if (R.direcciones) R.direcciones.enlazar(el.querySelector('#iLugar'), { cerca: R.direcciones.cercaDe(v, null) });
+    if (!puede) el.querySelectorAll('input, select, textarea').forEach(x => { x.disabled = true; });
+    if (!existente) setTimeout(() => { const f = A().tipo(it.tipo).traslado ? el.querySelector('#iDesde') : el.querySelector('#iTitulo'); if (f) f.focus(); }, 80);
+
+    function guardar(f) {
+      const val = s => (f.querySelector(s) || {}).value || '';
+      const tr = A().tipo(it.tipo).traslado;
+      it.fecha = val('#iFecha'); it.hora = val('#iHora');
+      it.lugar = tr ? '' : val('#iLugar').trim();
+      it.nota = val('#iNota').trim(); it.codigo = val('#iCodigo').trim().toUpperCase();
+      if (tr) {
+        it.desde = val('#iDesde').trim(); it.hasta = val('#iHasta').trim();
+        it.horaLlegada = val('#iLlega'); it.numero = val('#iNumero').trim().toUpperCase();
+        it.empresa = val('#iEmpresa').trim() || A().aerolineaDe(it.numero);
+        it.fechaLlegada = val('#iFechaLlega');
+        it.titulo = it.desde || it.hasta ? `${it.desde || '?'} → ${it.hasta || '?'}` : A().tipo(it.tipo).nombre;
+      } else {
+        it.titulo = val('#iTitulo').trim();
+        ['desde', 'hasta', 'horaLlegada', 'numero', 'empresa', 'fechaLlegada'].forEach(k => delete it[k]);
+        if (!it.titulo) { U.toast('Escribí qué es.'); return false; }
+      }
+      A().guardarItem(v, it);
+      guardarCosto(v, f, it.id, it.titulo, CATEGORIA[it.tipo] || 'otros');
+      const terminar = () => { R.db.guardarViaje(v); U.toast(it.fecha ? 'Guardado ✓' : 'Guardado en "Quiero hacer".'); R.app.refrescar(); };
+      if (archivos.length) R.documentos.guardarArchivos(v, archivos, { categoria: 'reserva', itemId: it.id }).then(terminar).catch(e => { U.toast(e.message); terminar(); });
+      else terminar();
+      return true;
+    }
+  }
+
+  async function borrar(v, it) {
+    const ok = await U.confirmar(`Se borra "${it.titulo}" del itinerario${gastoDe(v, it.id) ? ' y su gasto' : ''}.`, { titulo: 'Borrar', textoSi: 'Borrar', peligro: true });
+    if (!ok) return;
+    A().borrarItem(v, it.id);
+    R.db.guardarViaje(v);
+    R.app.refrescar();
+  }
+
+  /* ---------------------------------------------------------
+     Dónde dormís
+     --------------------------------------------------------- */
+  /** "¿Dónde dormís esta noche?": un alojamiento que ya cargaste (le suma la noche) o uno nuevo. */
+  function elegirNoche(v, fecha) {
+    const lista = v.alojamientos || [];
+    if (!lista.length) { editarAlojamiento(v, null, { desde: fecha }); return; }
+    const { el } = U.modal({
+      titulo: '¿Dónde dormís?',
+      subtitulo: 'La noche del ' + U.fmtFecha(fecha, 'largo'),
+      cuerpo: `<div class="menu-acciones">${lista.map(a => `<button type="button" class="menu-op" data-usar="${a.id}"><span>🛏️</span>${esc(a.nombre || 'Alojamiento')}</button>`).join('')}
+        <button type="button" class="menu-op" data-usar=""><span>＋</span>Otro alojamiento</button></div>`
+    });
+    el.querySelectorAll('[data-usar]').forEach(b => b.onclick = () => {
+      const a = A().alojamiento(v, b.dataset.usar);
+      if (!a) { editarAlojamiento(v, null, { desde: fecha }); return; }
+      if (!a.desde || fecha < a.desde) a.desde = fecha;
+      if (!a.hasta || fecha >= a.hasta) a.hasta = U.sumarDias(fecha, 1);
+      A().guardarAlojamiento(v, a);
+      R.db.guardarViaje(v);
+      U.cerrarModal();
+      R.app.refrescar();
+      U.toast(`Esa noche: ${a.nombre || 'alojamiento'} ✓`);
+    });
+  }
+
+  function editarAlojamiento(v, id, op) {
+    const o = op || {};
+    const puede = R.db.puedeOrganizar(v);
+    const existente = id ? A().alojamiento(v, id) : null;
+    const a = existente ? Object.assign({}, existente) : { id: U.id('al'), nombre: '', direccion: '', desde: o.desde || v.fechaInicio || '', hasta: o.desde ? U.sumarDias(o.desde, 1) : (v.fechaFin || ''), checkin: '', checkout: '', codigo: '', nota: '' };
+    const archivos = [];
+    const docs = existente ? A().docsDe(v, a.id) : [];
+    const noches = () => { const n = el.querySelector('#aDesde').value && el.querySelector('#aHasta').value ? U.diasEntre(el.querySelector('#aDesde').value, el.querySelector('#aHasta').value) : 0; return n > 0 ? U.plural(n, 'noche', 'noches') : ''; };
+    const { el } = U.modal({
+      titulo: existente ? (a.nombre || 'Alojamiento') : 'Alojamiento',
+      cuerpo: `
+        <div class="form-item">
+          <label class="campo"><span>Nombre</span><input id="aNombre" value="${esc(a.nombre)}" list="dlAloj" autocomplete="off" placeholder="Ej: Hotel Patagonia, depto de Airbnb"></label>
+          <label class="campo"><span>Dirección</span><input id="aDir" value="${esc(a.direccion)}" placeholder="Escribí el hotel o la calle y elegí de la lista"></label>
+          <div class="grilla-2">
+            <label class="campo"><span>Entrás <small>(check-in)</small></span><input type="date" id="aDesde" value="${esc(a.desde)}"></label>
+            <label class="campo"><span>Salís <small>(check-out)</small></span><input type="date" id="aHasta" value="${esc(a.hasta)}"></label>
+          </div>
+          <p class="ayuda" id="aNoches">${esc(a.desde && a.hasta && a.hasta > a.desde ? U.plural(U.diasEntre(a.desde, a.hasta), 'noche', 'noches') : '')}</p>
+          <details class="mas-datos" ${a.codigo || a.nota || a.checkin || a.checkout || gastoDe(v, a.id) || docs.length ? 'open' : ''}>
+            <summary>Más datos <small>(opcional)</small></summary>
+            <div class="grilla-2">
+              <label class="campo"><span>Hora de check-in</span><input type="time" id="aIn" value="${esc(a.checkin)}"></label>
+              <label class="campo"><span>Hora de check-out</span><input type="time" id="aOut" value="${esc(a.checkout)}"></label>
+            </div>
+            <label class="campo"><span>Código de reserva</span><input id="aCodigo" value="${esc(a.codigo)}"></label>
+            <label class="campo"><span>Notas</span><textarea id="aNota" rows="2" placeholder="Ej: teléfono, desayuno, cómo retirar la llave">${esc(a.nota)}</textarea></label>
+            ${puede ? costoHTML(v, a.id) : ''}
+            ${docs.length ? `<div class="docs-item">${docs.map(d => `<button type="button" class="chip-doc" data-doc="${d.id}">📎 ${esc(d.nombre)}</button>`).join('')}</div>` : ''}
+            ${puede ? U.zonaArchivos('aloj', archivos, 'Sumar la reserva o el voucher', true) : ''}
+          </details>
+          ${datalist('dlAloj', A().usados('alojamiento'))}
+        </div>`,
+      acciones: puede ? [
+        ...(existente ? [{ texto: 'Borrar', clase: 'btn-texto peligro', onClick: () => { borrarAloj(v, existente); return false; } }] : []),
+        { texto: 'Cancelar' },
+        { texto: 'Guardar', clase: 'btn-primario', onClick: el2 => guardar(el2) }
+      ] : [{ texto: 'Cerrar' }]
+    });
+    ['#aDesde', '#aHasta'].forEach(s => el.querySelector(s).addEventListener('change', () => { el.querySelector('#aNoches').textContent = noches(); }));
+    el.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => R.documentos.abrir((v.documentos || []).find(d => d.id === b.dataset.doc), v));
+    if (puede) U.enlazarArchivos(el, 'aloj', archivos, () => U.repintarArchivos(el, 'aloj', archivos, 'Sumar la reserva o el voucher', true));
+    if (R.direcciones) R.direcciones.enlazar(el.querySelector('#aDir'), { cerca: R.direcciones.cercaDe(v, null) });
+    if (!puede) el.querySelectorAll('input, select, textarea').forEach(x => { x.disabled = true; });
+
+    function guardar(f) {
+      const val = s => (f.querySelector(s) || {}).value || '';
+      a.nombre = val('#aNombre').trim(); a.direccion = val('#aDir').trim();
+      a.desde = val('#aDesde'); a.hasta = val('#aHasta');
+      a.checkin = val('#aIn'); a.checkout = val('#aOut'); a.codigo = val('#aCodigo').trim(); a.nota = val('#aNota').trim();
+      if (!a.nombre) { U.toast('Escribí el nombre del alojamiento.'); return false; }
+      if (a.desde && a.hasta && a.hasta <= a.desde) { U.toast('La salida tiene que ser después de la entrada.'); return false; }
+      A().guardarAlojamiento(v, a);
+      guardarCosto(v, f, a.id, a.nombre, 'alojamiento');
+      const terminar = () => { R.db.guardarViaje(v); U.toast('Guardado ✓'); R.app.refrescar(); };
+      if (archivos.length) R.documentos.guardarArchivos(v, archivos, { categoria: 'reserva', itemId: a.id }).then(terminar).catch(e => { U.toast(e.message); terminar(); });
+      else terminar();
+      return true;
+    }
+  }
+
+  async function borrarAloj(v, a) {
+    const ok = await U.confirmar(`Se borra "${a.nombre}"${gastoDe(v, a.id) ? ' y su gasto' : ''}.`, { titulo: 'Borrar alojamiento', textoSi: 'Borrar', peligro: true });
+    if (!ok) return;
+    A().borrarAlojamiento(v, a.id);
+    R.db.guardarViaje(v);
+    R.app.refrescar();
+  }
+
+  /* ---------------------------------------------------------
+     Hoy, en el inicio (cuando estás viajando)
+     --------------------------------------------------------- */
+  function hoyHTML(v) {
+    const hoy = U.hoyISO();
+    const d = diaDe(v, hoy);
+    return `
+      <section class="hoy2" data-hoy="${v.id}">
+        <div class="hoy2-cab"><strong>Hoy · Día ${d.numero || 1}</strong><a href="#viaje/${v.id}/itinerario">Ver todo →</a></div>
+        ${d.items.length ? d.items.slice(0, 5).map(it => `<a class="hoy2-fila" href="#viaje/${v.id}/itinerario"><span class="it2-hora">${esc(it.hora || '')}</span><span aria-hidden="true">${it.icono}</span><span>${esc(it.titulo)}</span></a>`).join('') : '<p class="dia2-libre">Día libre</p>'}
+        ${d.dormis ? `<p class="hoy2-noche">🛏️ Dormís en <strong>${esc(d.dormis.texto)}</strong>${d.dormis.direccion && R.gmaps ? ` · <a href="${esc(R.gmaps.comoLlegar(d.dormis.direccion))}" target="_blank" rel="noopener">Cómo llegar</a>` : ''}</p>` : ''}
+      </section>`;
+  }
+  function enlazarHoy() { /* los enlaces van directo al itinerario */ }
+
+  return { render, diaDe, diasDelViaje, editarItem, editarAlojamiento, elegirNoche, mover, hoyHTML, enlazarHoy, gastoDe };
 })();

@@ -1,10 +1,10 @@
 /* =========================================================
    Rutenda — recordatorios
-   - Calcula qué avisarte y cuándo (check-in, pasos que vencen,
-     valija, el día antes, el día a día del viaje).
-   - Los muestra en el inicio de la app (avisos de hoy).
-   - En modo nube los guarda en tu perfil: el servidor los manda
-     como notificación push a las 9 de la mañana de ese día.
+   Solo lo que pediste: un pendiente con fecha y "Avisame ese
+   día al celular". Nada automático.
+   - En el inicio de la app aparece ese día.
+   - En modo nube se guarda en tu perfil y el servidor lo manda
+     como notificación a la mañana de ese día.
    ========================================================= */
 window.R = window.R || {};
 
@@ -15,59 +15,16 @@ R.recordatorios = (function () {
   let firmaEnviada = '';
 
   /* ---------------------------------------------------------
-     Qué avisar
+     Qué avisar: los pendientes que pediste
      --------------------------------------------------------- */
   function delViaje(v) {
-    const r = [];
     const hoy = U.hoyISO();
-    if (v.ejemplo || v.finalizado || !v.fechaInicio || (v.fechaFin && v.fechaFin < hoy)) return r;
-    const url = id => `#viaje/${v.id}/${id || 'guia'}`;
-    const nombre = v.nombre || v.destino || 'tu viaje';
-    const agregar = (fecha, id, titulo, cuerpo, pestana) => {
-      if (fecha && fecha >= hoy) r.push({ id: `${v.id}_${id}_${fecha}`, viajeId: v.id, fecha, titulo, cuerpo, url: url(pestana) });
-    };
-
-    // Check-in de cada vuelo (cuando lo habilita la aerolínea)
-    R.recorrido.todosLosSegmentos(v.recorrido).forEach(x => {
-      const s = x.seg;
-      if (s.medio !== 'avion' || !s.sale || !s.sale.fecha) return;
-      const tarea = 's_checkin__' + s.id;
-      if (R.motor.resuelta(v, tarea)) return;
-      const det = R.cronogramaEditor.datosSegmento(v, s);
-      // El día que la aerolínea lo habilita (JetSMART 72 h, Aerolíneas 24 h…)
-      const k = R.guia.checkin(v, s);
-      const cuando = U.diasEntre(k.fecha, s.sale.fecha);
-      agregar(k.fecha, 'checkin_' + s.id, '✈️ Ya podés hacer el check-in',
-        `${s.desde.nombre} → ${s.hasta.nombre}, sale ${cuando === 0 ? 'hoy' : cuando === 1 ? 'mañana' : 'el ' + U.fmtFecha(s.sale.fecha, 'dia')}${s.sale.hora ? ' ' + s.sale.hora : ''}${det ? ' · ' + det : ''}${k.hora ? ` (se habilita a las ${k.hora})` : ''}.`, 'guia');
-    });
-
-    // Pasos de la guía que vencen pronto: un solo aviso por día y por viaje
-    const porDia = {};
-    R.motor.analizar(v).filter(t => !t.rec && !t.resuelta && !t.esperaVentana && t.fechaLimite && t.base !== 's_checkin').forEach(t => {
-      const f = t.fechaLimite <= U.sumarDias(hoy, 3) ? hoy : U.sumarDias(t.fechaLimite, -3);
-      (porDia[f] = porDia[f] || []).push(t);
-    });
-    Object.entries(porDia).forEach(([f, lista]) => {
-      lista.sort((a, b) => b.orden - a.orden);
-      agregar(f, 'pasos', `📋 ${nombre}: ${lista.length === 1 ? 'se acerca un paso' : `se acercan ${lista.length} pasos`}`,
-        lista.slice(0, 3).map(t => t.titulo).join(' · ') + (lista.length > 3 ? '…' : ''), 'guia');
-    });
-
-    // Valija una semana antes, repaso el mismo día que salís
-    if (!R.motor.resuelta(v, 's_valija')) agregar(U.sumarDias(v.fechaInicio, -7), 'valija', `🧳 Falta una semana para ${nombre}`, 'Buen momento para armar la valija con la lista paso a paso.', 'valija');
-    agregar(v.fechaInicio, 'manana', `🌅 Hoy empieza ${nombre}`, 'Documentos, pasajes y valija: el repaso antes de salir está en Rutenda.', 'itinerario');
-
-    // Durante el viaje: el resumen de cada día y la valija de vuelta
-    R.itinerario.diasDelViaje(v).forEach(f => {
-      if (f === v.fechaFin && f !== v.fechaInicio) {
-        agregar(f, 'vuelta', '🏠 Hoy volvés', 'Revisá la valija de vuelta y que no quede nada en el alojamiento.', 'valija');
-        return;
-      }
-      const d = R.itinerario.diaDe(v, f);
-      const cosas = d.items.filter(i => i.titulo).slice(0, 3).map(i => `${i.hora ? i.hora + ' ' : ''}${i.titulo}`);
-      agregar(f, 'hoy', `☀️ Día ${d.numero}${d.lugarNombre ? ' en ' + d.lugarNombre : ''}`, cosas.length ? cosas.join(' · ') : 'Día libre. ¡Disfrutalo!', 'itinerario');
-    });
-    return r;
+    if (v.ejemplo) return [];
+    const nombre = R.viajes ? R.viajes.nombreDe(v) : (v.nombre || 'tu viaje');
+    return (v.pendientes || []).filter(p => p.aviso && p.fecha && !p.hecho && p.fecha >= hoy).map(p => ({
+      id: `${v.id}_pend_${p.id}_${p.fecha}`, viajeId: v.id, fecha: p.fecha,
+      titulo: `✅ ${p.texto}`, cuerpo: `Pendiente de ${nombre}`, url: `#viaje/${v.id}/pendientes`
+    }));
   }
 
   function todos() {
@@ -82,7 +39,7 @@ R.recordatorios = (function () {
   function avisosHTML() {
     const hoy = U.hoyISO();
     const vistos = descartados();
-    const lista = todos().filter(a => a.fecha === hoy && !vistos[a.id] && !/_hoy_/.test(a.id));
+    const lista = todos().filter(a => a.fecha === hoy && !vistos[a.id]);
     if (!lista.length) return '';
     return `<section class="avisos-hoy">${lista.slice(0, 4).map(a => `
       <div class="aviso-hoy">

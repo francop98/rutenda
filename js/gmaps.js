@@ -47,19 +47,10 @@ R.gmaps = (function () {
 
   /* ---------- Viaje completo ---------- */
   /** Las ciudades del viaje en el orden en que las recorrés (incluye la vuelta a casa). */
-  function paradasViaje(v) {
-    const segs = R.recorrido.todosLosSegmentos(v.recorrido || []).map(x => x.seg).filter(s => s.desde && s.hasta);
-    if (!segs.length) {
-      const ds = (v.destinos || []).filter(d => d.nombre);
-      return [v.origen].concat(ds).filter(x => x && x.nombre);
-    }
-    const r = [segs[0].desde];
-    segs.forEach(s => r.push(s.hasta));
-    return r.filter((x, i) => x && x.nombre && (i === 0 || normal(x.nombre) !== normal(r[i - 1].nombre)));
-  }
+  function paradasViaje(v) { return R.agenda.paradas(v).filter(x => x && x.nombre); }
   /** Modo para Google Maps: en auto, "manejando"; si no, que Google elija. */
   function modoViaje(v) {
-    const segs = R.recorrido.todosLosSegmentos(v.recorrido || []).map(x => x.seg);
+    const segs = R.agenda.segmentos(v);
     return segs.length && segs.every(s => s.medio === 'auto') ? 'driving' : '';
   }
   function rutaViaje(v) { return ruta(paradasViaje(v).map(textoLugar), modoViaje(v)); }
@@ -67,8 +58,8 @@ R.gmaps = (function () {
   /** Cartel con la ruta completa y cada tramo por separado. */
   function abrirRutaViaje(v) {
     const paradas = paradasViaje(v);
-    if (paradas.length < 2) { U.toast('Cargá los destinos del viaje para ver la ruta.'); return; }
-    const segs = R.recorrido.todosLosSegmentos(v.recorrido || []).map(x => x.seg).filter(s => s.desde && s.hasta && s.desde.nombre && s.hasta.nombre);
+    if (paradas.length < 2) { U.toast('Cargá los lugares del viaje (o los traslados en el itinerario) para ver la ruta.'); return; }
+    const segs = R.agenda.segmentos(v).filter(s => s.desde.nombre && s.hasta.nombre);
     const hayVuelos = segs.some(s => s.medio === 'avion' || s.medio === 'barco');
     U.modal({
       titulo: '🗺️ La ruta en Google Maps',
@@ -79,7 +70,7 @@ R.gmaps = (function () {
         ${segs.length ? `
           <h4 class="titulo-paso">Cada tramo</h4>
           <ul class="gm-tramos">${segs.map(s => {
-            const m = R.recorrido.medio(s.medio);
+            const m = R.agenda.MEDIOS[s.medio] || R.agenda.MEDIOS.otro;
             const modo = s.medio === 'auto' ? 'driving' : (s.medio === 'micro' || s.medio === 'tren') ? 'transit' : '';
             return `<li><span>${m.icono}</span><span class="gm-texto">${esc(s.desde.nombre)} → ${esc(s.hasta.nombre)}</span>
               <a class="btn-texto-mini" href="${esc(ruta([textoLugar(s.desde), textoLugar(s.hasta)], modo))}" target="_blank" rel="noopener">Ver</a></li>`;
