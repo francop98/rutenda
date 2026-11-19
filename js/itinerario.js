@@ -274,7 +274,7 @@ R.itinerario = (function () {
           <div class="form-opcional">
             <div class="grilla-2 si-traslado">
               <label class="campo"><span>Empresa <small>(opcional)</small></span><input id="iEmpresa" value="${esc(it.empresa || '')}" list="dlEmpresas" autocomplete="off"></label>
-              <label class="campo"><span>Llega otro día <small>(opcional)</small></span><input type="date" id="iFechaLlega" value="${esc(it.fechaLlegada && it.fechaLlegada !== it.fecha ? it.fechaLlegada : '')}"></label>
+              <label class="campo"><span>Llega otro día <small>(opcional)</small></span><input type="date" id="iFechaLlega" value="${esc(it.fechaLlegada && it.fechaLlegada !== it.fecha ? it.fechaLlegada : '')}" ${it.fecha ? `min="${it.fecha}"` : ''}></label>
             </div>
             <label class="campo"><span>Código de reserva <small>(opcional)</small></span><input id="iCodigo" value="${esc(it.codigo || '')}" autocapitalize="characters"></label>
             <label class="campo"><span>Notas <small>(opcional)</small></span><textarea id="iNota" rows="2" placeholder="Ej: llevar efectivo, asientos 14A y 14B">${esc(it.nota || '')}</textarea></label>
@@ -299,6 +299,8 @@ R.itinerario = (function () {
     };
     pintarTipo();
     el.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => { if (!puede) return; it.tipo = b.dataset.tipo; pintarTipo(); });
+    const fSale = el.querySelector('#iFecha'), fLlega = el.querySelector('#iFechaLlega');
+    fSale.addEventListener('change', () => { fLlega.min = fSale.value || ''; if (fLlega.value && fLlega.value < fSale.value) fLlega.value = ''; });
     const num = el.querySelector('#iNumero'), emp = el.querySelector('#iEmpresa');
     num.addEventListener('change', () => { const a = A().aerolineaDe(num.value); if (a && !emp.value.trim()) emp.value = a; });
     el.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => R.documentos.abrir((v.documentos || []).find(d => d.id === b.dataset.doc), v));
@@ -390,7 +392,7 @@ R.itinerario = (function () {
           <label class="campo"><span>Dirección <small>(opcional)</small></span><input id="aDir" value="${esc(a.direccion)}" placeholder="Escribí el hotel o la calle y elegí de la lista"></label>
           <div class="grilla-2">
             <label class="campo"><span>Entrás <small>(check-in)</small></span><input type="date" id="aDesde" value="${esc(a.desde)}"></label>
-            <label class="campo"><span>Salís <small>(check-out)</small></span><input type="date" id="aHasta" value="${esc(a.hasta)}"></label>
+            <label class="campo"><span>Salís <small>(check-out)</small></span><input type="date" id="aHasta" value="${esc(a.hasta)}" ${a.desde ? `min="${a.desde}"` : ''}></label>
           </div>
           <p class="ayuda" id="aNoches">${esc(a.desde && a.hasta && a.hasta > a.desde ? U.plural(U.diasEntre(a.desde, a.hasta), 'noche', 'noches') : '')}</p>
           <div class="form-opcional">
@@ -413,6 +415,7 @@ R.itinerario = (function () {
       ] : [{ texto: 'Cerrar' }]
     });
     ['#aDesde', '#aHasta'].forEach(s => el.querySelector(s).addEventListener('change', () => { el.querySelector('#aNoches').textContent = noches(); }));
+    el.querySelector('#aDesde').addEventListener('change', e => { el.querySelector('#aHasta').min = e.target.value || ''; });
     el.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => R.documentos.abrir((v.documentos || []).find(d => d.id === b.dataset.doc), v));
     if (puede) U.enlazarArchivos(el, 'aloj', archivos, () => U.repintarArchivos(el, 'aloj', archivos, 'Sumar la reserva o el voucher', true));
     if (R.direcciones) R.direcciones.enlazar(el.querySelector('#aDir'), { cerca: R.direcciones.cercaDe(v, null) });
