@@ -3,6 +3,8 @@
    Rutas:
      #inicio                 → mis viajes
      #viaje/{id}/{pestaña}   → un viaje (itinerario, pendientes, gastos, valija, documentos, viajeros)
+     #nuevo                  → crear un viaje (página 1)
+     #armar/{id}/{paso}      → datos, transporte o noches
      #personas               → compañeros de viaje
      #valijas                → mis listas de valija
      #unirse/{codigo}        → sumarse a un viaje compartido
@@ -46,7 +48,9 @@
       a.classList.toggle('activo', a.dataset.nav === vista || (vista === 'viaje' && a.dataset.nav === 'viajes'));
     });
 
-    if (vista === 'unirse' && id) {
+    if (vista === 'nuevo' || (vista === 'armar' && id)) {
+      R.armar.render(app, vista, id, pestana);
+    } else if (vista === 'unirse' && id) {
       R.participantes.renderUnirse(app, id);
     } else if (vista === 'viaje' && id) {
       const v = R.db.viaje(id);
@@ -465,10 +469,11 @@
   document.getElementById('btnCargarBarra').onclick = () => R.cargar.abrir();
   /* ---------- Botón "Volver" en todas las pantallas (menos el inicio) ---------- */
   const pila = [];
-  const clavePila = h => { const p = (h || '#inicio').replace(/^#/, '').split('/'); return p[0] === 'viaje' ? 'viaje/' + p[1] : p[0] || 'inicio'; };
+  const clavePila = h => { const p = (h || '#inicio').replace(/^#/, '').split('/'); return p[0] === 'viaje' || p[0] === 'armar' ? p[0] + '/' + p[1] : p[0] || 'inicio'; };
   function padre(h) {
     const p = (h || '').replace(/^#/, '').split('/');
     if (p[0] === 'viaje') return '#viajes';
+    if (p[0] === 'armar') return '#viaje/' + p[1];
     return '#inicio';
   }
   function anotarRuta() {

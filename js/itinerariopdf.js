@@ -123,7 +123,7 @@ R.itinerarioPdf = (function () {
         const alto = 9 + lin.length * 4.3;
         espacio(alto + 2);
         color(MAR_CLARO, 'f'); doc.roundedRect(M, y - 4.5, ANCHO, alto, 2, 2, 'F');
-        color(TINTA); fuente('bold', 10.5); doc.text(limpio(a.nombre || 'Alojamiento'), M + 4, y + 1.5);
+        color(TINTA); fuente('bold', 10.5); doc.text(limpio(R.agenda.nombreAlojamiento(a)), M + 4, y + 1.5);
         color(SUAVE); fuente('normal', 8.5); doc.text(limpio(fechas), M + ANCHO - 4, y + 1.5, { align: 'right' });
         if (lin.length) { color(TINTA); fuente('normal', 9); doc.text(lin, M + 4, y + 6.8); }
         y += alto + 2;

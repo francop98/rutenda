@@ -42,9 +42,11 @@ R.agenda = (function () {
     return items(v).filter(it => it.fecha === fecha).sort((a, b) => (a.hora || '99').localeCompare(b.hora || '99'));
   }
   /** "Quiero hacer allá": lo que todavía no tiene día. */
-  function ideas(v) { return items(v).filter(it => !it.fecha); }
+  function ideas(v) { return items(v).filter(it => !it.fecha && !it.tramo); }
   function item(v, id) { return items(v).find(it => it.id === id) || null; }
   function alojamiento(v, id) { return (v.alojamientos || []).find(a => a.id === id) || null; }
+  /** "Hotel Patagonia", o "Alojamiento en Bariloche" si todavía no tiene nombre. */
+  function nombreAlojamiento(a) { return (a && a.nombre) || (a && a.ciudad ? `Alojamiento en ${a.ciudad}` : 'Alojamiento'); }
 
   /** Dónde dormís la noche de esa fecha (la que vos cargaste; nunca se deduce). */
   function nocheDe(v, fecha) {
@@ -279,7 +281,7 @@ R.agenda = (function () {
 
   return {
     TIPOS, ORDEN_TIPOS, TIPOS_A_LA_VISTA, MEDIOS, tipo, esTraslado,
-    items, delDia, ideas, item, alojamiento, nocheDe, dias, docsDe,
+    items, delDia, ideas, item, alojamiento, nombreAlojamiento, nocheDe, dias, docsDe,
     nuevoItem, guardarItem, borrarItem, guardarAlojamiento, borrarAlojamiento,
     segmentos, paradas, medioPrincipal, etiquetaSegmento, lugarConocido, checkin, aerolineaDe, usados, migrar
   };

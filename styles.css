@@ -2588,3 +2588,62 @@ button.dia2-noche:hover { background: var(--mar-claro); }
 .modal .form-item { padding: 0; border: 0; background: none; }
 .modal .form-item .campo input, .modal .form-item .campo select, .modal .form-item .campo textarea { background: var(--arena); }
 .pend2-nuevo .btn { font-size: 1.5rem; line-height: 1; font-weight: 500; }
+
+/* Armar el viaje (3 páginas) */
+.armar { max-width: 640px; margin: 0 auto; padding: 18px 0 110px; }
+.armar-pasos { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0 0 18px; }
+.armar-pasos li { flex: 1; }
+.armar-pasos a { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 6px; border-radius: 999px; background: var(--arena-2); color: var(--tinta-suave); font-size: .82rem; font-weight: 600; text-decoration: none; }
+.armar-pasos a[href] { cursor: pointer; }
+.armar-pasos span { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; background: var(--papel); font-size: .74rem; }
+.armar-pasos li.activo a { background: var(--mar); color: var(--sobre-mar); }
+.armar-pasos li.activo span { background: var(--sobre-mar); color: var(--mar); }
+.armar-titulo { font-size: 1.8rem; margin: 0 0 4px; }
+.armar-sub { margin: 0 0 16px; }
+.armar-sub2 { margin: 22px 0 10px; font-size: 1.25rem; }
+.armar-cuerpo { background: var(--papel); border: 1px solid var(--linea); border-radius: var(--radio); padding: 18px 16px 6px; box-shadow: var(--sombra); }
+.armar-pie { position: sticky; bottom: calc(70px + env(safe-area-inset-bottom)); display: flex; justify-content: space-between; gap: 10px; margin-top: 14px; padding: 10px 0; background: linear-gradient(transparent, var(--arena) 30%); }
+.armar-pie .btn { flex: 1; }
+@media (min-width: 761px) { .armar-pie { bottom: 0; } }
+.fv-destinos { list-style: none; padding: 0; margin: 0 0 10px; display: grid; gap: 10px; }
+.fv-destino { display: flex; align-items: flex-start; gap: 8px; padding: 10px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--arena); }
+.fv-num { flex: none; width: 26px; height: 26px; margin-top: 10px; border-radius: 50%; background: var(--mar); color: var(--sobre-mar); display: grid; place-items: center; font-size: .8rem; font-weight: 700; }
+.fv-destino-campos { flex: 1; min-width: 0; }
+.fv-destino-acc { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.check-chico { font-size: .86rem; color: var(--tinta-suave); margin-top: 6px; }
+.tramos { display: grid; gap: 12px; margin-bottom: 12px; }
+.tramo { padding: 12px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--arena); }
+.tramo-cab { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.tramo-cab > div { display: flex; flex-direction: column; min-width: 0; }
+.tramo-cab small { color: var(--tinta-suave); font-size: .82rem; }
+.tramo-num { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--mar); color: var(--sobre-mar); display: grid; place-items: center; font-size: .8rem; font-weight: 700; }
+.tramo-medios { margin-bottom: 10px; }
+.tramo .campo { margin-bottom: 8px; }
+.tramo .campo input { background: var(--papel); }
+.noches { display: grid; gap: 8px; }
+.noche { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 4px 10px; padding: 8px 10px; border: 1px solid var(--linea); border-radius: var(--radio-chico); }
+.noche.pregunta { border-color: var(--terracota); background: var(--terracota-claro); }
+.noche-fecha { font-weight: 600; font-size: .9rem; }
+.noche-fecha::first-letter { text-transform: uppercase; }
+.noche select { min-width: 0; padding: 8px 10px; border: 1px solid var(--linea); border-radius: 10px; background: var(--papel); color: var(--tinta); font: inherit; font-size: .9rem; }
+.noche-nota { grid-column: 1 / -1; color: var(--terracota-oscuro); font-size: .82rem; }
+.alojs { display: grid; gap: 10px; margin-bottom: 8px; }
+.aloj-armar { padding: 12px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--arena); }
+.aloj-armar > small { display: block; color: var(--tinta-suave); font-size: .84rem; margin: 2px 0 10px; }
+.aloj-armar .campo { margin-bottom: 8px; }
+.aloj-armar .campo input { background: var(--papel); }
+.falta-armar { display: grid; gap: 6px; padding: 12px; border: 1px dashed var(--terracota); border-radius: var(--radio-chico); background: var(--terracota-claro); margin-bottom: 4px; }
+.falta-armar > strong { font-size: .88rem; color: var(--terracota-oscuro); }
+.falta-fila { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--papel); color: var(--tinta); text-decoration: none; }
+.falta-fila > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; }
+.falta-fila small { color: var(--tinta-suave); font-size: .82rem; }
+.falta-fila b { color: var(--terracota-oscuro); font-size: .86rem; }
+.form-opcional { border-top: 1px dashed var(--linea); padding-top: 12px; margin-top: 4px; }
+.pend2-bloque .falta-armar { margin-bottom: 12px; }
+.fv-destino-pie { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.fv-destino-pie .check { flex: 1; margin: 0; }
+.fv-destino .lugar-caja, .fv-destino .lugar-input { width: 100%; }
+.tramo-horas { display: grid; grid-template-columns: auto minmax(0, 1.5fr) minmax(0, 1fr); align-items: center; gap: 8px; }
+.tramo-horas > span { font-size: .84rem; font-weight: 600; color: var(--tinta-suave); }
+.tramo-horas input { min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid var(--linea); border-radius: 10px; background: var(--papel); color: var(--tinta); font: inherit; font-size: .9rem; }
+.tramo-horas input:focus { outline: none; border-color: var(--mar); box-shadow: 0 0 0 3px var(--mar-claro); }

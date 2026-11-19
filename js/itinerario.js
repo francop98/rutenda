@@ -49,7 +49,7 @@ R.itinerario = (function () {
     const noche = A().nocheDe(v, fecha);
     const items = [];
     (v.alojamientos || []).filter(a => a.hasta === fecha).forEach(a => items.push({
-      id: a.id, alojamiento: true, hora: a.checkout || '', orden: a.checkout || '00', icono: '🛏️', titulo: `Check-out · ${a.nombre || 'alojamiento'}`, sub: '', lugar: a.direccion || '', clase: 'ev-aloj'
+      id: a.id, alojamiento: true, hora: a.checkout || '', orden: a.checkout || '00', icono: '🛏️', titulo: `Check-out · ${A().nombreAlojamiento(a)}`, sub: '', lugar: a.direccion || '', clase: 'ev-aloj'
     }));
     A().delDia(v, fecha).forEach(it => {
       const t = A().tipo(it.tipo);
@@ -60,7 +60,7 @@ R.itinerario = (function () {
       });
     });
     (v.alojamientos || []).filter(a => a.desde === fecha).forEach(a => items.push({
-      id: a.id, alojamiento: true, hora: a.checkin || '', orden: a.checkin || '98', icono: '🛏️', titulo: `Check-in · ${a.nombre || 'alojamiento'}`,
+      id: a.id, alojamiento: true, hora: a.checkin || '', orden: a.checkin || '98', icono: '🛏️', titulo: `Check-in · ${A().nombreAlojamiento(a)}`,
       sub: [a.direccion, a.codigo ? 'Cód. ' + a.codigo : ''].filter(Boolean).join(' · '), lugar: a.direccion || '', clase: 'ev-aloj', docs: A().docsDe(v, a.id).length
     }));
     // Sin hora: el check-out va primero, el check-in al final del día
@@ -68,7 +68,9 @@ R.itinerario = (function () {
     const lugarDe = a => a ? (a.direccion || a.nombre || '') : '';
     return {
       fecha, numero, items,
-      dormis: noche ? { icono: '🛏️', texto: noche.nombre || 'Alojamiento', direccion: noche.direccion || '', id: noche.id } : null,
+      dormis: noche ? { icono: '🛏️', texto: A().nombreAlojamiento(noche), direccion: noche.direccion || '', id: noche.id }
+        : (v.noches || {})[fecha] === 'viaje' ? { icono: '🚌', texto: 'Viajando', viaje: true }
+        : (v.noches || {})[fecha] === 'casa' ? { icono: '🏠', texto: 'En casa', casa: true } : null,
       amaneces: null, lugarNombre: ciudadDe(v, fecha), soloDia: false,
       inicioLugar: lugarDe(anoche), finLugar: lugarDe(noche),
       lugar: R.direcciones ? R.direcciones.cercaDe(v, null) : null
@@ -111,8 +113,9 @@ R.itinerario = (function () {
         </div>
         ${ruta}
         <footer class="dia2-pie">
-          ${d.dormis
+          ${d.dormis && d.dormis.id
             ? `<button type="button" class="dia2-noche" data-aloj="${d.dormis.id}"><span aria-hidden="true">🛏️</span><span>Dormís en <strong>${esc(d.dormis.texto)}</strong></span></button>`
+            : d.dormis ? `<button type="button" class="dia2-noche" ${puede ? `data-noche="${fecha}"` : 'disabled'}><span aria-hidden="true">${d.dormis.icono}</span><span>${d.dormis.viaje ? 'Esta noche, <strong>viajando</strong>' : 'Esta noche, <strong>en casa</strong>'}</span></button>`
             : ultimo ? '<span class="dia2-noche sin"><span aria-hidden="true">🏠</span><span>Volvés a casa</span></span>'
             : puede ? `<button type="button" class="dia2-noche sin" data-noche="${fecha}"><span aria-hidden="true">🛏️</span><span>¿Dónde dormís esta noche?</span></button>` : '<span></span>'}
           ${puede ? `<button type="button" class="dia2-mas" data-agregar="${fecha}">+ Agregar</button>` : ''}
@@ -127,6 +130,7 @@ R.itinerario = (function () {
     const ideas = A().ideas(v);
     cont.innerHTML = `
       <div class="itin2">
+        ${R.armar ? R.armar.faltaHTML(v) : ''}
         ${puede ? `<div class="itin2-acciones">
           <button type="button" class="btn btn-primario btn-chico" data-agregar="">+ Agregar</button>
           ${R.importar ? '<button type="button" class="btn btn-suave btn-chico" data-a="pegar">🎫 Reserva</button>' : ''}
@@ -267,18 +271,17 @@ R.itinerario = (function () {
             <label class="campo"><span>N° <small>(vuelo, servicio)</small></span><input id="iNumero" value="${esc(it.numero || '')}" autocapitalize="characters" placeholder="Ej: AR1672"></label>
           </div>
           <label class="campo no-traslado"><span>Dónde</span><input id="iLugar" value="${esc(it.lugar || '')}" placeholder="Escribí el lugar y elegí de la lista"></label>
-          <details class="mas-datos" ${it.empresa || it.codigo || it.nota || it.fechaLlegada || gastoDe(v, it.id) || docs.length ? 'open' : ''}>
-            <summary>Más datos <small>(opcional)</small></summary>
+          <div class="form-opcional">
             <div class="grilla-2 si-traslado">
-              <label class="campo"><span>Empresa</span><input id="iEmpresa" value="${esc(it.empresa || '')}" list="dlEmpresas" autocomplete="off"></label>
-              <label class="campo"><span>Llega otro día</span><input type="date" id="iFechaLlega" value="${esc(it.fechaLlegada && it.fechaLlegada !== it.fecha ? it.fechaLlegada : '')}"></label>
+              <label class="campo"><span>Empresa <small>(opcional)</small></span><input id="iEmpresa" value="${esc(it.empresa || '')}" list="dlEmpresas" autocomplete="off"></label>
+              <label class="campo"><span>Llega otro día <small>(opcional)</small></span><input type="date" id="iFechaLlega" value="${esc(it.fechaLlegada && it.fechaLlegada !== it.fecha ? it.fechaLlegada : '')}"></label>
             </div>
-            <label class="campo"><span>Código de reserva</span><input id="iCodigo" value="${esc(it.codigo || '')}" autocapitalize="characters"></label>
-            <label class="campo"><span>Notas</span><textarea id="iNota" rows="2" placeholder="Ej: llevar efectivo, asientos 14A y 14B">${esc(it.nota || '')}</textarea></label>
+            <label class="campo"><span>Código de reserva <small>(opcional)</small></span><input id="iCodigo" value="${esc(it.codigo || '')}" autocapitalize="characters"></label>
+            <label class="campo"><span>Notas <small>(opcional)</small></span><textarea id="iNota" rows="2" placeholder="Ej: llevar efectivo, asientos 14A y 14B">${esc(it.nota || '')}</textarea></label>
             ${puede ? costoHTML(v, it.id) : ''}
             ${docs.length ? `<div class="docs-item">${docs.map(d => `<button type="button" class="chip-doc" data-doc="${d.id}">📎 ${esc(d.nombre)}</button>`).join('')}</div>` : ''}
             ${puede ? U.zonaArchivos('item', archivos, 'Sumar el pasaje, voucher o entrada', true) : ''}
-          </details>
+          </div>
           ${datalist('dlEmpresas', A().usados('empresa'))}
         </div>`,
       acciones: puede ? [
@@ -344,14 +347,21 @@ R.itinerario = (function () {
   /** "¿Dónde dormís esta noche?": un alojamiento que ya cargaste (le suma la noche) o uno nuevo. */
   function elegirNoche(v, fecha) {
     const lista = v.alojamientos || [];
-    if (!lista.length) { editarAlojamiento(v, null, { desde: fecha }); return; }
     const { el } = U.modal({
       titulo: '¿Dónde dormís?',
       subtitulo: 'La noche del ' + U.fmtFecha(fecha, 'largo'),
-      cuerpo: `<div class="menu-acciones">${lista.map(a => `<button type="button" class="menu-op" data-usar="${a.id}"><span>🛏️</span>${esc(a.nombre || 'Alojamiento')}</button>`).join('')}
-        <button type="button" class="menu-op" data-usar=""><span>＋</span>Otro alojamiento</button></div>`
+      cuerpo: `<div class="menu-acciones">${lista.map(a => `<button type="button" class="menu-op" data-usar="${a.id}"><span>🛏️</span>${esc(A().nombreAlojamiento(a))}</button>`).join('')}
+        <button type="button" class="menu-op" data-usar=""><span>＋</span>Otro alojamiento</button>
+        <button type="button" class="menu-op" data-usar="viaje"><span>🚌</span>Viajando (micro, avión…)</button>
+        <button type="button" class="menu-op" data-usar="casa"><span>🏠</span>En casa</button></div>`
     });
     el.querySelectorAll('[data-usar]').forEach(b => b.onclick = () => {
+      if (b.dataset.usar === 'viaje' || b.dataset.usar === 'casa') {
+        v.noches = Object.assign({}, v.noches, { [fecha]: b.dataset.usar });
+        R.db.guardarViaje(v); U.cerrarModal(); R.app.refrescar();
+        return;
+      }
+      if (v.noches) delete v.noches[fecha];
       const a = A().alojamiento(v, b.dataset.usar);
       if (!a) { editarAlojamiento(v, null, { desde: fecha }); return; }
       if (!a.desde || fecha < a.desde) a.desde = fecha;
@@ -360,7 +370,7 @@ R.itinerario = (function () {
       R.db.guardarViaje(v);
       U.cerrarModal();
       R.app.refrescar();
-      U.toast(`Esa noche: ${a.nombre || 'alojamiento'} ✓`);
+      U.toast(`Esa noche: ${A().nombreAlojamiento(a)} ✓`);
     });
   }
 
@@ -373,28 +383,27 @@ R.itinerario = (function () {
     const docs = existente ? A().docsDe(v, a.id) : [];
     const noches = () => { const n = el.querySelector('#aDesde').value && el.querySelector('#aHasta').value ? U.diasEntre(el.querySelector('#aDesde').value, el.querySelector('#aHasta').value) : 0; return n > 0 ? U.plural(n, 'noche', 'noches') : ''; };
     const { el } = U.modal({
-      titulo: existente ? (a.nombre || 'Alojamiento') : 'Alojamiento',
+      titulo: existente ? A().nombreAlojamiento(a) : 'Alojamiento',
       cuerpo: `
         <div class="form-item">
-          <label class="campo"><span>Nombre</span><input id="aNombre" value="${esc(a.nombre)}" list="dlAloj" autocomplete="off" placeholder="Ej: Hotel Patagonia, depto de Airbnb"></label>
-          <label class="campo"><span>Dirección</span><input id="aDir" value="${esc(a.direccion)}" placeholder="Escribí el hotel o la calle y elegí de la lista"></label>
+          <label class="campo"><span>Nombre${a.ciudad ? ' <small>(opcional)</small>' : ''}</span><input id="aNombre" value="${esc(a.nombre)}" list="dlAloj" autocomplete="off" placeholder="${esc(a.ciudad ? 'Alojamiento en ' + a.ciudad : 'Ej: Hotel Patagonia, depto de Airbnb')}"></label>
+          <label class="campo"><span>Dirección <small>(opcional)</small></span><input id="aDir" value="${esc(a.direccion)}" placeholder="Escribí el hotel o la calle y elegí de la lista"></label>
           <div class="grilla-2">
             <label class="campo"><span>Entrás <small>(check-in)</small></span><input type="date" id="aDesde" value="${esc(a.desde)}"></label>
             <label class="campo"><span>Salís <small>(check-out)</small></span><input type="date" id="aHasta" value="${esc(a.hasta)}"></label>
           </div>
           <p class="ayuda" id="aNoches">${esc(a.desde && a.hasta && a.hasta > a.desde ? U.plural(U.diasEntre(a.desde, a.hasta), 'noche', 'noches') : '')}</p>
-          <details class="mas-datos" ${a.codigo || a.nota || a.checkin || a.checkout || gastoDe(v, a.id) || docs.length ? 'open' : ''}>
-            <summary>Más datos <small>(opcional)</small></summary>
+          <div class="form-opcional">
             <div class="grilla-2">
               <label class="campo"><span>Hora de check-in</span><input type="time" id="aIn" value="${esc(a.checkin)}"></label>
               <label class="campo"><span>Hora de check-out</span><input type="time" id="aOut" value="${esc(a.checkout)}"></label>
             </div>
-            <label class="campo"><span>Código de reserva</span><input id="aCodigo" value="${esc(a.codigo)}"></label>
-            <label class="campo"><span>Notas</span><textarea id="aNota" rows="2" placeholder="Ej: teléfono, desayuno, cómo retirar la llave">${esc(a.nota)}</textarea></label>
+            <label class="campo"><span>Código de reserva <small>(opcional)</small></span><input id="aCodigo" value="${esc(a.codigo)}"></label>
+            <label class="campo"><span>Notas <small>(opcional)</small></span><textarea id="aNota" rows="2" placeholder="Ej: teléfono, desayuno, cómo retirar la llave">${esc(a.nota)}</textarea></label>
             ${puede ? costoHTML(v, a.id) : ''}
             ${docs.length ? `<div class="docs-item">${docs.map(d => `<button type="button" class="chip-doc" data-doc="${d.id}">📎 ${esc(d.nombre)}</button>`).join('')}</div>` : ''}
             ${puede ? U.zonaArchivos('aloj', archivos, 'Sumar la reserva o el voucher', true) : ''}
-          </details>
+          </div>
           ${datalist('dlAloj', A().usados('alojamiento'))}
         </div>`,
       acciones: puede ? [
@@ -414,10 +423,10 @@ R.itinerario = (function () {
       a.nombre = val('#aNombre').trim(); a.direccion = val('#aDir').trim();
       a.desde = val('#aDesde'); a.hasta = val('#aHasta');
       a.checkin = val('#aIn'); a.checkout = val('#aOut'); a.codigo = val('#aCodigo').trim(); a.nota = val('#aNota').trim();
-      if (!a.nombre) { U.toast('Escribí el nombre del alojamiento.'); return false; }
+      if (!a.nombre && !a.ciudad) { U.toast('Escribí el nombre del alojamiento.'); return false; }
       if (a.desde && a.hasta && a.hasta <= a.desde) { U.toast('La salida tiene que ser después de la entrada.'); return false; }
       A().guardarAlojamiento(v, a);
-      guardarCosto(v, f, a.id, a.nombre, 'alojamiento');
+      guardarCosto(v, f, a.id, A().nombreAlojamiento(a), 'alojamiento');
       const terminar = () => { R.db.guardarViaje(v); U.toast('Guardado ✓'); R.app.refrescar(); };
       if (archivos.length) R.documentos.guardarArchivos(v, archivos, { categoria: 'reserva', itemId: a.id }).then(terminar).catch(e => { U.toast(e.message); terminar(); });
       else terminar();
@@ -426,7 +435,7 @@ R.itinerario = (function () {
   }
 
   async function borrarAloj(v, a) {
-    const ok = await U.confirmar(`Se borra "${a.nombre}"${gastoDe(v, a.id) ? ' y su gasto' : ''}.`, { titulo: 'Borrar alojamiento', textoSi: 'Borrar', peligro: true });
+    const ok = await U.confirmar(`Se borra "${A().nombreAlojamiento(a)}"${gastoDe(v, a.id) ? ' y su gasto' : ''}.`, { titulo: 'Borrar alojamiento', textoSi: 'Borrar', peligro: true });
     if (!ok) return;
     A().borrarAlojamiento(v, a.id);
     R.db.guardarViaje(v);
@@ -443,7 +452,8 @@ R.itinerario = (function () {
       <section class="hoy2" data-hoy="${v.id}">
         <div class="hoy2-cab"><strong>Hoy · Día ${d.numero || 1}</strong><a href="#viaje/${v.id}/itinerario">Ver todo →</a></div>
         ${d.items.length ? d.items.slice(0, 5).map(it => `<a class="hoy2-fila" href="#viaje/${v.id}/itinerario"><span class="it2-hora">${esc(it.hora || '')}</span><span aria-hidden="true">${it.icono}</span><span>${esc(it.titulo)}</span></a>`).join('') : '<p class="dia2-libre">Día libre</p>'}
-        ${d.dormis ? `<p class="hoy2-noche">🛏️ Dormís en <strong>${esc(d.dormis.texto)}</strong>${d.dormis.direccion && R.gmaps ? ` · <a href="${esc(R.gmaps.comoLlegar(d.dormis.direccion))}" target="_blank" rel="noopener">Cómo llegar</a>` : ''}</p>` : ''}
+        ${d.dormis && !d.dormis.id ? `<p class="hoy2-noche">${d.dormis.icono} Esta noche, <strong>${esc(d.dormis.texto.toLowerCase())}</strong></p>` : ''}
+        ${d.dormis && d.dormis.id ? `<p class="hoy2-noche">🛏️ Dormís en <strong>${esc(d.dormis.texto)}</strong>${d.dormis.direccion && R.gmaps ? ` · <a href="${esc(R.gmaps.comoLlegar(d.dormis.direccion))}" target="_blank" rel="noopener">Cómo llegar</a>` : ''}</p>` : ''}
       </section>`;
   }
   function enlazarHoy() { /* los enlaces van directo al itinerario */ }

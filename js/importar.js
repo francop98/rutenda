@@ -141,7 +141,12 @@ R.importar = (function () {
     });
     async function guardar(chkCosto) {
       c.items.forEach(it => R.agenda.guardarItem(v, it));
-      c.alojamientos.forEach(a => R.agenda.guardarAlojamiento(v, a));
+      c.alojamientos.forEach(a => {
+        // Si en "Dónde dormís" ya estaba ese alojamiento sin nombre, se completa ese (no se duplica)
+        const hueco = (v.alojamientos || []).find(x => x.deArmado && !x.nombre && a.desde && x.desde <= a.desde && a.desde < x.hasta);
+        if (hueco) Object.assign(a, { id: hueco.id, deArmado: true, destinoId: hueco.destinoId, ciudad: hueco.ciudad });
+        R.agenda.guardarAlojamiento(v, a);
+      });
       const principal = c.items[0] || c.alojamientos[0];
       if (c.costo && chkCosto && chkCosto.checked && principal) {
         v.movimientos.push({

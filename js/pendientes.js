@@ -55,6 +55,7 @@ R.pendientes = (function () {
             <input id="pTexto" placeholder="Ej: Sacar el seguro" aria-label="Nuevo pendiente" autocomplete="off">
             <button type="submit" class="btn btn-primario" aria-label="Agregar">+</button>
           </form>` : ''}
+          ${puede && R.armar ? R.armar.faltaHTML(v) : ''}
           ${pend.length ? `<div class="pend2-lista">${pend.map(p => filaHTML(p, puede)).join('')}</div>` : `<p class="texto-suave pend2-vacio">${hechos.length ? '¡Nada pendiente! 🎉' : 'Anotá lo que tengas que resolver antes o durante el viaje.'}</p>`}
           ${hechos.length ? `
             <button type="button" class="btn-texto-mini" data-a="hechos">${verHechos ? 'Ocultar' : 'Ver'} lo hecho (${hechos.length})</button>
