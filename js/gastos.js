@@ -172,6 +172,7 @@ R.gastos = (function () {
     const diasCorridos = v.fechaInicio && hoy >= v.fechaInicio ? Math.min(U.diasEntre(v.fechaInicio, v.fechaFin && hoy > v.fechaFin ? v.fechaFin : hoy) + 1, 365) : 0;
     const promedioDia = diasCorridos ? t.durante / diasCorridos : 0;
     const miParte = parteDe(v, yo);
+    const nDias = v.fechaInicio ? U.diasEntre(v.fechaInicio, v.fechaFin || v.fechaInicio) + 1 : 0;
     const miSaldo = s[yo] || 0;
     if (!['movimientos', 'cuentas', 'resumen'].includes(vistaGastos)) vistaGastos = 'movimientos';
 
@@ -179,15 +180,16 @@ R.gastos = (function () {
       <section class="gastos-hero">
         <div class="gh-fila">
           <div>
-            <small>${t.ingresado ? 'Costo neto del viaje' : 'Gastado en el viaje'}</small>
+            <small>Costo del viaje${t.ingresado ? ' (neto)' : ''}</small>
             <strong class="gh-total">${U.fmtMoneda(t.neto, v.monedaBase)}</strong>
+            ${t.neto > 0 ? `<span class="gh-sub gh-costo">${[variosViajeros ? `${U.fmtMoneda(Math.round(t.neto / v.participantes.length), v.monedaBase)} por persona` : '', nDias > 1 ? `${U.fmtMoneda(Math.round(t.neto / nDias), v.monedaBase)} por día` : ''].filter(Boolean).join(' · ')}</span>` : ''}
             ${t.ingresado ? `<span class="gh-sub">↓ ${U.fmtMoneda(t.gastado, v.monedaBase)} en gastos · ↑ ${U.fmtMoneda(t.ingresado, v.monedaBase)} en ingresos y reintegros</span>` : ''}
             ${t.antes && t.durante ? `<span class="gh-sub">${U.fmtMoneda(t.antes, v.monedaBase)} antes · ${U.fmtMoneda(t.durante, v.monedaBase)} durante</span>` : ''}
           </div>
           ${enCurso ? `<div class="gh-hoy"><small>Hoy</small><strong>${U.fmtMoneda(hoyTotal, v.monedaBase)}</strong>${promedioDia ? `<span>Promedio ${U.fmtMoneda(promedioDia, v.monedaBase)}/día</span>` : ''}</div>` : ''}
         </div>
         <div class="gh-datos">
-          ${variosViajeros ? `<span><small>Tu parte</small><strong>${U.fmtMoneda(miParte, v.monedaBase)}</strong></span>
+          ${variosViajeros ? `<span class="gh-miparte"><small>A vos te sale</small><strong>${U.fmtMoneda(miParte, v.monedaBase)}</strong></span>
           <span class="${miSaldo > 0.009 ? 'positivo' : miSaldo < -0.009 ? 'negativo' : ''}"><small>Tu saldo</small><strong>${miSaldo > 0.009 ? 'Te deben ' + U.fmtMoneda(miSaldo, v.monedaBase) : miSaldo < -0.009 ? 'Debés ' + U.fmtMoneda(-miSaldo, v.monedaBase) : 'A mano ✓'}</strong></span>` : ''}
           <span class="gh-pres"><small>Presupuesto <button class="btn-texto-mini solo-org" data-a="presupuesto">${pres ? 'Editar' : 'Definir'}</button></small>
             ${pres ? `<strong>${pctPres}% usado</strong><span class="barra-progreso ${pctPres > 100 ? 'excedido' : ''}"><span style="width:${Math.min(100, pctPres)}%"></span></span>` : '<strong class="gh-opcional">Opcional</strong>'}

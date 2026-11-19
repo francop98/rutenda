@@ -56,6 +56,7 @@ R.pendientes = (function () {
             <button type="submit" class="btn btn-primario" aria-label="Agregar">+</button>
           </form>` : ''}
           ${puede && R.armar ? R.armar.faltaHTML(v) : ''}
+          ${requisitosHTML(v)}
           ${pend.length ? `<div class="pend2-lista">${pend.map(p => filaHTML(p, puede)).join('')}</div>` : `<p class="texto-suave pend2-vacio">${hechos.length ? '¡Nada pendiente! 🎉' : 'Anotá lo que tengas que resolver antes o durante el viaje.'}</p>`}
           ${hechos.length ? `
             <button type="button" class="btn-texto-mini" data-a="hechos">${verHechos ? 'Ocultar' : 'Ver'} lo hecho (${hechos.length})</button>
@@ -82,6 +83,17 @@ R.pendientes = (function () {
         </section>
       </div>`;
     enlazar(v, cont);
+  }
+
+  /** Viajes al exterior: lo que hay que tramitar (visa, pasaporte, vacunas), con link a los requisitos. */
+  function requisitosHTML(v) {
+    const r = R.requisitos ? R.requisitos.resumen(v) : null;
+    if (!r) return '';
+    return `
+      <div class="falta-armar req-pend">
+        <strong>Para entrar al país</strong>
+        <a class="falta-fila" href="#viaje/${v.id}/documentos"><span aria-hidden="true">🛂</span><span>${esc(r.titulo)}<small>${esc(r.partes.length ? r.partes.join(' · ') : 'Nada para tramitar. Mirá el detalle.')}</small></span><b>Ver</b></a>
+      </div>`;
   }
 
   function filaHTML(p, puede) {

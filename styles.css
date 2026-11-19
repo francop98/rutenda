@@ -2647,3 +2647,40 @@ button.dia2-noche:hover { background: var(--mar-claro); }
 .tramo-horas > span { font-size: .84rem; font-weight: 600; color: var(--tinta-suave); }
 .tramo-horas input { min-width: 0; min-height: 44px; padding: 8px 10px; border: 1px solid var(--linea); border-radius: 10px; background: var(--papel); color: var(--tinta); font: inherit; font-size: .9rem; }
 .tramo-horas input:focus { outline: none; border-color: var(--mar); box-shadow: 0 0 0 3px var(--mar-claro); }
+
+/* 27.2 */
+.fv-seccion { padding: 4px 0 14px; }
+.fv-seccion + .fv-seccion { border-top: 1px solid var(--linea); padding-top: 18px; }
+.fv-seccion > h3 { margin: 0 0 12px; font-family: var(--fuente-titulo); font-size: 1.15rem; font-weight: 600; }
+.fv-vuelta { margin-top: 14px; padding: 12px; border-radius: var(--radio-chico); background: var(--arena); }
+.fv-vuelta > span { display: block; margin-bottom: 6px; }
+.fv-vuelta .chips-elegir { margin-bottom: 10px; }
+.tramo-indef { margin: 0 0 10px; }
+.tramo-datos:not(:empty) { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--linea); }
+.tramo-datos .campo input { background: var(--papel); }
+.chips-aero { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 8px; }
+.chip-mini { border: 1px solid var(--linea); background: var(--papel); color: var(--tinta); border-radius: 999px; padding: 4px 9px; font: inherit; font-size: .78rem; font-weight: 700; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-mini small { font-weight: 400; color: var(--tinta-suave); }
+.conexion { margin-bottom: 8px; }
+.conexion > span { display: block; font-size: .86rem; font-weight: 600; color: var(--tinta-suave); margin-bottom: 6px; }
+.tramo-aeros { align-items: start; }
+.it2-con { color: var(--mar-oscuro) !important; }
+.it2-falta { color: var(--terracota-oscuro) !important; font-weight: 600; }
+.form-item .si-vuelo, .form-item .si-programado { display: none; }
+.form-item.es-vuelo .si-vuelo, .form-item.es-programado .si-programado { display: grid; }
+.conexiones { display: grid; gap: 8px; }
+.conexion { display: grid; grid-template-columns: 1fr minmax(0, 52%); align-items: center; gap: 8px; margin: 0; }
+.conexion > span { margin: 0; font-size: .86rem; }
+.conexion select { min-width: 0; min-height: 40px; padding: 6px 8px; border: 1px solid var(--linea); border-radius: 10px; background: var(--papel); color: var(--tinta); font: inherit; font-size: .88rem; }
+.conexion.sin select { border-color: var(--terracota); color: var(--terracota-oscuro); }
+.req-pasaporte { margin: 12px 0 4px; padding: 12px; border-radius: var(--radio-chico); background: var(--arena); }
+.req-pasaporte p { margin: 0 0 6px; font-size: .9rem; }
+.req-pasaporte a { color: var(--mar); font-weight: 600; font-size: .88rem; }
+.req-pasaporte.req-vencido { background: var(--terracota-claro); }
+.req-pasaporte .campo input { background: var(--papel); }
+.req-nac { margin-top: 12px; }
+.req-pend { border-color: var(--mar); background: var(--mar-claro); }
+.req-pend > strong { color: var(--mar-oscuro); }
+.req-pend .falta-fila b { color: var(--mar); }
+.gh-costo { color: inherit; opacity: .85; }
+.tv-costo { color: var(--mar-oscuro); font-weight: 600; }

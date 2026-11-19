@@ -32,7 +32,7 @@ R.itinerarioPdf = (function () {
       .replace(/→/g, '>').replace(/[–—]/g, '-').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/…/g, '...')
       .replace(/[^\x00-\xFF]/g, '').replace(/\s{2,}/g, ' ').trim();
   }
-  const MEDIO_TXT = { avion: 'Avión', micro: 'Micro', auto: 'Auto', tren: 'Tren', barco: 'Barco', otro: 'Otro' };
+  const MEDIO_TXT = { avion: 'Avión', micro: 'Micro', auto: 'Auto', tren: 'Tren', barco: 'Barco', taxi: 'Taxi', transfer: 'Transfer', otro: 'Otro' };
 
   /** Logo de Rutenda para la portada (si no se puede leer, el PDF sale igual). */
   async function logo() {

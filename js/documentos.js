@@ -57,6 +57,7 @@ R.documentos = (function () {
           ${grupos.length ? '<button class="btn btn-primario" data-a="subir">+ Subir</button>' : ''}
         </div>
       </div>
+      ${R.requisitos ? R.requisitos.html(v) : ''}
       ${R.emergencias ? R.emergencias.html(v) : ''}
       ${R.queHacerSi ? R.queHacerSi.html(v) : ''}
       ${grupos.length ? grupos.map(g => `
@@ -68,6 +69,7 @@ R.documentos = (function () {
 
     cont.querySelectorAll('[data-a="subir"],[data-a="subir2"]').forEach(b => b.onclick = () => subir(v));
     if (R.emergencias) R.emergencias.enlazar(cont, v, () => render(v, cont));
+    if (R.requisitos) R.requisitos.enlazar(cont, () => render(v, cont));
     if (R.queHacerSi) R.queHacerSi.enlazar(cont);
     cont.querySelectorAll('[data-abrir]').forEach(b => b.onclick = () => abrir(v.documentos.find(d => d.id === b.dataset.abrir)));
     cont.querySelectorAll('[data-descargar]').forEach(b => b.onclick = () => descargar(v.documentos.find(d => d.id === b.dataset.descargar)));

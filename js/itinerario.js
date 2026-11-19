@@ -22,12 +22,25 @@ R.itinerario = (function () {
     const t = A().tipo(it.tipo);
     const partes = [];
     if (t.traslado) {
+      if (it.aeroDesde || it.aeroHasta) partes.push(`${it.aeroDesde || '?'} → ${it.aeroHasta || '?'}`);
       if (it.horaLlegada) partes.push(`llega ${it.fechaLlegada && it.fechaLlegada !== it.fecha ? U.fmtFecha(it.fechaLlegada, 'dia') + ' ' : ''}${it.horaLlegada}`);
       if (it.numero || it.empresa) partes.push([it.empresa, it.numero].filter(Boolean).join(' '));
     }
     if (it.codigo) partes.push('Cód. ' + it.codigo);
     if (!t.traslado && it.lugar) partes.push(it.lugar);
     return partes.join(' · ');
+  }
+
+  /** "🚕 Taxi o remis al aeropuerto · Falta: cómo salís del aeropuerto" */
+  function conexionesTexto(it) {
+    if (!A().esProgramado(it)) return null;
+    const term = A().TERMINAL[it.tipo];
+    const fem = term === 'terminal' || term === 'estación';
+    const al = fem ? 'a la' : 'al', del = fem ? 'de la' : 'del';
+    const txt = (k, prep) => { const c = A().conexion(k); return c && k !== 'no' ? `${c[1]} ${c[2]} ${prep} ${term}` : ''; };
+    const hechas = [txt(it.alSalir, al), txt(it.alLlegar, del)].filter(Boolean);
+    const faltan = [!it.alSalir ? `cómo llegás ${al} ${term}` : '', !it.alLlegar ? `cómo salís ${del} ${term}` : ''].filter(Boolean);
+    return hechas.length || faltan.length ? { ok: hechas.join(' · '), falta: faltan.length ? 'Falta: ' + faltan.join(' y ') : '' } : null;
   }
 
   /** Dónde estás ese día (para el PDF y el link de la familia): adonde llegaste con el último traslado, o el único destino. */
@@ -56,7 +69,7 @@ R.itinerario = (function () {
       items.push({
         id: it.id, hora: it.hora || '', icono: t.icono, titulo: it.titulo || t.nombre, sub: detalleItem(it), nota: it.nota || '',
         lugar: t.traslado ? '' : (it.lugar || ''), clase: t.traslado ? 'ev-traslado' : '', tipo: it.tipo,
-        docs: A().docsDe(v, it.id).length, checkin: it.fecha >= U.hoyISO() ? A().checkin(it) : null
+        docs: A().docsDe(v, it.id).length, checkin: it.fecha >= U.hoyISO() ? A().checkin(it) : null, conexiones: conexionesTexto(it)
       });
     });
     (v.alojamientos || []).filter(a => a.desde === fecha).forEach(a => items.push({
@@ -90,6 +103,8 @@ R.itinerario = (function () {
           <strong>${esc(it.titulo)}</strong>
           ${it.sub ? `<small>${esc(it.sub)}</small>` : ''}
           ${it.nota ? `<small class="it2-nota">${esc(it.nota)}</small>` : ''}
+          ${it.conexiones && it.conexiones.ok ? `<small class="it2-con">${esc(it.conexiones.ok)}</small>` : ''}
+          ${it.conexiones && it.conexiones.falta && v.armado && R.db.puedeOrganizar(v) ? `<small class="it2-falta">${esc(it.conexiones.falta)}</small>` : ''}
           ${ck ? `<small class="it2-checkin">Check-in online desde el ${esc(U.fmtFecha(ck.fecha, 'dia'))}${ck.hora ? ' a las ' + esc(ck.hora) : ''}</small>` : ''}
         </span>
         ${it.docs ? `<span class="it2-docs" aria-label="${it.docs} archivos">📎${it.docs > 1 ? it.docs : ''}</span>` : ''}
@@ -209,7 +224,7 @@ R.itinerario = (function () {
   /* ---------------------------------------------------------
      Agregar o cambiar algo del itinerario
      --------------------------------------------------------- */
-  const CATEGORIA = { vuelo: 'transporte', micro: 'transporte', tren: 'transporte', barco: 'transporte', auto: 'transporte', traslado: 'transporte', comida: 'comida', paseo: 'actividades', excursion: 'actividades', entrada: 'actividades', otro: 'otros' };
+  const CATEGORIA = { vuelo: 'transporte', micro: 'transporte', tren: 'transporte', barco: 'transporte', auto: 'transporte', traslado: 'transporte', taxi: 'transporte', otromedio: 'transporte', comida: 'comida', paseo: 'actividades', excursion: 'actividades', entrada: 'actividades', otro: 'otros' };
 
   /** El gasto que se cargó junto con algo del itinerario o un alojamiento. */
   function gastoDe(v, id) { return (v.movimientos || []).find(m => m.origenItem === id) || null; }
@@ -270,6 +285,14 @@ R.itinerario = (function () {
             <label class="campo"><span>Llega</span><input type="time" id="iLlega" value="${esc(it.horaLlegada || '')}"></label>
             <label class="campo"><span>N° <small>(vuelo, servicio)</small></span><input id="iNumero" value="${esc(it.numero || '')}" autocapitalize="characters" placeholder="Ej: AR1672"></label>
           </div>
+          <div class="si-vuelo grilla-2">
+            <label class="campo"><span>Aeropuerto de salida</span><input id="iAeroDesde" value="${esc(it.aeroDesde || '')}" maxlength="3" autocapitalize="characters" placeholder="Sigla, ej: AEP"></label>
+            <label class="campo"><span>Aeropuerto de llegada</span><input id="iAeroHasta" value="${esc(it.aeroHasta || '')}" maxlength="3" autocapitalize="characters" placeholder="Sigla, ej: BRC"></label>
+          </div>
+          <div class="si-programado grilla-2">
+            <label class="campo"><span class="lbl-con-salir">Hasta la terminal</span><select id="iAlSalir"><option value="">Sin resolver</option>${A().CONEXIONES.map(([k, ic, n]) => `<option value="${k}" ${it.alSalir === k ? 'selected' : ''}>${ic} ${n}</option>`).join('')}</select></label>
+            <label class="campo"><span class="lbl-con-llegar">Desde la terminal</span><select id="iAlLlegar"><option value="">Sin resolver</option>${A().CONEXIONES.map(([k, ic, n]) => `<option value="${k}" ${it.alLlegar === k ? 'selected' : ''}>${ic} ${n}</option>`).join('')}</select></label>
+          </div>
           <label class="campo no-traslado"><span>Dónde</span><input id="iLugar" value="${esc(it.lugar || '')}" placeholder="Escribí el lugar y elegí de la lista"></label>
           <div class="form-opcional">
             <div class="grilla-2 si-traslado">
@@ -294,6 +317,11 @@ R.itinerario = (function () {
     const pintarTipo = () => {
       const tr = A().tipo(it.tipo).traslado;
       form.classList.toggle('es-traslado', !!tr);
+      form.classList.toggle('es-vuelo', it.tipo === 'vuelo');
+      form.classList.toggle('es-programado', A().esProgramado(it));
+      const term = A().TERMINAL[it.tipo] || 'terminal';
+      el.querySelector('.lbl-con-salir').textContent = `Cómo llegás ${term === 'terminal' || term === 'estación' ? 'a la' : 'al'} ${term}`;
+      el.querySelector('.lbl-con-llegar').textContent = `Cómo salís ${term === 'terminal' || term === 'estación' ? 'de la' : 'del'} ${term}`;
       el.querySelector('.lbl-hora').textContent = tr ? 'Sale' : 'Hora';
       el.querySelectorAll('[data-tipo]').forEach(b => b.classList.toggle('activo', b.dataset.tipo === it.tipo));
     };
@@ -319,6 +347,12 @@ R.itinerario = (function () {
         it.desde = val('#iDesde').trim(); it.hasta = val('#iHasta').trim();
         it.horaLlegada = val('#iLlega'); it.numero = val('#iNumero').trim().toUpperCase();
         it.empresa = val('#iEmpresa').trim() || A().aerolineaDe(it.numero);
+        it.aeroDesde = it.tipo === 'vuelo' ? val('#iAeroDesde').trim().toUpperCase() : '';
+        it.aeroHasta = it.tipo === 'vuelo' ? val('#iAeroHasta').trim().toUpperCase() : '';
+        it.alSalir = A().esProgramado(it) ? val('#iAlSalir') : '';
+        it.alLlegar = A().esProgramado(it) ? val('#iAlLlegar') : '';
+        it.sinMedio = false;
+        if (it.fecha) it.pendiente = false;
         it.fechaLlegada = val('#iFechaLlega');
         it.titulo = it.desde || it.hasta ? `${it.desde || '?'} → ${it.hasta || '?'}` : A().tipo(it.tipo).nombre;
       } else {

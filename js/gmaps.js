@@ -51,7 +51,7 @@ R.gmaps = (function () {
   /** Modo para Google Maps: en auto, "manejando"; si no, que Google elija. */
   function modoViaje(v) {
     const segs = R.agenda.segmentos(v);
-    return segs.length && segs.every(s => s.medio === 'auto') ? 'driving' : '';
+    return segs.length && segs.every(s => ['auto', 'taxi', 'transfer'].includes(s.medio)) ? 'driving' : '';
   }
   function rutaViaje(v) { return ruta(paradasViaje(v).map(textoLugar), modoViaje(v)); }
 
@@ -71,7 +71,7 @@ R.gmaps = (function () {
           <h4 class="titulo-paso">Cada tramo</h4>
           <ul class="gm-tramos">${segs.map(s => {
             const m = R.agenda.MEDIOS[s.medio] || R.agenda.MEDIOS.otro;
-            const modo = s.medio === 'auto' ? 'driving' : (s.medio === 'micro' || s.medio === 'tren') ? 'transit' : '';
+            const modo = ['auto', 'taxi', 'transfer'].includes(s.medio) ? 'driving' : (s.medio === 'micro' || s.medio === 'tren') ? 'transit' : '';
             return `<li><span>${m.icono}</span><span class="gm-texto">${esc(s.desde.nombre)} → ${esc(s.hasta.nombre)}</span>
               <a class="btn-texto-mini" href="${esc(ruta([textoLugar(s.desde), textoLugar(s.hasta)], modo))}" target="_blank" rel="noopener">Ver</a></li>`;
           }).join('')}</ul>` : ''}`,

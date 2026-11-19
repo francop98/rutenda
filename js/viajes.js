@@ -136,7 +136,8 @@ R.viajes = (function () {
     if (!pestana || !(PESTANAS.some(p => p.id === pestana) || OTRAS[pestana])) pestana = 'itinerario';
     const personas = v.participantes.map(id => R.db.persona(id)).filter(Boolean);
     const org = R.db.puedeOrganizar(v);
-    const faltan = (R.pendientes ? R.pendientes.faltan(v) : 0) + (R.armar ? R.armar.cuantasFaltan(v) : 0);
+    const req = R.requisitos ? R.requisitos.resumen(v) : null;
+    const faltan = (R.pendientes ? R.pendientes.faltan(v) : 0) + (R.armar ? R.armar.cuantasFaltan(v) : 0) + (req && req.partes.length ? 1 : 0);
     app.innerHTML = `
       <section class="portada-viaje portada-compacta" style="background:${R.paisaje.fondo(v)}">
         ${U.paisaje(v)}
@@ -165,6 +166,15 @@ R.viajes = (function () {
     else if (pestana === 'viajeros') R.participantes.renderViajeros(v, cont);
   }
 
+  /** "Te salió $ 350.000" (tu parte; si viajás solo, el total). */
+  function costoTexto(v) {
+    if (!R.gastos || !(v.movimientos || []).some(m => m.tipo === 'gasto')) return '';
+    const yo = R.db.yoEn(v);
+    const mio = v.participantes.length > 1 ? R.gastos.parteDe(v, yo) : R.gastos.totales(v).neto;
+    if (mio <= 0) return '';
+    return `${estadoViaje(v) === 'pasado' ? 'Te salió' : 'Te va saliendo'} ${U.fmtMoneda(mio, v.monedaBase)}`;
+  }
+
   /* ---------- Tarjeta (Mis viajes) ---------- */
   function tarjeta(v) {
     const personas = v.participantes.map(id => R.db.persona(id)).filter(Boolean);
@@ -178,6 +188,7 @@ R.viajes = (function () {
         <div class="tv-cuerpo">
           <p class="tv-meta">${esc(destinoCompleto(v))}</p>
           <p class="tv-meta">${esc(v.fechaInicio ? U.fmtRango(v.fechaInicio, v.fechaFin) : 'Sin fechas')}</p>
+          ${costoTexto(v) ? `<p class="tv-meta tv-costo">💸 ${esc(costoTexto(v))}</p>` : ''}
           <div class="tv-pie"><span class="avatares">${personas.map(p => U.avatar(p, 24)).join('')}</span></div>
         </div>
       </a>`;
@@ -185,6 +196,6 @@ R.viajes = (function () {
 
   return {
     PESTANAS, nombreDe, destinoCompleto, estadoViaje, cuentaRegresiva, ciudadDeSiempre,
-    nuevo, editar, abrirAsistente: (v, op) => (v ? editar(v) : nuevo(op)), finalizar, menuViaje, renderViaje, tarjeta
+    costoTexto, nuevo, editar, abrirAsistente: (v, op) => (v ? editar(v) : nuevo(op)), finalizar, menuViaje, renderViaje, tarjeta
   };
 })();

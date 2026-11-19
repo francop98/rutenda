@@ -69,6 +69,7 @@ R.importar = (function () {
           tipo, fecha: t(x.fechaSalida), hora: t(x.horaSalida), desde, hasta,
           horaLlegada: t(x.horaLlegada), fechaLlegada: t(x.fechaLlegada) && t(x.fechaLlegada) !== t(x.fechaSalida) ? t(x.fechaLlegada) : '',
           empresa: t(x.empresa || r.empresa), numero: t(x.numero), codigo,
+          aeroDesde: tipo === 'vuelo' ? t(x.desdeAeropuerto) : '', aeroHasta: tipo === 'vuelo' ? t(x.hastaAeropuerto) : '',
           titulo: desde || hasta ? `${desde || '?'} → ${hasta || '?'}` : R.agenda.tipo(tipo).nombre,
           nota: [r.asientos ? 'Asientos: ' + r.asientos : '', r.equipaje ? 'Equipaje: ' + r.equipaje : ''].filter(Boolean).join(' · ')
         }));
@@ -140,7 +141,15 @@ R.importar = (function () {
       ]
     });
     async function guardar(chkCosto) {
-      c.items.forEach(it => R.agenda.guardarItem(v, it));
+      c.items.forEach((it, i) => {
+        // Si el tramo ya estaba en el recorrido (cargado sin datos), se completa ese y no se duplica
+        const ya = R.agenda.parecido(v, it);
+        if (ya) {
+          const id = ya.id;
+          c.items[i] = it = Object.assign({}, ya, Object.fromEntries(Object.entries(it).filter(([k, x]) => x && !['id', 'creado', 'titulo', 'desde', 'hasta'].includes(k))), { id, pendiente: false, sinMedio: false });
+        }
+        R.agenda.guardarItem(v, it);
+      });
       c.alojamientos.forEach(a => {
         // Si en "Dónde dormís" ya estaba ese alojamiento sin nombre, se completa ese (no se duplica)
         const hueco = (v.alojamientos || []).find(x => x.deArmado && !x.nombre && a.desde && x.desde <= a.desde && a.desde < x.hasta);

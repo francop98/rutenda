@@ -81,6 +81,8 @@
    */
   let refrescoPendiente = false;
   function refrescarRemoto() {
+    // En las páginas de armar el viaje no se redibuja: se perdería lo que estás cargando
+    if (/^#(nuevo|armar)/.test(location.hash)) return;
     if (U.fondoBloqueado() !== null) { refrescoPendiente = true; return; }
     const activo = document.activeElement;
     if (activo && app.contains(activo) && /INPUT|TEXTAREA|SELECT/.test(activo.tagName)) {

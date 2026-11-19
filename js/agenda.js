@@ -21,16 +21,27 @@ R.agenda = (function () {
     tren: { icono: '🚆', nombre: 'Tren', traslado: true, medio: 'tren' },
     barco: { icono: '⛴️', nombre: 'Barco', traslado: true, medio: 'barco' },
     auto: { icono: '🚗', nombre: 'Auto', traslado: true, medio: 'auto' },
-    traslado: { icono: '🚕', nombre: 'Traslado', traslado: true, medio: 'otro' },
+    traslado: { icono: '🚐', nombre: 'Transfer', traslado: true, medio: 'transfer' },
+    taxi: { icono: '🚕', nombre: 'Taxi o remis', traslado: true, medio: 'taxi' },
+    otromedio: { icono: '🧭', nombre: 'Otro medio', traslado: true, medio: 'otro' },
     paseo: { icono: '📍', nombre: 'Paseo' },
     excursion: { icono: '🥾', nombre: 'Excursión' },
     comida: { icono: '🍽️', nombre: 'Comida' },
     entrada: { icono: '🎟️', nombre: 'Entrada' },
     otro: { icono: '📝', nombre: 'Otro' }
   };
-  const ORDEN_TIPOS = ['paseo', 'excursion', 'comida', 'entrada', 'vuelo', 'micro', 'auto', 'tren', 'barco', 'traslado', 'otro'];
+  const ORDEN_TIPOS = ['paseo', 'excursion', 'comida', 'entrada', 'vuelo', 'micro', 'tren', 'barco', 'auto', 'traslado', 'taxi', 'otromedio', 'otro'];
   // Los que se muestran para elegir (los demás aparecen solo si algo ya es de ese tipo)
-  const TIPOS_A_LA_VISTA = ['paseo', 'comida', 'excursion', 'vuelo', 'micro', 'tren', 'auto', 'otro'];
+  const TIPOS_A_LA_VISTA = ['paseo', 'comida', 'excursion', 'vuelo', 'micro', 'tren', 'auto', 'traslado', 'taxi', 'otro'];
+  /** Con horario fijo (hay que estar a una hora en un aeropuerto, terminal, estación o puerto). */
+  const PROGRAMADOS = ['vuelo', 'micro', 'tren', 'barco'];
+  const esProgramado = it => PROGRAMADOS.includes(it && it.tipo);
+  const TERMINAL = { vuelo: 'aeropuerto', micro: 'terminal', tren: 'estación', barco: 'puerto' };
+  /** Cómo llegás a la terminal o de la terminal a donde vas. */
+  const CONEXIONES = [['taxi', '🚕', 'Taxi o remis'], ['transfer', '🚐', 'Transfer'], ['colectivo', '🚌', 'Colectivo'], ['buscan', '🙋', 'Me buscan / llevan'], ['auto', '🚗', 'En auto'], ['pie', '🚶', 'Caminando'], ['no', '✕', 'No hace falta']];
+  const conexion = k => CONEXIONES.find(c => c[0] === k) || null;
+  /** Cuántas conexiones de este traslado falta resolver (0, 1 o 2). */
+  function conexionesFaltan(it) { return esProgramado(it) ? (it.alSalir ? 0 : 1) + (it.alLlegar ? 0 : 1) : 0; }
   const tipo = t => TIPOS[t] || TIPOS.otro;
   const esTraslado = it => !!tipo(it.tipo).traslado;
   const normal = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
@@ -96,10 +107,17 @@ R.agenda = (function () {
     v.movimientos = (v.movimientos || []).filter(m => m.origenItem !== id);
   }
 
+  /** Un traslado ya cargado entre los mismos lugares (y el mismo día, o sin día): para no duplicarlo al pegar una reserva. */
+  function parecido(v, nuevo) {
+    const igual = (a, b) => { const x = normal(a), y = normal(b); return x && y && (x === y || x.includes(y) || y.includes(x)); };
+    return items(v).find(it => it.id !== nuevo.id && esTraslado(it) && igual(it.desde, nuevo.desde) && igual(it.hasta, nuevo.hasta) && (!it.fecha || !nuevo.fecha || it.fecha === nuevo.fecha)) || null;
+  }
+
   /* ---------- Para el mapa, Google Maps, el resumen y el PDF ---------- */
   const MEDIOS = {
     avion: { icono: '✈️', nombre: 'Avión' }, micro: { icono: '🚌', nombre: 'Micro' }, auto: { icono: '🚗', nombre: 'Auto' },
-    tren: { icono: '🚆', nombre: 'Tren' }, barco: { icono: '⛴️', nombre: 'Barco' }, otro: { icono: '🚕', nombre: 'Traslado' }
+    tren: { icono: '🚆', nombre: 'Tren' }, barco: { icono: '⛴️', nombre: 'Barco' }, taxi: { icono: '🚕', nombre: 'Taxi o remis' },
+    transfer: { icono: '🚐', nombre: 'Transfer' }, otro: { icono: '🧭', nombre: 'Traslado' }
   };
   function lugarConocido(v, nombre) {
     const n = normal(nombre);
@@ -135,7 +153,8 @@ R.agenda = (function () {
   /** Cómo se mueve el viaje (para el dibujo de la portada). */
   function medioPrincipal(v) {
     const cuenta = {};
-    segmentos(v).forEach(s => { cuenta[s.medio] = (cuenta[s.medio] || 0) + 1; });
+    // Taxis y transfers no cuentan: el dibujo es del medio con el que hacés el viaje
+    segmentos(v).filter(s => ['avion', 'micro', 'auto', 'tren', 'barco'].includes(s.medio)).forEach(s => { cuenta[s.medio] = (cuenta[s.medio] || 0) + 1; });
     const top = Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a])[0];
     return top || (v.perfil && v.perfil.transporte) || 'avion';
   }
@@ -280,8 +299,8 @@ R.agenda = (function () {
   }
 
   return {
-    TIPOS, ORDEN_TIPOS, TIPOS_A_LA_VISTA, MEDIOS, tipo, esTraslado,
-    items, delDia, ideas, item, alojamiento, nombreAlojamiento, nocheDe, dias, docsDe,
+    TIPOS, ORDEN_TIPOS, TIPOS_A_LA_VISTA, MEDIOS, tipo, esTraslado, PROGRAMADOS, esProgramado, TERMINAL, CONEXIONES, conexion, conexionesFaltan,
+    items, delDia, ideas, item, parecido, alojamiento, nombreAlojamiento, nocheDe, dias, docsDe,
     nuevoItem, guardarItem, borrarItem, guardarAlojamiento, borrarAlojamiento,
     segmentos, paradas, medioPrincipal, etiquetaSegmento, lugarConocido, checkin, aerolineaDe, usados, migrar
   };
