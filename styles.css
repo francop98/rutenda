@@ -2880,3 +2880,44 @@ body.teclado-abierto .armar-pie { position: static; background: none; }
 .ip-lista small { display: block; color: var(--tinta-suave); font-size: .8rem; margin-top: 2px; }
 .ip-ojo { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--arena-2); font-size: .78rem; }
 .ip-nota { margin: 10px 0 0; font-size: .78rem; }
+
+/* 30.2 — Transporte y noches: cada parte en su sección */
+.tramos { display: grid; gap: 18px; }
+.tramo { padding: 0 0 4px; border: 1.5px solid var(--linea); border-radius: var(--radio); background: var(--papel); box-shadow: var(--sombra); overflow: hidden; }
+.tramo-cab { margin: 0; padding: 12px 14px; background: var(--mar-claro); border-bottom: 1px solid var(--linea); }
+.tramo-cab strong { font-size: 1rem; }
+.tramo-sec { margin: 12px 12px 0; padding: 12px; border: 1px solid var(--linea); border-radius: 14px; background: var(--arena); }
+.tramo-sec-tit { display: block; margin-bottom: 10px; font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--tinta-suave); }
+.tramo-sec .tramo-medios { margin-bottom: 6px; }
+.tramo-sec .tramo-indef { margin: 4px 0 0; }
+.tramo-sec .tramo-aviso { margin-bottom: 0; }
+.tramo-datos:not(:empty) { margin-top: 0; padding-top: 0; border-top: 0; }
+.tramo .ruta-con { margin: 12px 12px 0; padding: 14px 12px; border: 1px solid var(--linea); border-top: 4px solid var(--salvia); border-radius: 14px; background: var(--salvia-claro); }
+.revisar .tramo.ok, .revisar .tramo.falta { box-shadow: none; }
+.revisar .tramo.ok { border-color: var(--salvia); }
+.revisar .tramo.falta { border-color: var(--alerta); }
+.revisar .tramo.ok .tramo-cab { background: var(--salvia-claro); box-shadow: inset 4px 0 0 var(--salvia); }
+.revisar .tramo.falta .tramo-cab { background: var(--terracota-claro); box-shadow: inset 4px 0 0 var(--alerta); }
+
+.armar-panel { margin-bottom: 18px; padding: 14px; border: 1.5px solid var(--linea); border-radius: var(--radio); background: var(--papel); box-shadow: var(--sombra); }
+.armar-panel-tit { margin: -14px -14px 12px; padding: 12px 14px; background: var(--mar-claro); border-bottom: 1px solid var(--linea); border-radius: var(--radio) var(--radio) 0 0; font-size: 1rem; font-weight: 700; font-family: inherit; }
+.armar-panel .noche { background: var(--arena); }
+.armar-panel .noche.pregunta { background: var(--terracota-claro); }
+.armar-panel .alojs { display: grid; gap: 10px; }
+.armar-panel .ayuda { margin-bottom: 0; }
+
+/* 30.2 — Puerta a puerta: botones un poco más grandes */
+.rc-paso { min-height: 44px; padding: 10px 14px 10px 30px; font-size: .95rem; margin: 4px 0; }
+.rc-paso .rc-linea { left: 13px; }
+.rc-punto-btn { min-height: 44px; padding: 10px 12px; font-size: .98rem; }
+.rc-cambiar { font-size: .84rem; }
+.rc-opciones { gap: 8px; margin: 8px 0 10px; }
+.rc-opciones .chip-op { padding: 9px 14px; font-size: .92rem; }
+.rc-titulo { font-size: .8rem; }
+
+/* 30.2 — Ayuda: tarjetas plegadas */
+.ayuda-vista > details { margin-bottom: 12px; }
+.ayuda-requisitos .tarjeta-requisitos > .titulo-seccion { display: none; }
+.ayuda-vista .plegable > summary small { display: block; font-weight: 500; color: var(--tinta-suave); font-size: .82rem; margin-top: 2px; }
+.ayuda-vista > details.bloque { padding: 0; }
+.ayuda-vista > details > .plegable-cuerpo { padding-top: 2px; }

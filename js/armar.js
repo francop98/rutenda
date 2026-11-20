@@ -427,7 +427,7 @@ R.armar = (function () {
           <input data-f="${campo}" data-ciudad="${esc(ciudad)}" value="${esc(x[campo])}" autocapitalize="characters" autocomplete="off" placeholder="Sigla o nombre">
           <div class="chips-aero" data-chips="${campo}">${chipsAero(x[campo], ciudad, '')}</div>
         </div>`;
-      return `
+      const campos = `
         ${tipo === 'vuelo' ? `
           <div class="grilla-2">
             <label class="campo"><span>N° de vuelo</span><input data-f="numero" value="${esc(x.numero)}" autocapitalize="characters" autocomplete="off" placeholder="Por ej.: AR1673"><small class="ayuda-campo" data-ayuda-vuelo hidden></small></label>
@@ -444,8 +444,10 @@ R.armar = (function () {
               <span>Llegás</span><input type="date" data-f="escLlegaF" value="${esc(x.escLlegaF)}" aria-label="Día que llegás a la escala"><input type="time" data-f="escLlegaH" value="${esc(x.escLlegaH)}" aria-label="Hora que llegás a la escala">
               <span>Salís</span><input type="date" data-f="escSaleF" value="${esc(x.escSaleF)}" aria-label="Día que salís de la escala"><input type="time" data-f="escSaleH" value="${esc(x.escSaleH)}" aria-label="Hora que salís de la escala">
             </div>
-          </div>
-          <div class="ruta-con">${rutaHTML(x)}</div>` : ''}`;
+          </div>` : ''}`;
+      const titulo = tipo === 'vuelo' ? '✈️ Datos del vuelo' : `${A().tipo(tipo).icono} Datos del ${A().tipo(tipo).nombre.toLowerCase()}`;
+      return `${campos.trim() ? `<div class="tramo-sec"><span class="tramo-sec-tit">${esc(titulo)}</span>${campos}</div>` : ''}
+        ${prog ? `<div class="ruta-con">${rutaHTML(x)}</div>` : ''}`;
     }
 
     /** Chips de aeropuertos: los de la ciudad, o los que coinciden con lo que escribiste. Marca el elegido. */
@@ -543,14 +545,20 @@ R.armar = (function () {
       <div class="tramos">${lista.map((x, i) => `
         <div class="tramo" data-i="${i}">
           <div class="tramo-cab"><span class="tramo-num">${i + 1}</span><div><strong>${esc(x.t.desde.nombre)} → ${esc(x.t.hasta.nombre)}</strong><small>${etiqueta(x)}</small></div></div>
-          <div class="chips-elegir chips-chicos tramo-medios">${chipsMedios(x.medio, 'medio')}</div>
-          <label class="check check-chico tramo-indef"><input type="checkbox" data-indef ${x.indef ? 'checked' : ''}> Todavía no lo sé (lo completo después)</label>
+          <div class="tramo-sec">
+            <span class="tramo-sec-tit">¿En qué vas?</span>
+            <div class="chips-elegir chips-chicos tramo-medios">${chipsMedios(x.medio, 'medio')}</div>
+            <label class="check check-chico tramo-indef"><input type="checkbox" data-indef ${x.indef ? 'checked' : ''}> Todavía no lo sé (lo completo después)</label>
+          </div>
           <div class="tramo-def" ${x.indef ? 'hidden' : ''}>
+            <div class="tramo-sec">
+            <span class="tramo-sec-tit">¿Cuándo?</span>
             <div class="tramo-horas">
               <span>Sale</span><input type="date" data-f="fecha" value="${esc(x.fecha)}" ${minSale(i) ? `min="${minSale(i)}"` : ''} aria-label="Día que sale"><input type="time" data-f="hora" value="${esc(x.hora)}" aria-label="Hora que sale">
               <span>Llega</span><input type="date" data-f="fechaLlega" value="${esc(x.fechaLlega)}" ${x.fecha ? `min="${x.fecha}"` : ''} aria-label="Día que llega"><input type="time" data-f="horaLlega" value="${esc(x.horaLlega)}" aria-label="Hora que llega">
             </div>
             <p class="tramo-aviso" hidden></p>
+            </div>
             <div class="tramo-datos">${datosHTML(x)}</div>
           </div>
         </div>`).join('')}</div>
@@ -669,7 +677,7 @@ R.armar = (function () {
         x.indef = e.target.checked;
         el.querySelector('.tramo-def').hidden = x.indef;
       });
-      el.querySelectorAll('.tramo-def > .tramo-horas input').forEach(i => i.addEventListener('change', () => setTimeout(() => validar(el), 0)));
+      el.querySelectorAll('.tramo-def > .tramo-sec > .tramo-horas input').forEach(i => i.addEventListener('change', () => setTimeout(() => validar(el), 0)));
       // Sin fecha de salida, el calendario de "Llega" igual arranca en el viaje (no en hoy)
       if (!f.value && v.fechaInicio) fl.min = minSale(Number(el.dataset.i)) || v.fechaInicio;
       f.addEventListener('change', () => {
@@ -736,6 +744,7 @@ R.armar = (function () {
         });
         A().guardarItem(v, it);
       });
+      limpiarNoches(v);
       v.armado = true;
       R.db.guardarViaje(v);
       return true;
@@ -743,6 +752,22 @@ R.armar = (function () {
   }
 
   /* ---------- 3. Noches ---------- */
+  /**
+   * Lo que quedó guardado de una noche ("viajando" o "en casa"), salvo que el transporte
+   * ahora diga otra cosa: si cambiaste un horario y esa noche ya no viajás, no sigue diciendo "viajando".
+   */
+  function nocheGuardada(v, f) {
+    const n = (v.noches || {})[f] || '';
+    if (n !== 'viaje' && n !== 'casa') return n;
+    const s = lugarSegunTransporte(v, f);
+    if (n === 'viaje' && s.lugar && !s.pregunta) return '';
+    if (n === 'casa' && s.viaje) return '';
+    return n;
+  }
+  function limpiarNoches(v) {
+    Object.keys(v.noches || {}).forEach(f => { if (!nocheGuardada(v, f)) delete v.noches[f]; });
+  }
+
   // Si llegás al día siguiente antes de esta hora, puede que esa noche duermas en un alojamiento: se pregunta
   const HORA_DUDOSA = '04:00';
   /**
@@ -810,7 +835,7 @@ R.armar = (function () {
       if (s.pregunta === 'auto') notas[f] = `Vas de ${s.tramo.t.desde.nombre} a ${s.tramo.t.hasta.nombre} y llegás otro día: ¿manejás de corrido o parás a dormir en el camino?`;
       if (a && !a.deArmado) elegido[f] = 'aloj:' + a.id;
       else if (a && a.deArmado && a.destinoId) elegido[f] = a.destinoId.startsWith('parada:') ? a.destinoId : 'lugar:' + a.destinoId;
-      else if ((v.noches || {})[f]) elegido[f] = v.noches[f];
+      else if (nocheGuardada(v, f)) elegido[f] = nocheGuardada(v, f);
       else if (s.pregunta) elegido[f] = '';
       else if (s.viaje) elegido[f] = 'viaje';
       else if (s.lugar && s.lugar.id === 'o') elegido[f] = 'casa';
@@ -862,10 +887,15 @@ R.armar = (function () {
     }
 
     const cuerpo = ns.length ? `
-      <div class="noches"></div>
-      <h2 class="titulo-seccion armar-sub2">Alojamientos</h2>
-      <div class="alojs"></div>
-      <p class="ayuda">El nombre y la dirección son opcionales: si todavía no reservaste, dejalo así y lo completás después.</p>` : '<p class="texto-suave">Es ida y vuelta en el día: no hay noches. 🎒</p>';
+      <section class="armar-panel">
+        <h2 class="armar-panel-tit">🌙 Noche por noche</h2>
+        <div class="noches"></div>
+      </section>
+      <section class="armar-panel">
+        <h2 class="armar-panel-tit">🛏️ Alojamientos</h2>
+        <div class="alojs"></div>
+        <p class="ayuda">El nombre y la dirección son opcionales: si todavía no reservaste, dejalo así y lo completás después.</p>
+      </section>` : '<p class="texto-suave">Es ida y vuelta en el día: no hay noches. 🎒</p>';
     pagina(app, 'noches', v, 'Dónde dormís', 'Noche por noche. Lo que se pudo, sale del transporte; cambialo si no es así.', cuerpo,
       `<button type="button" class="btn btn-suave" data-a="omitir">Omitir por ahora</button>
        <button type="button" class="btn btn-primario" data-a="listo">Listo</button>`);
@@ -964,5 +994,5 @@ R.armar = (function () {
     }
   }
 
-  return { nuevo, render, tramos, itemsDeTramos, noches, faltaHTML, cuantasFaltan, faltaTransporte, faltanNoches, faltanConexiones, tramoResuelto, lugarSegunTransporte };
+  return { nuevo, render, tramos, itemsDeTramos, noches, faltaHTML, cuantasFaltan, faltaTransporte, faltanNoches, faltanConexiones, tramoResuelto, lugarSegunTransporte, nocheGuardada };
 })();

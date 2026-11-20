@@ -82,6 +82,7 @@ R.itinerario = (function () {
     return ds.length === 1 ? ds[0].nombre : '';
   }
 
+  const nocheG = (v, f) => R.armar && R.armar.nocheGuardada ? R.armar.nocheGuardada(v, f) : (v.noches || {})[f];
   function diaDe(v, fecha) {
     const dias = A().dias(v);
     const numero = dias.indexOf(fecha) + 1;
@@ -113,8 +114,8 @@ R.itinerario = (function () {
     return {
       fecha, numero, items,
       dormis: noche ? { icono: '🛏️', texto: A().nombreAlojamiento(noche), direccion: noche.direccion || '', id: noche.id }
-        : (v.noches || {})[fecha] === 'viaje' ? { icono: '🚌', texto: 'Viajando', viaje: true }
-        : (v.noches || {})[fecha] === 'casa' ? { icono: '🏠', texto: 'En casa', casa: true } : null,
+        : nocheG(v, fecha) === 'viaje' ? { icono: '🚌', texto: 'Viajando', viaje: true }
+        : nocheG(v, fecha) === 'casa' ? { icono: '🏠', texto: 'En casa', casa: true } : null,
       amaneces: null, lugarNombre: ciudadDe(v, fecha), soloDia: false,
       inicioLugar: lugarDe(anoche), finLugar: lugarDe(noche),
       lugar: R.direcciones ? R.direcciones.cercaDe(v, null) : null

@@ -39,16 +39,18 @@ R.agenda = (function () {
   const TERMINAL = { vuelo: 'aeropuerto', micro: 'terminal', tren: 'estación', barco: 'puerto' };
   /** Cómo llegás a la terminal o de la terminal a donde vas. */
   const CONEXIONES = [
-    ['taxi', '🚕', 'Taxi, remis, Uber o similar'], ['transfer', '🚐', 'Transfer contratado'], ['hotel', '🏨', 'Traslado del alojamiento'],
-    ['colectivo', '🚌', 'Colectivo'], ['subte', '🚇', 'Subte o tren'], ['buscan', '🙋', 'Me buscan o me llevan'], ['auto', '🚗', 'Mi auto'],
-    ['alquilado', '🔑', 'Auto alquilado'], ['pie', '🚶', 'Caminando'], ['no', '✕', 'No hace falta'], ['nose', '❔', 'Todavía no lo sé']];
-  // 'app' (Uber, Cabify…) quedó unificado con taxi y remis
-  const conexion = k => CONEXIONES.find(c => c[0] === (k === 'app' ? 'taxi' : k)) || null;
+    ['taxi', '🚕', 'Taxi, remis, Uber o similar'], ['transfer', '🚐', 'Transfer contratado'],
+    ['colectivo', '🚌', 'Colectivo'], ['subte', '🚇', 'Subte o tren'], ['buscan', '🙋', 'Me buscan o me llevan'], ['auto', '🚗', 'Auto'],
+    ['pie', '🚶', 'Caminando'], ['no', '✕', 'No hace falta'], ['nose', '❔', 'Todavía no lo sé']];
+  // Opciones que se unificaron o se sacaron: Uber/Cabify → taxi, auto alquilado → auto, traslado del alojamiento → transfer
+  const CONEXION_VIEJA = { app: 'taxi', alquilado: 'auto', hotel: 'transfer' };
+  const conexion = k => CONEXIONES.find(c => c[0] === (CONEXION_VIEJA[k] || k)) || null;
   const conexionResuelta = k => !!k && k !== 'nose';
   /** A dónde vas después de la terminal (o de dónde salís antes): no se da por hecho. */
-  const PUNTOS = [['aloj', '🛏️', 'Alojamiento'], ['casa', '🏠', 'Mi casa'], ['familia', '👪', 'Casa de familia o amigos'], ['actividad', '📍', 'Un paseo o actividad'], ['combino', '🪑', 'Me quedo en la terminal'], ['otro', '📌', 'Otro lugar']];
-  // 'tiempo' (29.1) es lo mismo que quedarse en la terminal
-  const punto = k => PUNTOS.find(c => c[0] === (k === 'tiempo' ? 'combino' : k)) || null;
+  const PUNTOS = [['aloj', '🛏️', 'Alojamiento'], ['casa', '🏠', 'Mi casa'], ['actividad', '📍', 'Un paseo o actividad'], ['combino', '🪑', 'Me quedo en la terminal'], ['otro', '📌', 'Otro lugar']];
+  // 'tiempo' (29.1) es quedarse en la terminal; 'familia' pasó a "Otro lugar"
+  const PUNTO_VIEJO = { tiempo: 'combino', familia: 'otro' };
+  const punto = k => PUNTOS.find(c => c[0] === (PUNTO_VIEJO[k] || k)) || null;
   /** Cuántas conexiones de este traslado falta resolver (0, 1 o 2). "Todavía no lo sé" cuenta como pendiente. */
   function conexionesFaltan(it) { return esProgramado(it) ? (conexionResuelta(it.alSalir) ? 0 : 1) + (conexionResuelta(it.alLlegar) ? 0 : 1) : 0; }
   const tipo = t => TIPOS[t] || TIPOS.otro;

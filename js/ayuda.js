@@ -21,8 +21,9 @@ R.ayuda = (function () {
     const propios = v.contactos || [];
     const vacio = !alojs.length && !transportes.length && !propios.length;
     return `
-      <section class="bloque ayuda-bloque">
-        <h3 class="bloque-titulo">📇 Contactos del viaje</h3>
+      <details class="bloque plegable ayuda-bloque">
+        <summary><div><h3 class="bloque-titulo">📇 Contactos del viaje</h3><small>Alojamientos, transporte y teléfonos</small></div></summary>
+        <div class="plegable-cuerpo">
         ${vacio ? '<p class="texto-suave">Acá aparecen los alojamientos y las empresas de transporte que cargues, con su dirección y código de reserva. También podés sumar los teléfonos que quieras tener a mano.</p>' : ''}
         ${alojs.map(a => `
           <div class="contacto-fila">
@@ -45,16 +46,23 @@ R.ayuda = (function () {
             ${puede ? `<button type="button" class="btn-icono" data-borrar-contacto="${c.id}" aria-label="Borrar">×</button>` : ''}
           </div>`).join('')}
         ${puede ? '<button type="button" class="btn btn-suave btn-chico" data-a="nuevoContacto">+ Agregar un contacto</button>' : ''}
-      </section>`;
+        </div>
+      </details>`;
   }
 
   function render(v, cont) {
+    // Las tarjetas arrancan cerradas; si abriste alguna y se repinta (por ej. al cambiar un dato), sigue abierta
+    const abiertas = [...cont.querySelectorAll('.ayuda-vista > details')].map(d => d.open);
+    const reqHTML = R.requisitos ? R.requisitos.html(v) : '';
     cont.innerHTML = `
       <div class="ayuda-vista">
         <p class="texto-suave ayuda-intro">Lo que necesitás si algo pasa. Se guarda en el celular y se ve también sin señal.</p>
         ${R.emergencias ? R.emergencias.html(v) : ''}
         ${contactosHTML(v)}
-        ${R.requisitos ? R.requisitos.html(v) : ''}
+        ${reqHTML.trim() ? `<details class="bloque plegable ayuda-requisitos" data-requisitos>
+          <summary><div><h3 class="bloque-titulo">🛂 Requisitos de entrada</h3><small>Documentos, pasaporte y salud</small></div></summary>
+          <div class="plegable-cuerpo">${reqHTML}</div>
+        </details>` : ''}
         ${R.infoPais ? R.infoPais.html(v) : ''}
         ${R.queHacerSi ? R.queHacerSi.html(v) : ''}
       </div>`;
@@ -62,8 +70,7 @@ R.ayuda = (function () {
     if (R.emergencias) R.emergencias.enlazar(cont, v, repintar);
     if (R.requisitos) R.requisitos.enlazar(cont, repintar);
     if (R.queHacerSi) R.queHacerSi.enlazar(cont);
-    const det = cont.querySelector('[data-emergencias]');
-    if (det) det.open = true;
+    cont.querySelectorAll('.ayuda-vista > details').forEach((d, i) => { if (abiertas[i]) d.open = true; });
     const bn = cont.querySelector('[data-a="nuevoContacto"]');
     if (bn) bn.onclick = () => nuevoContacto(v, repintar);
     cont.querySelectorAll('[data-borrar-contacto]').forEach(b => b.onclick = async () => {
@@ -71,7 +78,7 @@ R.ayuda = (function () {
       v.contactos = (v.contactos || []).filter(c => c.id !== b.dataset.borrarContacto);
       R.db.guardarViaje(v); repintar();
     });
-    if (location.hash.includes('#requisitos')) { const r = cont.querySelector('#requisitos'); if (r) r.scrollIntoView({ block: 'start' }); }
+    if (location.hash.includes('#requisitos')) { const r = cont.querySelector('[data-requisitos]'); if (r) { r.open = true; r.scrollIntoView({ block: 'start' }); } }
   }
 
   function nuevoContacto(v, alTerminar) {

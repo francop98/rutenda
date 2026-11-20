@@ -95,8 +95,9 @@ R.infoPais = (function () {
     if (!ps.length) return '';
     const mio = P[casa(v)];
     return `
-      <section class="bloque ayuda-bloque">
-        <h3 class="bloque-titulo">🌍 Info práctica</h3>
+      <details class="bloque plegable ayuda-bloque">
+        <summary><div><h3 class="bloque-titulo">🌍 Info práctica</h3><small>Enchufe, manejo, propina e idioma${ps.length === 1 ? ' en ' + esc(NOMBRES[ps[0]] || ps[0]) : ''}</small></div></summary>
+        <div class="plegable-cuerpo">
         ${ps.map(c => {
           const [idioma, enchufes, v2, manejo, propina] = P[c];
           const misEnchufes = mio ? mio[1].split(', ') : [];
@@ -115,7 +116,8 @@ R.infoPais = (function () {
           </div>`;
         }).join('')}
         <p class="texto-suave ip-nota">Datos orientativos: pueden variar según el lugar.</p>
-      </section>`;
+        </div>
+      </details>`;
   }
 
   return { html, paises };
