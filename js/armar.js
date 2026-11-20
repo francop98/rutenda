@@ -92,18 +92,39 @@ R.armar = (function () {
   /** Cuántas cosas de armado quedan (para la pestaña Pendientes). */
   function cuantasFaltan(v) { return v.armado ? (faltaTransporte(v) ? 1 : 0) + (faltanConexiones(v) ? 1 : 0) + (faltanNoches(v) ? 1 : 0) : 0; }
 
-  function faltaHTML(v) {
+  /**
+   * "Para completar": en el itinerario, solo lo que falta.
+   * En Pendientes (completo = true), las tres partes: en verde lo que está y en rojo lo que falta.
+   */
+  function faltaHTML(v, completo) {
     if (!v.armado || !R.db.puedeOrganizar(v)) return '';
     const t = faltaTransporte(v), n = faltanNoches(v), c = faltanConexiones(v);
-    if (!t && !n && !c) return '';
+    if (!t && !n && !c && !completo) return '';
+    const hayNoches = noches(v).length > 0;
+    const fila = (ok, paso, icono, titulo, txtOk, txtFalta) => (ok && !completo) ? '' : `
+      <a class="falta-fila ${ok ? 'ok' : 'falta'}" href="#armar/${v.id}/${paso}" data-revisar>
+        <span aria-hidden="true">${ok ? '✅' : icono}</span><span>${titulo}<small>${ok ? txtOk : txtFalta}</small></span><b>${ok ? 'Ver' : 'Completar'}</b></a>`;
     return `
-      <div class="falta-armar">
-        <strong>Para completar cuando quieras</strong>
-        ${t ? `<a class="falta-fila" href="#armar/${v.id}/transporte"><span aria-hidden="true">🚌</span><span>Cómo vas de un lugar a otro<small>${U.plural(t, 'tramo sin resolver', 'tramos sin resolver')}</small></span><b>Completar</b></a>` : ''}
-        ${c ? `<a class="falta-fila" href="#armar/${v.id}/transporte"><span aria-hidden="true">🚕</span><span>Traslados a aeropuertos y terminales<small>${c} sin resolver: cómo llegás y cómo salís</small></span><b>Completar</b></a>` : ''}
-        ${n ? `<a class="falta-fila" href="#armar/${v.id}/noches"><span aria-hidden="true">🛏️</span><span>Dónde dormís<small>${U.plural(n, 'noche sin definir', 'noches sin definir')}</small></span><b>Completar</b></a>` : ''}
+      <div class="falta-armar ${!t && !n && !c ? 'todo-ok' : ''}">
+        <strong>${!t && !n && !c ? 'El viaje está armado' : 'Para completar cuando quieras'}</strong>
+        ${fila(!t, 'transporte', '🚌', 'Cómo vas de un lugar a otro', 'Todos los tramos resueltos', U.plural(t, 'tramo sin resolver', 'tramos sin resolver'))}
+        ${fila(!c, 'transporte', '🚕', 'Traslados a aeropuertos y terminales', 'Todos resueltos', `${c} sin resolver: cómo llegás y cómo salís`)}
+        ${hayNoches ? fila(!n, 'noches', '🛏️', 'Dónde dormís', 'Todas las noches definidas', U.plural(n, 'noche sin definir', 'noches sin definir')) : ''}
       </div>`;
   }
+
+  // Al entrar desde "Para completar", se marca en verde lo resuelto y en rojo lo que falta
+  let revisarProx = false;
+  document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-revisar]')) revisarProx = true; }, true);
+  // Moverse entre las páginas guarda la que estás viendo
+  let guardarActual = null;
+  document.addEventListener('click', e => {
+    const a = e.target.closest && e.target.closest('[data-ir-paso]');
+    if (!a) return;
+    e.preventDefault();
+    if (guardarActual && guardarActual() === false) return;
+    location.hash = a.dataset.irPaso;
+  });
 
   /* ---------------------------------------------------------
      Páginas
@@ -112,6 +133,9 @@ R.armar = (function () {
   function nuevo(op) { pendienteNuevo = op || null; location.hash = '#nuevo'; }
 
   function render(app, vista, id, paso) {
+    const revisar = revisarProx;
+    revisarProx = false;
+    guardarActual = null;
     if (vista === 'nuevo') { document.title = 'Nuevo viaje · Rutenda'; pagDatos(app, null, pendienteNuevo || {}); pendienteNuevo = null; return; }
     const v = R.db.viaje(id);
     if (!v || !R.db.puedeOrganizar(v)) { location.hash = v ? `#viaje/${v.id}` : '#inicio'; return; }
@@ -119,12 +143,14 @@ R.armar = (function () {
     if (paso === 'transporte') pagTransporte(app, v);
     else if (paso === 'noches') pagNoches(app, v);
     else pagDatos(app, v, {});
+    const sec = app.querySelector('.armar');
+    if (sec) sec.classList.toggle('revisar', revisar);
   }
 
   function pasosHTML(actual, v) {
     const lista = [['datos', '1', 'El viaje'], ['transporte', '2', 'Transporte'], ['noches', '3', 'Noches']];
     return `<ol class="armar-pasos">${lista.map(([id, n, t]) => {
-      const link = v && id !== actual ? `href="#armar/${v.id}/${id}"` : '';
+      const link = v && id !== actual ? `href="#armar/${v.id}/${id}" data-ir-paso="#armar/${v.id}/${id}"` : '';
       return `<li class="${id === actual ? 'activo' : ''}"><a ${link}><span>${n}</span>${t}</a></li>`;
     }).join('')}</ol>`;
   }
@@ -161,24 +187,31 @@ R.armar = (function () {
 
     pagina(app, 'datos', existente, editando ? 'Editar el viaje' : 'Nuevo viaje', editando ? '' : 'Lo único obligatorio es a dónde vas. Transporte y alojamiento vienen después (y los podés dejar para más adelante).',
       '<div class="form-viaje"></div>',
-      `${editando ? `<a class="btn btn-suave" href="#viaje/${existente.id}">Cancelar</a>` : '<a class="btn btn-suave" href="#inicio">Cancelar</a>'}
-       <button type="button" class="btn btn-primario" data-a="guardar">${editando ? 'Guardar' : 'Siguiente: transporte →'}</button>`);
+      editando ? `<button type="button" class="btn btn-suave" data-a="guardar">Guardar</button>
+       <button type="button" class="btn btn-primario" data-a="guardarSeguir">Transporte →</button>`
+        : `<a class="btn btn-suave" href="#inicio">Cancelar</a>
+       <button type="button" class="btn btn-primario" data-a="guardar">Siguiente: transporte →</button>`);
     const caja = app.querySelector('.form-viaje');
 
     function leer() {
-      campos.forEach((c, i) => { if (b.destinos[i]) Object.assign(b.destinos[i], c.obtener(), { id: b.destinos[i].id, soloDia: b.destinos[i].soloDia }); });
+      campos.forEach((c, i) => { if (b.destinos[i]) Object.assign(b.destinos[i], c.obtener(), { id: b.destinos[i].id, soloDia: b.destinos[i].soloDia, paso: b.destinos[i].paso }); });
       if (campoOrigen) b.origen = campoOrigen.obtener();
       const q = s => caja.querySelector(s);
       b.fechaInicio = q('#fvIda').value; b.fechaFin = q('#fvVuelta').value;
       b.nombre = q('#fvNombre').value.trim(); b.monedaBase = q('#fvMoneda').value;
-      caja.querySelectorAll('[data-en-el-dia]').forEach(x => { const d = b.destinos[Number(x.dataset.enElDia)]; if (d) d.soloDia = x.checked; });
+      caja.querySelectorAll('[data-clase-destino]').forEach(x => {
+        const d = b.destinos[Number(x.dataset.claseDestino)];
+        if (!d) return;
+        d.soloDia = x.value === 'dia';
+        if (x.value === 'paso') d.paso = true; else delete d.paso;
+      });
     }
 
     function pintar() {
       const conocidos = R.db.personas().filter(p => !p.esYo && !b.viajeros.some(x => normal(x.nombre) === normal(p.nombre)));
       caja.innerHTML = `
         <section class="fv-seccion"><h3>🧭 El viaje</h3>
-        <label class="campo"><span>Nombre del viaje <small>(opcional)</small></span><input id="fvNombre" value="${esc(b.nombre)}" placeholder="${esc(b.destinos.filter(d => d.nombre && !d.soloDia).map(d => d.nombre).join(' → ') || 'Ej: Vacaciones de verano')}" maxlength="60"></label>
+        <label class="campo"><span>Nombre del viaje <small>(opcional)</small></span><input id="fvNombre" value="${esc(b.nombre)}" placeholder="${esc(b.destinos.filter(d => d.nombre && !d.soloDia).map(d => d.nombre).join(' → ') || 'Un nombre para reconocer el viaje')}" maxlength="60"></label>
         </section>
         <section class="fv-seccion"><h3>🗺️ Recorrido</h3>
         <div class="campo"><span>Salís desde</span><div id="fvOrigen"></div></div>
@@ -189,7 +222,11 @@ R.armar = (function () {
               <div class="fv-destino-campos">
                 <div data-lugar="${i}"></div>
                 <div class="fv-destino-pie">
-                  <label class="check check-chico"><input type="checkbox" data-en-el-dia="${i}" ${d.soloDia ? 'checked' : ''}> Voy y vuelvo en el día</label>
+                  <select class="fv-clase" data-clase-destino="${i}" aria-label="Qué hacés en ${esc(d.nombre || 'este destino')}">
+                    <option value="noche" ${!d.soloDia && !d.paso ? 'selected' : ''}>🛏️ Duermo ahí</option>
+                    <option value="dia" ${d.soloDia ? 'selected' : ''}>🎒 Voy en el día</option>
+                    <option value="paso" ${d.paso ? 'selected' : ''}>⏳ Solo paso, sin dormir</option>
+                  </select>
                   ${b.destinos.length > 1 ? `<button type="button" class="btn-icono" data-quitar-destino="${i}" aria-label="Quitar" title="Quitar">×</button>` : ''}
                 </div>
               </div>
@@ -227,7 +264,7 @@ R.armar = (function () {
       });
       campoOrigen = R.lugares.campo(caja.querySelector('#fvOrigen'), { valor: b.origen, placeholder: 'Tu ciudad', sugeridos: usadas, alCambiar: () => { leer(); pintarVuelta(); } });
       pintarVuelta();
-      caja.querySelectorAll('[data-en-el-dia]').forEach(x => x.addEventListener('change', () => { leer(); pintarVuelta(); }));
+      caja.querySelectorAll('[data-clase-destino]').forEach(x => x.addEventListener('change', () => { leer(); pintarVuelta(); }));
       caja.querySelector('[data-a="otroDestino"]').onclick = () => {
         leer(); b.destinos.push({ id: U.id('dst'), nombre: '' }); pintar();
         const ins = caja.querySelectorAll('.fv-destino .lugar-input'); ins[ins.length - 1].focus();
@@ -254,6 +291,8 @@ R.armar = (function () {
         caja.querySelector('#fvDias').textContent = textoDias();
       });
       vuelta.addEventListener('change', () => { leer(); caja.querySelector('#fvDias').textContent = textoDias(); });
+      // El calendario de la vuelta arranca en la fecha de ida
+      U.calendarioDesde(vuelta, () => ida.value);
       if (!editando && !b.destinos[0].nombre) setTimeout(() => { const i = caja.querySelector('.fv-destino .lugar-input'); if (i) i.focus(); }, 80);
     }
     /** "¿Volvés?" y "¿Por dónde volvés?", con los lugares del viaje como opciones. */
@@ -303,13 +342,14 @@ R.armar = (function () {
       }));
     }
 
-    app.querySelector('[data-a="guardar"]').onclick = () => {
+    /** Guarda la página. Devuelve el viaje, o false si falta algo. */
+    function guardarDatos() {
       leer();
       const destinos = b.destinos.filter(d => d.nombre);
-      if (!destinos.length) { U.toast('¿A dónde vas? Escribí al menos un destino.'); return; }
-      if (!b.origen || !b.origen.nombre) { U.toast('¿Desde dónde salís? Así se arma la vuelta.'); return; }
-      if (b.fechaFin && b.fechaInicio && b.fechaFin < b.fechaInicio) { U.toast('La vuelta tiene que ser después de la ida.'); return; }
-      if (b.fechaFin && !b.fechaInicio) { U.toast('Poné también la fecha de ida.'); return; }
+      if (!destinos.length) { U.toast('¿A dónde vas? Escribí al menos un destino.'); return false; }
+      if (!b.origen || !b.origen.nombre) { U.toast('¿Desde dónde salís? Así se arma la vuelta.'); return false; }
+      if (b.fechaFin && b.fechaInicio && b.fechaFin < b.fechaInicio) { U.toast('La vuelta tiene que ser después de la ida.'); return false; }
+      if (b.fechaFin && !b.fechaInicio) { U.toast('Poné también la fecha de ida.'); return false; }
       // Cada escapada de un día sale del lugar anterior
       let base = '';
       destinos.forEach(d => { if (d.soloDia) d.base = base; else { delete d.base; base = d.id; } });
@@ -326,9 +366,7 @@ R.armar = (function () {
         const vigentes = new Set(tramos(v).map(t => t.clave));
         A().items(v).filter(i => i.tramo && !vigentes.has(i.tramo)).forEach(i => A().borrarItem(v, i.id));
         R.db.guardarViaje(v);
-        U.toast('Cambios guardados.');
-        location.hash = `#viaje/${v.id}/itinerario`;
-        return;
+        return v;
       }
       const v = Object.assign({
         id: U.id('via'), v2: 26, armado: true, creado: new Date().toISOString(),
@@ -336,8 +374,17 @@ R.armar = (function () {
         tareas: {}, tareasPropias: [], itinerario: [], documentos: [], movimientos: [], cambios: []
       }, datos, { participantes: participantes() });
       R.db.guardarViaje(v);
-      location.hash = `#armar/${v.id}/transporte`;
+      return v;
+    }
+    if (editando) guardarActual = () => !!guardarDatos();
+    app.querySelector('[data-a="guardar"]').onclick = () => {
+      const v = guardarDatos();
+      if (!v) return;
+      if (editando) { U.toast('Cambios guardados.'); location.hash = `#viaje/${v.id}/itinerario`; }
+      else location.hash = `#armar/${v.id}/transporte`;
     };
+    const bs = app.querySelector('[data-a="guardarSeguir"]');
+    if (bs) bs.onclick = () => { const v = guardarDatos(); if (v) location.hash = `#armar/${v.id}/transporte`; };
     pintar();
   }
 
@@ -350,17 +397,20 @@ R.armar = (function () {
         medio: it ? TIPO_A_MEDIO[it.tipo] || 'otro' : '',
         fecha: it ? it.fecha : (ida ? v.fechaInicio || '' : ultimo && t.vuelta ? v.fechaFin || '' : ''),
         hora: it ? it.hora || '' : '',
-        fechaLlega: it ? it.fechaLlegada || it.fecha || '' : '',
+        fechaLlega: it ? it.fechaLlegada || it.fecha || '' : (ida ? v.fechaInicio || '' : ultimo && t.vuelta ? v.fechaFin || '' : ''),
         horaLlega: it ? it.horaLlegada || '' : '',
         empresa: it ? it.empresa || '' : '', numero: it ? it.numero || '' : '', codigo: it ? it.codigo || '' : '',
         aeroDesde: it ? it.aeroDesde || '' : '', aeroHasta: it ? it.aeroHasta || '' : '',
         alSalir: it ? it.alSalir || '' : '', alLlegar: it ? it.alLlegar || '' : '',
+        puntoSalida: it && it.puntoSalida ? it.puntoSalida : (t.desde.id === 'o' ? 'casa' : t.desde.paso ? 'tiempo' : ''),
+        puntoLlegada: it && it.puntoLlegada ? it.puntoLlegada : (t.hasta.id === 'o' ? 'casa' : t.hasta.paso ? 'tiempo' : ''),
         hayEscala: !!(it && it.escala && it.escala.lugar),
         escLugar: it && it.escala ? it.escala.lugar || '' : '', escLlegaF: it && it.escala ? it.escala.llegaFecha || '' : '', escLlegaH: it && it.escala ? it.escala.llegaHora || '' : '',
         escSaleF: it && it.escala ? it.escala.saleFecha || '' : '', escSaleH: it && it.escala ? it.escala.saleHora || '' : '',
         indef: !!(it && it.pendiente)
       };
     });
+    lista.forEach(x => tiempoSinConexion(x));
     const etiqueta = x => x.t.vuelta ? 'Vuelta' : x.t.enElDia ? (x.t.hasta.soloDia ? 'Escapada de un día · ida' : 'Escapada de un día · vuelta') : 'Ida';
     /** El calendario de "Sale" arranca en la salida del tramo anterior (o en el inicio del viaje). */
     const minSale = i => { for (let k = i - 1; k >= 0; k--) if (lista[k].fecha) return lista[k].fecha; return ''; };
@@ -380,16 +430,16 @@ R.armar = (function () {
       return `
         ${tipo === 'vuelo' ? `
           <div class="grilla-2">
-            <label class="campo"><span>N° de vuelo</span><input data-f="numero" value="${esc(x.numero)}" autocapitalize="characters" placeholder="Ej: AR1672"></label>
-            <label class="campo"><span>Aerolínea</span><input data-f="empresa" value="${esc(x.empresa)}" list="dlEmpresasArmar" placeholder="Se completa con el N°"></label>
+            <label class="campo"><span>N° de vuelo</span><input data-f="numero" value="${esc(x.numero)}" autocapitalize="characters" placeholder="Como figura en el pasaje"></label>
+            <label class="campo"><span>Aerolínea</span><input data-f="empresa" value="${esc(x.empresa)}" list="dlEmpresasArmar" placeholder="Se completa con el número de vuelo"></label>
           </div>
           <div class="grilla-2 tramo-aeros">${campoAero('aeroDesde', x.t.desde.nombre)}${campoAero('aeroHasta', x.t.hasta.nombre)}</div>`
         : ['micro', 'tren', 'barco', 'traslado'].includes(tipo) ? `
-          <label class="campo"><span>Empresa${tipo === 'traslado' ? ' <small>(opcional)</small>' : ''}</span><input data-f="empresa" value="${esc(x.empresa)}" list="dlEmpresasArmar" placeholder="${tipo === 'micro' ? 'Ej: Vía Bariloche' : ''}"></label>` : ''}
+          <label class="campo"><span>Empresa${tipo === 'traslado' ? ' <small>(opcional)</small>' : ''}</span><input data-f="empresa" value="${esc(x.empresa)}" list="dlEmpresasArmar" placeholder="Nombre de la empresa"></label>` : ''}
         ${prog ? `<label class="campo"><span>Código de reserva <small>(opcional)</small></span><input data-f="codigo" value="${esc(x.codigo)}" autocapitalize="characters"></label>
           <label class="check check-chico"><input type="checkbox" data-escala ${x.hayEscala ? 'checked' : ''}> Hace escala o combinación</label>
           <div class="escala" ${x.hayEscala ? '' : 'hidden'}>
-            <label class="campo"><span>¿Dónde?</span><input data-f="escLugar" value="${esc(x.escLugar)}" placeholder="Ej: Buenos Aires"></label>
+            <label class="campo"><span>¿Dónde?</span><input data-f="escLugar" value="${esc(x.escLugar)}" placeholder="Ciudad de la escala"></label>
             <div class="tramo-horas">
               <span>Llegás</span><input type="date" data-f="escLlegaF" value="${esc(x.escLlegaF)}" aria-label="Día que llegás a la escala"><input type="time" data-f="escLlegaH" value="${esc(x.escLlegaH)}" aria-label="Hora que llegás a la escala">
               <span>Salís</span><input type="date" data-f="escSaleF" value="${esc(x.escSaleF)}" aria-label="Día que salís de la escala"><input type="time" data-f="escSaleH" value="${esc(x.escSaleH)}" aria-label="Hora que salís de la escala">
@@ -416,25 +466,40 @@ R.armar = (function () {
       const fem = term === 'terminal' || term === 'estación';
       const icono = A().tipo(tipo).icono;
       const nombreTerm = (aero, ciudad) => tipo === 'vuelo' ? `Aeropuerto ${aero ? aero + ' · ' + ciudad : 'de ' + ciudad}` : `${fem ? (term === 'terminal' ? 'Terminal' : 'Estación') : 'Puerto'} de ${ciudad}`;
-      const lugar = p => p.id === 'o' ? '🏠 Tu casa' : `🛏️ Alojamiento en ${p.nombre}`;
       const paso = (campo, pregunta) => {
         const c = A().conexion(x[campo]);
+        const ok = A().conexionResuelta(x[campo]);
         return `
-          <button type="button" class="rc-paso ${c ? '' : 'sin'}" data-con="${campo}" aria-expanded="false">
+          <button type="button" class="rc-paso ${ok ? 'ok' : 'sin'}" data-con="${campo}" aria-expanded="false">
             <span class="rc-linea" aria-hidden="true"></span>
             <span class="rc-elegido">${c ? `${c[1]} ${esc(c[2])}` : esc(pregunta)}</span><span class="rc-cambiar">${c ? 'Cambiar' : 'Elegir'}</span>
           </button>
           <div class="rc-opciones" data-ops="${campo}" hidden>${A().CONEXIONES.map(([k, ic, n]) => `<button type="button" class="chip-op ${x[campo] === k ? 'activo' : ''}" data-val="${k}">${ic} ${n}</button>`).join('')}</div>`;
       };
+      // Los extremos (de dónde salís y a dónde vas) los elegís vos: no se da por hecho que es el alojamiento
+      const extremo = (campo, pregunta, ciudad) => {
+        const p = A().punto(x[campo]);
+        return `
+          <button type="button" class="rc-punto rc-punto-btn ${p ? '' : 'sin-punto'}" data-con="${campo}" aria-expanded="false">
+            <span>${p ? `${p[1]} ${esc(p[0] === 'aloj' ? 'Alojamiento en ' + ciudad : p[2])}` : esc(pregunta)}</span><span class="rc-cambiar">${p ? 'Cambiar' : 'Elegir'}</span>
+          </button>
+          <div class="rc-opciones" data-ops="${campo}" hidden>${A().PUNTOS.map(([k, ic, n]) => `<button type="button" class="chip-op ${x[campo] === k ? 'activo' : ''}" data-val="${k}">${ic} ${n}</button>`).join('')}</div>`;
+      };
       return `
         <span class="rc-titulo">Puerta a puerta</span>
-        <div class="rc-punto">${lugar(x.t.desde)}</div>
-        ${paso('alSalir', `¿Cómo llegás ${fem ? 'a la' : 'al'} ${term}?`)}
+        ${extremo('puntoSalida', '¿Desde dónde salís?', x.t.desde.nombre)}
+        ${x.puntoSalida === 'tiempo' ? '' : paso('alSalir', `¿Cómo llegás ${fem ? 'a la' : 'al'} ${term}?`)}
         <div class="rc-punto rc-term">${icono} ${esc(nombreTerm(x.aeroDesde, x.t.desde.nombre))}</div>
         <div class="rc-viaje"><span class="rc-linea punteada" aria-hidden="true"></span>${esc(A().tipo(tipo).nombre)}${x.hayEscala && x.escLugar ? ` · escala en ${esc(x.escLugar)}` : ''}</div>
         <div class="rc-punto rc-term">${icono} ${esc(nombreTerm(x.aeroHasta, x.t.hasta.nombre))}</div>
-        ${paso('alLlegar', `¿Cómo salís ${fem ? 'de la' : 'del'} ${term}?`)}
-        <div class="rc-punto">${lugar(x.t.hasta)}</div>`;
+        ${x.puntoLlegada === 'tiempo' ? '' : paso('alLlegar', `¿Cómo salís ${fem ? 'de la' : 'del'} ${term}?`)}
+        ${extremo('puntoLlegada', '¿A dónde vas después?', x.t.hasta.nombre)}`;
+    }
+
+    /** Si hacés tiempo en la terminal hasta el próximo transporte, no hay traslado que resolver de ese lado. */
+    function tiempoSinConexion(x) {
+      if (x.puntoSalida === 'tiempo') x.alSalir = 'no';
+      if (x.puntoLlegada === 'tiempo') x.alLlegar = 'no';
     }
 
     /** La llegada no puede ser antes que la salida. Si es el mismo día y la hora es menor, es al día siguiente. */
@@ -511,7 +576,9 @@ R.armar = (function () {
         el.querySelectorAll('.rc-opciones [data-val]').forEach(b => b.onclick = () => {
           const campo = b.closest('.rc-opciones').dataset.ops;
           x[campo] = b.dataset.val;
+          tiempoSinConexion(x);
           repintarRuta();
+          marcarEstado(el);
         });
       }
       enlazarRuta();
@@ -552,7 +619,14 @@ R.armar = (function () {
       });
       el.querySelectorAll('.escala [data-f]').forEach(i => i.addEventListener('change', () => { validar(el); repintarRuta(); }));
       const num = el.querySelector('[data-f="numero"]'), emp = el.querySelector('[data-f="empresa"]');
-      if (num && emp) num.addEventListener('change', () => { const a = A().aerolineaDe(num.value); if (a && !emp.value.trim()) emp.value = a; });
+      // La aerolínea se completa sola mientras escribís el número (AR, FO, WJ, LA…)
+      if (num && emp) num.addEventListener('input', () => {
+        const a = A().aerolineaDe(num.value);
+        if (a && (!emp.value.trim() || emp.dataset.auto === '1')) { emp.value = a; emp.dataset.auto = '1'; x.empresa = a; }
+      });
+      if (emp) emp.addEventListener('input', () => { emp.dataset.auto = ''; });
+      // El calendario de las escalas arranca en el día que sale el tramo
+      el.querySelectorAll('[data-f="escLlegaF"], [data-f="escSaleF"]').forEach(i => U.calendarioDesde(i, () => el.querySelector('[data-f="fecha"]').value || v.fechaInicio));
     }
     function cambiarMedio(el, medio) {
       leer(el);
@@ -592,12 +666,33 @@ R.armar = (function () {
       app.querySelectorAll('[data-todos]').forEach(y => y.classList.toggle('activo', y === b));
     });
 
+    // Calendarios: "Sale" arranca en el tramo anterior (o el inicio del viaje) y "Llega" en el día que sale
+    app.querySelectorAll('.tramo').forEach(el => {
+      const i = Number(el.dataset.i);
+      U.calendarioDesde(el.querySelector('[data-f="fecha"]'), () => minSale(i) || v.fechaInicio);
+      U.calendarioDesde(el.querySelector('[data-f="fechaLlega"]'), () => el.querySelector('[data-f="fecha"]').value || minSale(i) || v.fechaInicio);
+      el.querySelectorAll('input, [data-indef]').forEach(inp => inp.addEventListener('change', () => marcarEstado(el)));
+      marcarEstado(el);
+    });
+
     const siguiente = () => { location.hash = noches(v).length ? `#armar/${v.id}/noches` : `#viaje/${v.id}/itinerario`; };
     app.querySelector('[data-a="omitir"]').onclick = () => { v.armado = true; R.db.guardarViaje(v); siguiente(); };
-    app.querySelector('[data-a="seguir"]').onclick = () => {
+    guardarActual = guardarTransporte;
+    app.querySelector('[data-a="seguir"]').onclick = () => { if (guardarTransporte()) siguiente(); };
+    /** Verde si el tramo está resuelto (medio, día si tiene horario, y cómo llegás/salís de la terminal); rojo si falta algo. */
+    function marcarEstado(el) {
+      const x = lista[Number(el.dataset.i)];
+      leer(el);
+      const tipo = MEDIO_A_TIPO[x.medio];
+      const prog = A().PROGRAMADOS.includes(tipo);
+      const ok = !!x.medio && !x.indef && (!prog || !!x.fecha) && (!prog || (A().conexionResuelta(x.alSalir) && A().conexionResuelta(x.alLlegar)));
+      el.classList.toggle('ok', ok);
+      el.classList.toggle('falta', !ok);
+    }
+    function guardarTransporte() {
       leerTodo();
       const conError = [...app.querySelectorAll('.tramo')].find(el => !validar(el));
-      if (conError) { U.toast('Hay un tramo con la llegada antes que la salida.'); conError.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+      if (conError) { U.toast('Hay un tramo con la llegada antes que la salida.'); conError.scrollIntoView({ behavior: 'smooth', block: 'center' }); return false; }
       lista.forEach(x => {
         if (!x.medio && !x.fecha && !x.it && !x.indef) return;
         const it = x.it ? Object.assign({}, x.it) : A().nuevoItem({});
@@ -612,14 +707,15 @@ R.armar = (function () {
           codigo: prog ? x.codigo.toUpperCase() : (it.codigo || ''),
           aeroDesde: tipo === 'vuelo' ? x.aeroDesde.toUpperCase() : '', aeroHasta: tipo === 'vuelo' ? x.aeroHasta.toUpperCase() : '',
           alSalir: prog ? x.alSalir : '', alLlegar: prog ? x.alLlegar : '',
+          puntoSalida: prog ? x.puntoSalida : '', puntoLlegada: prog ? x.puntoLlegada : '',
           escala: prog && x.hayEscala && x.escLugar ? { lugar: x.escLugar, llegaFecha: x.escLlegaF, llegaHora: x.escLlegaH, saleFecha: x.escSaleF, saleHora: x.escSaleH } : null
         });
         A().guardarItem(v, it);
       });
       v.armado = true;
       R.db.guardarViaje(v);
-      siguiente();
-    };
+      return true;
+    }
   }
 
   /* ---------- 3. Noches ---------- */
@@ -664,16 +760,19 @@ R.armar = (function () {
     }
     if (j === -1 && k < L.length && L[k].t.desde.id !== 'o' && !posibles.some(p => p.id === L[k].t.desde.id)) posibles.push(L[k].t.desde);
     if (j >= 0 && L[j].t.hasta.id === 'o' && k === L.length) return { lugar: L[j].t.hasta };
-    if (posibles.length === 1) return { lugar: posibles[0] };
-    if (posibles.length > 1) return { opciones: posibles };
-    const quedas = destinosDe(v).filter(d => !d.soloDia);
+    // Donde solo pasás no se da por hecho un alojamiento: si te toca la noche ahí, se pregunta
+    const reales = posibles.filter(p => !p.paso);
+    if (posibles.length && !reales.length) return { pregunta: 'paso', lugar: posibles[0] };
+    if (reales.length === 1) return { lugar: reales[0] };
+    if (reales.length > 1) return { opciones: reales };
+    const quedas = destinosDe(v).filter(d => !d.soloDia && !d.paso);
     if (quedas.length === 1) return { lugar: quedas[0] };
     return {};
   }
 
   function pagNoches(app, v) {
     const ns = noches(v);
-    const quedas = destinosDe(v).filter(d => !d.soloDia);
+    const quedas = destinosDe(v).filter(d => !d.soloDia && !d.paso);
     const manuales = (v.alojamientos || []).filter(a => !a.deArmado);
     const deArmado = (v.alojamientos || []).filter(a => a.deArmado);
     const elegido = {}, notas = {};
@@ -683,6 +782,7 @@ R.armar = (function () {
       if (s.opciones) notas[f] = `Puede ser ${s.opciones.map(o => o.nombre).join(' o ')}: falta el día que vas de uno a otro.`;
       if (s.pregunta === 'madrugada') notas[f] = `Llegás a ${s.tramo.t.hasta.nombre} a las ${s.tramo.it.horaLlegada}: ¿esa noche ya dormís en un alojamiento o la pasás viajando?`;
       if (s.pregunta === 'escala') notas[f] = `Hacés escala en ${s.escala.lugar} (llegás ${U.fmtFecha(s.escala.llegaFecha, 'dia')}${s.escala.llegaHora ? ' ' + s.escala.llegaHora : ''}, salís ${U.fmtFecha(s.escala.saleFecha, 'dia')}${s.escala.saleHora ? ' ' + s.escala.saleHora : ''}): ¿dormís en un hotel ahí o en el aeropuerto/terminal?`;
+      if (s.pregunta === 'paso') notas[f] = `En ${s.lugar.nombre} solo pasás y esa noche te toca ahí: ¿la pasás en el aeropuerto o la terminal, o vas a un hotel?`;
       if (s.pregunta === 'auto') notas[f] = `Vas de ${s.tramo.t.desde.nombre} a ${s.tramo.t.hasta.nombre} y llegás otro día: ¿manejás de corrido o parás a dormir en el camino?`;
       if (a && !a.deArmado) elegido[f] = 'aloj:' + a.id;
       else if (a && a.deArmado && a.destinoId) elegido[f] = a.destinoId.startsWith('parada:') ? a.destinoId : 'lugar:' + a.destinoId;
@@ -693,6 +793,7 @@ R.armar = (function () {
       else if (s.lugar && !s.lugar.soloDia) elegido[f] = 'lugar:' + s.lugar.id;
       else elegido[f] = '';
     });
+    const separadas = new Set();
     // Datos que ya cargaste en cada alojamiento, para no perderlos al reagrupar
     const datosAloj = {};
     deArmado.forEach(a => { (datosAloj[a.destinoId] = datosAloj[a.destinoId] || []).push(a); });
@@ -703,8 +804,9 @@ R.armar = (function () {
       const ops = quedas.map(d => [`lugar:${d.id}`, `🛏️ En ${d.nombre}`]);
       manuales.forEach(a => ops.push([`aloj:${a.id}`, `🛏️ ${A().nombreAlojamiento(a)}`]));
       if (s.escala) ops.unshift([`parada:${s.escala.lugar}`, `🛏️ Hotel en ${s.escala.lugar} (escala)`]);
+      if (s.pregunta === 'paso') ops.unshift([`parada:${s.lugar.nombre}`, `🛏️ Hotel en ${s.lugar.nombre}`]);
       const tr = s.tramo ? `${s.tramo.t.desde.nombre} → ${s.tramo.t.hasta.nombre}` : '';
-      ops.push(['viaje', s.pregunta === 'escala' ? '✈️ En el aeropuerto / terminal' : tr ? `${A().tipo(s.tramo.it.tipo).icono} Viajando (${tr})` : '🚌 Viajando']);
+      ops.push(['viaje', s.pregunta === 'escala' || s.pregunta === 'paso' ? '✈️ En el aeropuerto / terminal' : tr ? `${A().tipo(s.tramo.it.tipo).icono} Viajando (${tr})` : '🚌 Viajando']);
       ops.push(['casa', '🏠 En casa']);
       // "En otro lugar": una parada en el camino (la escribís vos)
       const otro = (elegido[f] || '').startsWith('parada:') && !(s.escala && elegido[f] === `parada:${s.escala.lugar}`);
@@ -750,24 +852,43 @@ R.armar = (function () {
     function pintar() {
       const cn = app.querySelector('.noches');
       if (!cn) return;
-      cn.innerHTML = ns.map(f => `
-        <div class="noche ${notas[f] && !elegido[f] ? 'pregunta' : ''}">
-          <span class="noche-fecha">${esc(U.fmtFecha(f, 'dia'))}</span>
-          <select data-noche="${f}" aria-label="Noche del ${esc(U.fmtFecha(f, 'dia'))}">${opciones(f)}</select>
+      // Las noches seguidas con lo mismo van juntas en una fila ("Del 2 al 6 · 4 noches · En Bariloche").
+      // Las que tienen una pregunta (madrugada, escala, auto) van solas.
+      const bloques = [];
+      ns.forEach(f => {
+        const ult = bloques[bloques.length - 1];
+        const solo = !!notas[f] || separadas.has(f);
+        if (ult && !solo && !ult.solo && ult.valor === (elegido[f] || '')) ult.noches.push(f);
+        else bloques.push({ valor: elegido[f] || '', noches: [f], solo });
+      });
+      const rango = b => {
+        const f0 = b.noches[0], f1 = b.noches[b.noches.length - 1];
+        return b.noches.length === 1 ? `Noche del ${U.fmtFecha(f0, 'dia')}` : `Del ${U.fmtFecha(f0, 'dia')} al ${U.fmtFecha(U.sumarDias(f1, 1), 'dia')} · ${b.noches.length} noches`;
+      };
+      cn.innerHTML = bloques.map(b => {
+        const f = b.noches[0];
+        return `
+        <div class="noche ${b.valor ? 'ok' : 'falta'} ${notas[f] && !b.valor ? 'pregunta' : ''}">
+          <span class="noche-fecha">${esc(rango(b))}</span>
+          <select data-noche="${b.noches.join(',')}" aria-label="${esc(rango(b))}">${opciones(f)}</select>
           ${notas[f] ? `<small class="noche-nota">${esc(notas[f])}</small>` : ''}
-        </div>`).join('');
+          ${b.noches.length > 1 ? `<button type="button" class="btn-texto-mini noche-separar" data-separar="${b.noches.join(',')}">Cambiar alguna noche suelta</button>` : ''}
+        </div>`;
+      }).join('');
+      cn.querySelectorAll('[data-separar]').forEach(b => b.onclick = () => { leerEscritos(); b.dataset.separar.split(',').forEach(f => separadas.add(f)); pintar(); });
       cn.querySelectorAll('[data-noche]').forEach(s => s.onchange = () => {
         leerEscritos();
+        const fechas = s.dataset.noche.split(',');
         if (s.value === '__otro') {
           // Se pide el lugar ahí mismo
           const fila = s.closest('.noche');
-          fila.insertAdjacentHTML('beforeend', `<form class="noche-otro"><input placeholder="¿Dónde? Ej: Neuquén" aria-label="Dónde parás a dormir"><button class="btn btn-suave btn-chico">OK</button></form>`);
+          fila.insertAdjacentHTML('beforeend', `<form class="noche-otro"><input placeholder="Ciudad o lugar donde parás" aria-label="Dónde parás a dormir"><button class="btn btn-suave btn-chico">Listo</button></form>`);
           const fo = fila.querySelector('.noche-otro');
           fo.querySelector('input').focus();
-          fo.onsubmit = e => { e.preventDefault(); const t = fo.querySelector('input').value.trim(); if (!t) return; elegido[s.dataset.noche] = 'parada:' + t; pintar(); };
+          fo.onsubmit = e => { e.preventDefault(); const t = fo.querySelector('input').value.trim(); if (!t) return; fechas.forEach(f => { elegido[f] = 'parada:' + t; }); pintar(); };
           return;
         }
-        elegido[s.dataset.noche] = s.value; pintar();
+        fechas.forEach(f => { elegido[f] = s.value; }); pintar();
       });
       const gs = grupos();
       const ca = app.querySelector('.alojs');
@@ -778,8 +899,8 @@ R.armar = (function () {
         return `
           <div class="aloj-armar" data-g="${g.k}">
             <strong>🛏️ ${esc(g.ciudad)}</strong><small>${U.plural(n, 'noche', 'noches')} · entrás el ${esc(U.fmtFecha(g.desde, 'dia'))}, salís el ${esc(U.fmtFecha(g.hasta, 'dia'))}</small>
-            <label class="campo"><span>Nombre <small>(opcional)</small></span><input data-c="nombre" value="${esc(w.nombre != null ? w.nombre : p.nombre || '')}" placeholder="Ej: Hotel Patagonia, depto de Airbnb" list="dlAlojArmar"></label>
-            <label class="campo"><span>Dirección <small>(opcional)</small></span><input data-c="direccion" value="${esc(w.direccion != null ? w.direccion : p.direccion || '')}" placeholder="Escribí el hotel o la calle"></label>
+            <label class="campo"><span>Nombre <small>(opcional)</small></span><input data-c="nombre" value="${esc(w.nombre != null ? w.nombre : p.nombre || '')}" placeholder="Nombre del hotel, departamento o casa" list="dlAlojArmar"></label>
+            <label class="campo"><span>Dirección <small>(opcional)</small></span><input data-c="direccion" value="${esc(w.direccion != null ? w.direccion : p.direccion || '')}" placeholder="Calle y número, o nombre del lugar"></label>
           </div>`;
       }).join('') + `<datalist id="dlAlojArmar">${A().usados('alojamiento').map(x => `<option value="${esc(x)}">`).join('')}</datalist>`
         : '<p class="texto-suave">Elegí en qué destino dormís cada noche y acá aparece el alojamiento.</p>';
@@ -789,7 +910,13 @@ R.armar = (function () {
 
     const terminar = () => { location.hash = `#viaje/${v.id}/itinerario`; };
     app.querySelector('[data-a="omitir"]').onclick = () => { v.armado = true; R.db.guardarViaje(v); terminar(); };
+    guardarActual = () => { guardarNoches(); return true; };
     app.querySelector('[data-a="listo"]').onclick = () => {
+      guardarNoches();
+      U.toast('¡Listo! Ahora sumá qué hacés cada día. 🧭');
+      terminar();
+    };
+    function guardarNoches() {
       if (ns.length) {
         leerEscritos();
         const gs = grupos();
@@ -810,9 +937,7 @@ R.armar = (function () {
       }
       v.armado = true;
       R.db.guardarViaje(v);
-      U.toast('¡Listo! Ahora sumá qué hacés cada día. 🧭');
-      terminar();
-    };
+    }
   }
 
   return { nuevo, render, tramos, itemsDeTramos, noches, faltaHTML, cuantasFaltan, faltaTransporte, faltanNoches, faltanConexiones, tramoResuelto, lugarSegunTransporte };

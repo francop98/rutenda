@@ -21,7 +21,7 @@ R.viajes = (function () {
   const OTRAS = { documentos: 'Archivos', viajeros: 'Viajeros', ayuda: 'Ayuda' };
 
   /* ---------- Datos del viaje ---------- */
-  const lugares = v => (v.destinos || []).filter(d => d.nombre && !d.soloDia);
+  const lugares = v => (v.destinos || []).filter(d => d.nombre && !d.soloDia && !d.paso);
   const todos = v => (v.destinos || []).filter(d => d.nombre);
   function nombreDe(v) { return v.nombre || (lugares(v).length ? lugares(v) : todos(v)).map(d => d.nombre).join(' → ') || v.destino || 'Viaje'; }
   function destinoCompleto(v) {

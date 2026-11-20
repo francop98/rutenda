@@ -277,7 +277,7 @@ R.itinerario = (function () {
     const ideas = A().ideas(v);
     const dias = A().dias(v);
     if (!ideas.length || !dias.length) return;
-    const quedas = (v.destinos || []).filter(d => d.nombre && !d.soloDia);
+    const quedas = (v.destinos || []).filter(d => d.nombre && !d.soloDia && !d.paso);
     const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     // 1) Dónde queda cada idea (lo que ya sabemos, o lo buscamos cerca del destino)
     U.toast('Buscando dónde queda cada idea… 🔎');

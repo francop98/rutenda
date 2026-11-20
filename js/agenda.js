@@ -38,10 +38,17 @@ R.agenda = (function () {
   const esProgramado = it => PROGRAMADOS.includes(it && it.tipo);
   const TERMINAL = { vuelo: 'aeropuerto', micro: 'terminal', tren: 'estación', barco: 'puerto' };
   /** Cómo llegás a la terminal o de la terminal a donde vas. */
-  const CONEXIONES = [['taxi', '🚕', 'Taxi o remis'], ['transfer', '🚐', 'Transfer'], ['colectivo', '🚌', 'Colectivo'], ['buscan', '🙋', 'Me buscan / llevan'], ['auto', '🚗', 'En auto'], ['pie', '🚶', 'Caminando'], ['no', '✕', 'No hace falta']];
+  const CONEXIONES = [
+    ['taxi', '🚕', 'Taxi o remis'], ['app', '📱', 'Uber, Cabify o similar'], ['transfer', '🚐', 'Transfer contratado'], ['hotel', '🏨', 'Traslado del alojamiento'],
+    ['colectivo', '🚌', 'Colectivo'], ['subte', '🚇', 'Subte o tren'], ['buscan', '🙋', 'Me buscan o me llevan'], ['auto', '🚗', 'Mi auto'],
+    ['alquilado', '🔑', 'Auto alquilado'], ['pie', '🚶', 'Caminando'], ['no', '✕', 'No hace falta'], ['nose', '❔', 'Todavía no lo sé']];
   const conexion = k => CONEXIONES.find(c => c[0] === k) || null;
-  /** Cuántas conexiones de este traslado falta resolver (0, 1 o 2). */
-  function conexionesFaltan(it) { return esProgramado(it) ? (it.alSalir ? 0 : 1) + (it.alLlegar ? 0 : 1) : 0; }
+  const conexionResuelta = k => !!k && k !== 'nose';
+  /** A dónde vas después de la terminal (o de dónde salís antes): no se da por hecho. */
+  const PUNTOS = [['tiempo', '⏳', 'Hago tiempo hasta el próximo transporte'], ['aloj', '🛏️', 'Alojamiento'], ['casa', '🏠', 'Mi casa'], ['familia', '👪', 'Casa de familia o amigos'], ['actividad', '📍', 'Directo a una actividad o paseo'], ['combino', '🔁', 'Combino con otro transporte'], ['otro', '📌', 'Otro lugar']];
+  const punto = k => PUNTOS.find(c => c[0] === k) || null;
+  /** Cuántas conexiones de este traslado falta resolver (0, 1 o 2). "Todavía no lo sé" cuenta como pendiente. */
+  function conexionesFaltan(it) { return esProgramado(it) ? (conexionResuelta(it.alSalir) ? 0 : 1) + (conexionResuelta(it.alLlegar) ? 0 : 1) : 0; }
   const tipo = t => TIPOS[t] || TIPOS.otro;
   const esTraslado = it => !!tipo(it.tipo).traslado;
   const normal = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
@@ -299,7 +306,7 @@ R.agenda = (function () {
   }
 
   return {
-    TIPOS, ORDEN_TIPOS, TIPOS_A_LA_VISTA, MEDIOS, tipo, esTraslado, PROGRAMADOS, esProgramado, TERMINAL, CONEXIONES, conexion, conexionesFaltan,
+    TIPOS, ORDEN_TIPOS, TIPOS_A_LA_VISTA, MEDIOS, tipo, esTraslado, PROGRAMADOS, esProgramado, TERMINAL, CONEXIONES, conexion, conexionResuelta, PUNTOS, punto, conexionesFaltan,
     items, delDia, ideas, item, parecido, alojamiento, nombreAlojamiento, nocheDe, dias, docsDe,
     nuevoItem, guardarItem, borrarItem, guardarAlojamiento, borrarAlojamiento,
     segmentos, paradas, medioPrincipal, etiquetaSegmento, lugarConocido, checkin, aerolineaDe, usados, migrar
