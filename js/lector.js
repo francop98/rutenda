@@ -18,8 +18,17 @@
     H2: 'Sky Airline', G3: 'Gol', AD: 'Azul', CM: 'Copa Airlines', AV: 'Avianca', ZP: 'Paranair', OB: 'BoA', OY: 'Andes', '2Z': 'Voepass', DM: 'Arajet',
     IB: 'Iberia', UX: 'Air Europa', I2: 'Iberia Express', V7: 'Volotea', VY: 'Vueling', FR: 'Ryanair', U2: 'easyJet', TP: 'TAP Air Portugal', AF: 'Air France', KL: 'KLM',
     LH: 'Lufthansa', LX: 'Swiss', BA: 'British Airways', AZ: 'ITA Airways', TK: 'Turkish Airlines', EK: 'Emirates', QR: 'Qatar Airways', ET: 'Ethiopian',
-    AA: 'American Airlines', UA: 'United', DL: 'Delta', AM: 'Aeroméxico', AC: 'Air Canada', B6: 'JetBlue', NK: 'Spirit', Y4: 'Volaris', VB: 'Viva Aerobus'
+    AA: 'American Airlines', UA: 'United', DL: 'Delta', AM: 'Aeroméxico', AC: 'Air Canada', B6: 'JetBlue', NK: 'Spirit', Y4: 'Volaris', VB: 'Viva Aerobus',
+    AS: 'Alaska Airlines', WN: 'Southwest', F9: 'Frontier', P5: 'Wingo', '5U': 'TAG', EW: 'Eurowings', DE: 'Condor', SK: 'SAS', AY: 'Finnair', OS: 'Austrian',
+    SN: 'Brussels Airlines', LO: 'LOT', A3: 'Aegean', EI: 'Aer Lingus', W6: 'Wizz Air', DY: 'Norwegian', LY: 'El Al', MS: 'EgyptAir', AT: 'Royal Air Maroc',
+    EY: 'Etihad', SV: 'Saudia', AI: 'Air India', SQ: 'Singapore Airlines', CX: 'Cathay Pacific', NH: 'ANA', JL: 'Japan Airlines', KE: 'Korean Air', OZ: 'Asiana',
+    CA: 'Air China', MU: 'China Eastern', CZ: 'China Southern', TG: 'Thai Airways', QF: 'Qantas', NZ: 'Air New Zealand', SA: 'South African Airways',
+    UC: 'LATAM Chile', '9V': 'Avior', QL: 'LASER', V0: 'Conviasa', '7P': 'Air Panama', TA: 'TACA', '2K': 'Avianca Ecuador'
   };
+  /** Algunos pasajes muestran el código de 3 letras (OACI): ARG1673 = AR1673. */
+  const OACI = { ARG: 'AR', FBZ: 'FO', JAT: 'JA', LAN: 'LA', TAM: 'JJ', LPE: 'LP', SKU: 'H2', GLO: 'G3', AZU: 'AD', CMP: 'CM', AVA: 'AV', AMX: 'AM', ACA: 'AC',
+    AAL: 'AA', UAL: 'UA', DAL: 'DL', IBE: 'IB', AEA: 'UX', VLG: 'VY', RYR: 'FR', EZY: 'U2', TAP: 'TP', AFR: 'AF', KLM: 'KL', DLH: 'LH', SWR: 'LX', BAW: 'BA',
+    ITY: 'AZ', THY: 'TK', UAE: 'EK', QTR: 'QR', ETH: 'ET', ETD: 'EY', PZP: 'ZP', BOV: 'OB', ANS: 'OY' };
   const EMPRESAS_MICRO = /(andesmar|via bariloche|v[ií]a tac|flecha bus|chevallier|plusmar|el r[aá]pido|cata internacional|crucero del norte|rutamar|jetmar|condor estrella|la estrella|urquiza|tienda le[oó]n|plataforma ?10|central de pasajes|busbud|flixbus|turbus|cruz del sur|pullman)/i;
   const RENTADORAS = /(hertz|avis|budget|localiza|europcar|sixt|enterprise|alamo|national|dollar|thrifty|rentalcars|mondial)/i;
   const SEGUROS = /(assist ?card|universal assistance|travel ace|coris|intermac|card ?assist|axa|allianz|mapfre|sancor|asistencia al viajero|seguro de viaje)/i;
@@ -257,7 +266,7 @@
     return r;
   }
 
-  const api = { leer, fechas, horas, vuelos, aeropuertos, codigoReserva, monto, AEROLINEAS };
+  const api = { leer, fechas, horas, vuelos, aeropuertos, codigoReserva, monto, AEROLINEAS, OACI };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else { raiz.R = raiz.R || {}; raiz.R.lector = api; }
 })(typeof window !== 'undefined' ? window : this);

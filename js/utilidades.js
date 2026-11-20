@@ -5,7 +5,7 @@
 window.R = window.R || {};
 
 /** Versión de la app (cambios chicos: 10.1, 10.2…; cambios grandes: 11, 12…). Igual que VERSION en sw.js. */
-window.R.VERSION = '29.2';
+window.R.VERSION = '30';
 
 R.util = (function () {
   const pad = n => String(n).padStart(2, '0');
@@ -420,16 +420,16 @@ R.util = (function () {
    * Para que el calendario de una fecha vacía no arranque en hoy sino en la fecha que importa
    * (la llegada en la salida, la vuelta en la ida…): al tocarlo, se completa con esa fecha.
    */
+  /** Al abrir el calendario de una fecha vacía, que arranque en la fecha de referencia (por ej. el día que sale)
+      sin escribirla: se usa como mínimo, así el calendario se ubica ahí y no deja elegir un día anterior. */
   function calendarioDesde(input, ref) {
     if (!input || input.dataset.calRef) return;
     input.dataset.calRef = '1';
     const poner = () => {
-      if (input.value) return;
       const r = typeof ref === 'function' ? ref() : ref;
-      if (!r) return;
-      input.value = r;
-      input.dispatchEvent(new Event('change', { bubbles: true }));
+      if (r) input.min = r;
     };
+    poner();
     input.addEventListener('pointerdown', poner);
     input.addEventListener('focus', poner);
   }

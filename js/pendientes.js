@@ -118,6 +118,16 @@ R.pendientes = (function () {
         const d = U.diasEntre(hoy, x.cancelaHasta);
         r.push({ id: 'cancela_' + x.id + '_' + x.cancelaHasta, texto: `Cancelación gratis de ${x.titulo || A().nombreAlojamiento(x)}: hasta el ${U.fmtFecha(x.cancelaHasta, 'dia')}`, detalle: d <= 7 ? `⏰ Vence ${d === 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`}. Si cambian los planes, cancelá antes.` : 'Si cambian los planes, cancelá antes de esa fecha.', urgente: d <= 7 });
       });
+    // Pagos pendientes de reservas (seña pagada, falta el resto)
+    const desde = U.sumarDias(hoy, -30);
+    (v.alojamientos || []).filter(a => a.pagarHasta && a.pagarHasta >= desde).concat(A().items(v).filter(it => it.pagarHasta && it.pagarHasta >= desde))
+      .sort((a, b) => a.pagarHasta.localeCompare(b.pagarHasta))
+      .forEach(x => {
+        const d = U.diasEntre(hoy, x.pagarHasta);
+        const que = x.titulo || A().nombreAlojamiento(x);
+        r.push({ id: 'pago_' + x.id + '_' + x.pagarHasta, texto: `Pagar ${x.pagarMonto ? x.pagarMonto + ' de ' : 'lo que falta de '}${que}: antes del ${U.fmtFecha(x.pagarHasta, 'dia')}`,
+          detalle: d < 0 ? '⚠️ Ya pasó la fecha: fijate si quedó pago.' : d <= 7 ? `⏰ Vence ${d === 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`}.` : 'Tildalo cuando lo pagues.', urgente: d <= 7 });
+      });
     if ((v.alojamientos || []).length) sumar('aloj_horario', 'Confirmar el horario de entrada con el alojamiento', 'Sobre todo si llegás temprano o muy tarde.');
     if (destinos.length) sumar('mapas', `Descargar el mapa sin conexión de ${destinos.join(', ')}`, 'En Google Maps: tu foto → Mapas sin conexión.');
     return r;

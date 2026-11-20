@@ -16,7 +16,7 @@ R.armar = (function () {
   const A = () => R.agenda;
   const normal = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 
-  const MEDIOS = [['avion', '✈️', 'Avión'], ['micro', '🚌', 'Micro'], ['auto', '🚗', 'Auto'], ['tren', '🚆', 'Tren'], ['barco', '⛴️', 'Barco'], ['taxi', '🚕', 'Taxi o remis'], ['transfer', '🚐', 'Transfer o excursión'], ['otro', '🧭', 'Otro']];
+  const MEDIOS = [['avion', '✈️', 'Avión'], ['micro', '🚌', 'Micro'], ['auto', '🚗', 'Auto'], ['tren', '🚆', 'Tren'], ['barco', '⛴️', 'Barco'], ['taxi', '🚕', 'Taxi, remis o Uber'], ['transfer', '🚐', 'Transfer o excursión'], ['otro', '🧭', 'Otro']];
   const MEDIO_A_TIPO = { avion: 'vuelo', micro: 'micro', auto: 'auto', tren: 'tren', barco: 'barco', taxi: 'taxi', transfer: 'traslado', otro: 'otromedio' };
   const TIPO_A_MEDIO = { vuelo: 'avion', micro: 'micro', auto: 'auto', tren: 'tren', barco: 'barco', taxi: 'taxi', traslado: 'transfer', otromedio: 'otro' };
 
@@ -397,13 +397,13 @@ R.armar = (function () {
         medio: it ? TIPO_A_MEDIO[it.tipo] || 'otro' : '',
         fecha: it ? it.fecha : (ida ? v.fechaInicio || '' : ultimo && t.vuelta ? v.fechaFin || '' : ''),
         hora: it ? it.hora || '' : '',
-        fechaLlega: it ? it.fechaLlegada || it.fecha || '' : (ida ? v.fechaInicio || '' : ultimo && t.vuelta ? v.fechaFin || '' : ''),
+        fechaLlega: it ? it.fechaLlegada || (it.horaLlegada ? it.fecha || '' : '') : '',
         horaLlega: it ? it.horaLlegada || '' : '',
         empresa: it ? it.empresa || '' : '', numero: it ? it.numero || '' : '', codigo: it ? it.codigo || '' : '',
         aeroDesde: it ? it.aeroDesde || '' : '', aeroHasta: it ? it.aeroHasta || '' : '',
-        alSalir: it ? it.alSalir || '' : '', alLlegar: it ? it.alLlegar || '' : '',
-        puntoSalida: it && it.puntoSalida ? it.puntoSalida : (t.desde.id === 'o' ? 'casa' : t.desde.paso ? 'tiempo' : ''),
-        puntoLlegada: it && it.puntoLlegada ? it.puntoLlegada : (t.hasta.id === 'o' ? 'casa' : t.hasta.paso ? 'tiempo' : ''),
+        alSalir: it ? A().conexion(it.alSalir) ? A().conexion(it.alSalir)[0] : '' : '', alLlegar: it ? A().conexion(it.alLlegar) ? A().conexion(it.alLlegar)[0] : '' : '',
+        puntoSalida: it && it.puntoSalida ? it.puntoSalida : (t.desde.id === 'o' ? 'casa' : ''),
+        puntoLlegada: it && it.puntoLlegada ? it.puntoLlegada : (t.hasta.id === 'o' ? 'casa' : ''),
         hayEscala: !!(it && it.escala && it.escala.lugar),
         escLugar: it && it.escala ? it.escala.lugar || '' : '', escLlegaF: it && it.escala ? it.escala.llegaFecha || '' : '', escLlegaH: it && it.escala ? it.escala.llegaHora || '' : '',
         escSaleF: it && it.escala ? it.escala.saleFecha || '' : '', escSaleH: it && it.escala ? it.escala.saleHora || '' : '',
@@ -430,7 +430,7 @@ R.armar = (function () {
       return `
         ${tipo === 'vuelo' ? `
           <div class="grilla-2">
-            <label class="campo"><span>N° de vuelo</span><input data-f="numero" value="${esc(x.numero)}" autocapitalize="characters" placeholder="Como figura en el pasaje"></label>
+            <label class="campo"><span>N° de vuelo</span><input data-f="numero" value="${esc(x.numero)}" autocapitalize="characters" autocomplete="off" placeholder="Por ej.: AR1673"><small class="ayuda-campo" data-ayuda-vuelo hidden></small></label>
             <label class="campo"><span>Aerolínea</span><input data-f="empresa" value="${esc(x.empresa)}" list="dlEmpresasArmar" placeholder="Se completa con el número de vuelo"></label>
           </div>
           <div class="grilla-2 tramo-aeros">${campoAero('aeroDesde', x.t.desde.nombre)}${campoAero('aeroHasta', x.t.hasta.nombre)}</div>`
@@ -477,29 +477,37 @@ R.armar = (function () {
           <div class="rc-opciones" data-ops="${campo}" hidden>${A().CONEXIONES.map(([k, ic, n]) => `<button type="button" class="chip-op ${x[campo] === k ? 'activo' : ''}" data-val="${k}">${ic} ${n}</button>`).join('')}</div>`;
       };
       // Los extremos (de dónde salís y a dónde vas) los elegís vos: no se da por hecho que es el alojamiento
+      // Quedarse en la terminal se dice distinto según el lado: "Ya estoy en el aeropuerto" / "Me quedo en el aeropuerto"
+      const elTerm = `${fem ? 'la' : 'el'} ${term}`;
+      const textoPunto = (campo, k, n, ciudad) => k === 'aloj' && ciudad ? `Alojamiento en ${ciudad}`
+        : k === 'combino' ? (campo === 'puntoSalida' ? `Ya estoy en ${elTerm} (vengo de otro transporte)` : `Me quedo en ${elTerm} hasta el próximo transporte`) : n;
       const extremo = (campo, pregunta, ciudad) => {
         const p = A().punto(x[campo]);
         return `
           <button type="button" class="rc-punto rc-punto-btn ${p ? '' : 'sin-punto'}" data-con="${campo}" aria-expanded="false">
-            <span>${p ? `${p[1]} ${esc(p[0] === 'aloj' ? 'Alojamiento en ' + ciudad : p[2])}` : esc(pregunta)}</span><span class="rc-cambiar">${p ? 'Cambiar' : 'Elegir'}</span>
+            <span>${p ? `${p[1]} ${esc(textoPunto(campo, p[0], p[2], ciudad))}` : esc(pregunta)}</span><span class="rc-cambiar">${p ? 'Cambiar' : 'Elegir'}</span>
           </button>
-          <div class="rc-opciones" data-ops="${campo}" hidden>${A().PUNTOS.map(([k, ic, n]) => `<button type="button" class="chip-op ${x[campo] === k ? 'activo' : ''}" data-val="${k}">${ic} ${n}</button>`).join('')}</div>`;
+          <div class="rc-opciones" data-ops="${campo}" hidden>${A().PUNTOS.map(([k, ic, n]) => `<button type="button" class="chip-op ${(A().punto(x[campo]) || [])[0] === k ? 'activo' : ''}" data-val="${k}">${ic} ${esc(textoPunto(campo, k, n))}</button>`).join('')}</div>`;
       };
       return `
         <span class="rc-titulo">Puerta a puerta</span>
         ${extremo('puntoSalida', '¿Desde dónde salís?', x.t.desde.nombre)}
-        ${x.puntoSalida === 'tiempo' ? '' : paso('alSalir', `¿Cómo llegás ${fem ? 'a la' : 'al'} ${term}?`)}
+        ${enTerminal(x.puntoSalida) ? '' : paso('alSalir', `¿Cómo llegás ${fem ? 'a la' : 'al'} ${term}?`)}
         <div class="rc-punto rc-term">${icono} ${esc(nombreTerm(x.aeroDesde, x.t.desde.nombre))}</div>
         <div class="rc-viaje"><span class="rc-linea punteada" aria-hidden="true"></span>${esc(A().tipo(tipo).nombre)}${x.hayEscala && x.escLugar ? ` · escala en ${esc(x.escLugar)}` : ''}</div>
         <div class="rc-punto rc-term">${icono} ${esc(nombreTerm(x.aeroHasta, x.t.hasta.nombre))}</div>
-        ${x.puntoLlegada === 'tiempo' ? '' : paso('alLlegar', `¿Cómo salís ${fem ? 'de la' : 'del'} ${term}?`)}
+        ${enTerminal(x.puntoLlegada) ? '' : paso('alLlegar', `¿Cómo salís ${fem ? 'de la' : 'del'} ${term}?`)}
         ${extremo('puntoLlegada', '¿A dónde vas después?', x.t.hasta.nombre)}`;
     }
 
-    /** Si hacés tiempo en la terminal hasta el próximo transporte, no hay traslado que resolver de ese lado. */
+    /** Si te quedás en la terminal (o ya estás ahí), no hay traslado que resolver de ese lado.
+        Si después cambiás a otro lugar, el traslado vuelve a quedar para elegir. */
+    function enTerminal(k) { return (A().punto(k) || [])[0] === 'combino'; }
     function tiempoSinConexion(x) {
-      if (x.puntoSalida === 'tiempo') x.alSalir = 'no';
-      if (x.puntoLlegada === 'tiempo') x.alLlegar = 'no';
+      [['puntoSalida', 'alSalir'], ['puntoLlegada', 'alLlegar']].forEach(([pu, co]) => {
+        if (enTerminal(x[pu])) { if (x[co] !== 'no') x['auto_' + co] = true; x[co] = 'no'; }
+        else if (x['auto_' + co]) { x[co] = ''; x['auto_' + co] = false; }
+      });
     }
 
     /** La llegada no puede ser antes que la salida. Si es el mismo día y la hora es menor, es al día siguiente. */
@@ -565,6 +573,7 @@ R.armar = (function () {
     function enlazarDatos(el) {
       const x = lista[Number(el.dataset.i)];
       const repintarRuta = () => { const r = el.querySelector('.ruta-con'); if (r) { r.innerHTML = rutaHTML(x); enlazarRuta(); } };
+      el._repintarRuta = repintarRuta;
       function enlazarRuta() {
         el.querySelectorAll('[data-con]').forEach(b => b.onclick = () => {
           const ops = el.querySelector(`[data-ops="${b.dataset.con}"]`);
@@ -577,6 +586,15 @@ R.armar = (function () {
           const campo = b.closest('.rc-opciones').dataset.ops;
           x[campo] = b.dataset.val;
           tiempoSinConexion(x);
+          // Si te quedás en la terminal para combinar, el tramo que sigue sale de ahí
+          const sig = lista[Number(el.dataset.i) + 1];
+          const cambia = campo === 'puntoLlegada' && sig && (enTerminal(x.puntoLlegada) ? !sig.puntoSalida : enTerminal(sig.puntoSalida));
+          if (cambia) {
+            sig.puntoSalida = enTerminal(x.puntoLlegada) ? 'combino' : '';
+            tiempoSinConexion(sig);
+            const elSig = app.querySelector(`.tramo[data-i="${Number(el.dataset.i) + 1}"]`);
+            if (elSig && elSig._repintarRuta) elSig._repintarRuta();
+          }
           repintarRuta();
           marcarEstado(el);
         });
@@ -621,8 +639,14 @@ R.armar = (function () {
       const num = el.querySelector('[data-f="numero"]'), emp = el.querySelector('[data-f="empresa"]');
       // La aerolínea se completa sola mientras escribís el número (AR, FO, WJ, LA…)
       if (num && emp) num.addEventListener('input', () => {
-        const a = A().aerolineaDe(num.value);
-        if (a && (!emp.value.trim() || emp.dataset.auto === '1')) { emp.value = a; emp.dataset.auto = '1'; x.empresa = a; }
+        const r = A().leerVuelo(num.value);
+        if (r.empresa && (!emp.value.trim() || emp.dataset.auto === '1')) { emp.value = r.empresa; emp.dataset.auto = '1'; x.empresa = r.empresa; }
+        const ay = el.querySelector('[data-ayuda-vuelo]');
+        if (ay) {
+          ay.textContent = r.falta === 'letras' ? 'Sumá las letras de la aerolínea (por ej. AR1673) y se completa sola.'
+            : r.falta === 'desconocida' ? `No conozco la aerolínea «${r.codigo}»: escribila abajo.` : '';
+          ay.hidden = !ay.textContent;
+        }
       });
       if (emp) emp.addEventListener('input', () => { emp.dataset.auto = ''; });
       // El calendario de las escalas arranca en el día que sale el tramo
@@ -650,14 +674,14 @@ R.armar = (function () {
       if (!f.value && v.fechaInicio) fl.min = minSale(Number(el.dataset.i)) || v.fechaInicio;
       f.addEventListener('change', () => {
         fl.min = f.value || '';
-        if (!fl.value || fl.value < f.value) fl.value = f.value;
+        if (fl.value && fl.value < f.value) fl.value = '';
         const sig = app.querySelector(`.tramo[data-i="${Number(el.dataset.i) + 1}"] [data-f="fecha"]`);
         if (sig && f.value) sig.min = f.value;
         // La escapada de un día: la vuelta es el mismo día
         const par = x.t.enElDia ? lista[Number(el.dataset.i) + (x.t.hasta.soloDia ? 1 : -1)] : null;
         if (par && !par.fecha) {
           const otro = app.querySelector(`.tramo[data-i="${lista.indexOf(par)}"]`);
-          otro.querySelector('[data-f="fecha"]').value = f.value; otro.querySelector('[data-f="fechaLlega"]').value = f.value;
+          otro.querySelector('[data-f="fecha"]').value = f.value;
         }
       });
     });

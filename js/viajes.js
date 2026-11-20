@@ -15,10 +15,11 @@ R.viajes = (function () {
     { id: 'itinerario', nombre: 'Itinerario', icono: '🗓️' },
     { id: 'pendientes', nombre: 'Pendientes', icono: '✅' },
     { id: 'gastos', nombre: 'Gastos', icono: '💸' },
-    { id: 'valija', nombre: 'Valija', icono: '🧳' }
+    { id: 'valija', nombre: 'Valija', icono: '🧳' },
+    { id: 'ayuda', nombre: 'Ayuda', icono: '🆘' }
   ];
   // Se abren desde el menú ⋯ o desde la portada
-  const OTRAS = { documentos: 'Archivos', viajeros: 'Viajeros', ayuda: 'Ayuda' };
+  const OTRAS = { documentos: 'Archivos', viajeros: 'Viajeros' };
 
   /* ---------- Datos del viaje ---------- */
   const lugares = v => (v.destinos || []).filter(d => d.nombre && !d.soloDia && !d.paso);
@@ -89,11 +90,11 @@ R.viajes = (function () {
     const ops = [];
     if (org) ops.push(['editar', '✏️', 'Editar el viaje', 'Destinos, fechas, transporte y dónde dormís']);
     ops.push(['viajeros', '👥', 'Viajeros', 'Invitar a quienes viajan con vos']);
-    ops.push(['ayuda', '🆘', 'Ayuda', 'Emergencias, contactos, requisitos y qué hacer si…']);
     ops.push(['documentos', '📁', 'Archivos', 'Pasajes, vouchers y documentos']);
     ops.push(['ruta', '🗺️', 'Ver la ruta en Google Maps', '']);
     ops.push(['mapa', '📍', 'Mapa del viaje', '']);
     ops.push(['pdf', '📄', 'Itinerario en PDF', 'Para imprimir o mandar']);
+    if (R.calendario) ops.push(['calendario', '📅', 'Pasar al calendario del celular', 'Google Calendar, iPhone u Outlook']);
     if (R.familia && R.db.modo() === 'nube') ops.push(['familia', '🔗', 'Link del itinerario', v.linkFamilia && v.linkFamilia.activo ? 'Activo · solo los días, sin gastos ni pendientes' : 'Para tu familia o quien viaja sin la app']);
     if (R.linkCuentas && R.db.modo() === 'nube' && (v.participantes || []).length > 1) ops.push(['linkCuentas', '🔗', 'Link de cuentas para el grupo', v.linkCuentas && v.linkCuentas.activo ? 'Activo' : '']);
     if (v.fechaInicio) ops.push(['resumen', '🖼️', 'Resumen para compartir', '']);
@@ -108,11 +109,12 @@ R.viajes = (function () {
       const op = bt.dataset.op;
       U.cerrarModal();
       if (op === 'editar') editar(v);
-      else if (op === 'viajeros' || op === 'documentos' || op === 'ayuda') location.hash = `#viaje/${v.id}/${op}`;
+      else if (op === 'viajeros' || op === 'documentos') location.hash = `#viaje/${v.id}/${op}`;
       else if (op === 'transporte' || op === 'noches') location.hash = `#armar/${v.id}/${op}`;
       else if (op === 'ruta') R.gmaps.abrirRutaViaje(v);
       else if (op === 'mapa') { const { el: m } = U.modal({ titulo: 'Mapa del viaje', ancho: true, cuerpo: '<div id="mapaViaje" class="mapa-viaje"></div>' }); R.mapa.mostrar(m.querySelector('#mapaViaje'), v); }
       else if (op === 'pdf') R.itinerarioPdf.descargar(v);
+      else if (op === 'calendario') R.calendario.descargar(v);
       else if (op === 'familia') R.familia.abrir(v);
       else if (op === 'linkCuentas') R.linkCuentas.abrir(v);
       else if (op === 'resumen') R.resumen.abrir(v);
@@ -140,7 +142,6 @@ R.viajes = (function () {
     app.innerHTML = `
       <section class="portada-viaje portada-compacta" style="background:${R.paisaje.fondo(v)}">
         ${U.paisaje(v)}
-        <a class="btn-ayuda-viaje" href="#viaje/${v.id}/ayuda" aria-label="Ayuda: emergencias y contactos" title="Ayuda">🆘</a>
         <button class="btn-menu-viaje" data-a="menu" aria-label="Opciones del viaje">⋯</button>
         <div class="portada-contenido">
           <h1 ${org ? 'class="editable" data-a="editar" title="Editar el viaje"' : ''}>${esc(nombreDe(v))}</h1>

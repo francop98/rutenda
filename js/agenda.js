@@ -22,7 +22,7 @@ R.agenda = (function () {
     barco: { icono: '⛴️', nombre: 'Barco', traslado: true, medio: 'barco' },
     auto: { icono: '🚗', nombre: 'Auto', traslado: true, medio: 'auto' },
     traslado: { icono: '🚐', nombre: 'Transfer', traslado: true, medio: 'transfer' },
-    taxi: { icono: '🚕', nombre: 'Taxi o remis', traslado: true, medio: 'taxi' },
+    taxi: { icono: '🚕', nombre: 'Taxi, remis o Uber', traslado: true, medio: 'taxi' },
     otromedio: { icono: '🧭', nombre: 'Otro medio', traslado: true, medio: 'otro' },
     paseo: { icono: '📍', nombre: 'Paseo' },
     excursion: { icono: '🥾', nombre: 'Excursión' },
@@ -39,14 +39,16 @@ R.agenda = (function () {
   const TERMINAL = { vuelo: 'aeropuerto', micro: 'terminal', tren: 'estación', barco: 'puerto' };
   /** Cómo llegás a la terminal o de la terminal a donde vas. */
   const CONEXIONES = [
-    ['taxi', '🚕', 'Taxi o remis'], ['app', '📱', 'Uber, Cabify o similar'], ['transfer', '🚐', 'Transfer contratado'], ['hotel', '🏨', 'Traslado del alojamiento'],
+    ['taxi', '🚕', 'Taxi, remis, Uber o similar'], ['transfer', '🚐', 'Transfer contratado'], ['hotel', '🏨', 'Traslado del alojamiento'],
     ['colectivo', '🚌', 'Colectivo'], ['subte', '🚇', 'Subte o tren'], ['buscan', '🙋', 'Me buscan o me llevan'], ['auto', '🚗', 'Mi auto'],
     ['alquilado', '🔑', 'Auto alquilado'], ['pie', '🚶', 'Caminando'], ['no', '✕', 'No hace falta'], ['nose', '❔', 'Todavía no lo sé']];
-  const conexion = k => CONEXIONES.find(c => c[0] === k) || null;
+  // 'app' (Uber, Cabify…) quedó unificado con taxi y remis
+  const conexion = k => CONEXIONES.find(c => c[0] === (k === 'app' ? 'taxi' : k)) || null;
   const conexionResuelta = k => !!k && k !== 'nose';
   /** A dónde vas después de la terminal (o de dónde salís antes): no se da por hecho. */
-  const PUNTOS = [['tiempo', '⏳', 'Hago tiempo hasta el próximo transporte'], ['aloj', '🛏️', 'Alojamiento'], ['casa', '🏠', 'Mi casa'], ['familia', '👪', 'Casa de familia o amigos'], ['actividad', '📍', 'Directo a una actividad o paseo'], ['combino', '🔁', 'Combino con otro transporte'], ['otro', '📌', 'Otro lugar']];
-  const punto = k => PUNTOS.find(c => c[0] === k) || null;
+  const PUNTOS = [['aloj', '🛏️', 'Alojamiento'], ['casa', '🏠', 'Mi casa'], ['familia', '👪', 'Casa de familia o amigos'], ['actividad', '📍', 'Un paseo o actividad'], ['combino', '🪑', 'Me quedo en la terminal'], ['otro', '📌', 'Otro lugar']];
+  // 'tiempo' (29.1) es lo mismo que quedarse en la terminal
+  const punto = k => PUNTOS.find(c => c[0] === (k === 'tiempo' ? 'combino' : k)) || null;
   /** Cuántas conexiones de este traslado falta resolver (0, 1 o 2). "Todavía no lo sé" cuenta como pendiente. */
   function conexionesFaltan(it) { return esProgramado(it) ? (conexionResuelta(it.alSalir) ? 0 : 1) + (conexionResuelta(it.alLlegar) ? 0 : 1) : 0; }
   const tipo = t => TIPOS[t] || TIPOS.otro;
@@ -123,7 +125,7 @@ R.agenda = (function () {
   /* ---------- Para el mapa, Google Maps, el resumen y el PDF ---------- */
   const MEDIOS = {
     avion: { icono: '✈️', nombre: 'Avión' }, micro: { icono: '🚌', nombre: 'Micro' }, auto: { icono: '🚗', nombre: 'Auto' },
-    tren: { icono: '🚆', nombre: 'Tren' }, barco: { icono: '⛴️', nombre: 'Barco' }, taxi: { icono: '🚕', nombre: 'Taxi o remis' },
+    tren: { icono: '🚆', nombre: 'Tren' }, barco: { icono: '⛴️', nombre: 'Barco' }, taxi: { icono: '🚕', nombre: 'Taxi, remis o Uber' },
     transfer: { icono: '🚐', nombre: 'Transfer' }, otro: { icono: '🧭', nombre: 'Traslado' }
   };
   function lugarConocido(v, nombre) {
@@ -197,9 +199,18 @@ R.agenda = (function () {
     return { fecha: `${abre.getFullYear()}-${dos(abre.getMonth() + 1)}-${dos(abre.getDate())}`, hora: it.hora ? `${dos(abre.getHours())}:${dos(abre.getMinutes())}` : '', horas: fila[1], aerolinea: fila[2] };
   }
   /** "AR1672" → "Aerolíneas Argentinas" */
-  function aerolineaDe(numero) {
-    const m = String(numero || '').toUpperCase().replace(/\s/g, '').match(/^([A-Z0-9]{2})\d{1,4}$/);
-    return m && R.lector ? R.lector.AEROLINEAS[m[1]] || '' : '';
+  function aerolineaDe(numero) { return leerVuelo(numero).empresa; }
+  /** Lee el número de vuelo: { codigo, empresa, falta: 'letras' | 'desconocida' | '' }. Acepta "AR1673", "AR 1673", "ar-1673" o "ARG1673". */
+  function leerVuelo(numero) {
+    const t = String(numero || '').toUpperCase().replace(/[\s\-.]/g, '');
+    if (!t || !R.lector) return { codigo: '', empresa: '', falta: '' };
+    if (/^\d+$/.test(t)) return { codigo: '', empresa: '', falta: 'letras' };
+    const m3 = t.match(/^([A-Z]{3})(\d{1,5})[A-Z]?$/);
+    if (m3 && R.lector.OACI[m3[1]]) return { codigo: R.lector.OACI[m3[1]], empresa: R.lector.AEROLINEAS[R.lector.OACI[m3[1]]] || '', falta: '' };
+    const m = t.match(/^([A-Z0-9]{2})(\d{1,5})[A-Z]?$/);
+    if (!m) return { codigo: '', empresa: '', falta: '' };
+    const empresa = R.lector.AEROLINEAS[m[1]] || '';
+    return { codigo: m[1], empresa, falta: empresa ? '' : 'desconocida' };
   }
   /** Empresas y lugares que ya usaste (para sugerirlos al escribir). */
   function usados(campo) {
@@ -309,6 +320,6 @@ R.agenda = (function () {
     TIPOS, ORDEN_TIPOS, TIPOS_A_LA_VISTA, MEDIOS, tipo, esTraslado, PROGRAMADOS, esProgramado, TERMINAL, CONEXIONES, conexion, conexionResuelta, PUNTOS, punto, conexionesFaltan,
     items, delDia, ideas, item, parecido, alojamiento, nombreAlojamiento, nocheDe, dias, docsDe,
     nuevoItem, guardarItem, borrarItem, guardarAlojamiento, borrarAlojamiento,
-    segmentos, paradas, medioPrincipal, etiquetaSegmento, lugarConocido, checkin, aerolineaDe, usados, migrar
+    segmentos, paradas, medioPrincipal, etiquetaSegmento, lugarConocido, checkin, aerolineaDe, leerVuelo, usados, migrar
   };
 })();

@@ -2851,3 +2851,32 @@ body.teclado-abierto .armar-pie { position: static; background: none; }
 .fv-destino .fv-quitar { flex: none; margin-top: 4px; }
 .fv-destino { flex-wrap: wrap; }
 .fv-destino > .fv-destino-pie { flex: 1 1 100%; margin-top: 0; }
+.ayuda-campo { display: block; margin-top: 4px; font-size: .8rem; color: var(--tinta-suave); }
+
+/* 30 — Qué hacer en cada destino */
+.quiero2-quehacer { margin-top: 8px; }
+.qh-lugar { margin: 0 0 8px; color: var(--tinta-suave); }
+.qh-destinos, .qh-filtros { margin-bottom: 10px; }
+.qh-cargando { padding: 14px 0; text-align: center; }
+.qh-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.qh-item { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--papel); }
+.qh-icono { font-size: 1.2rem; flex: none; }
+.qh-texto { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.qh-texto strong { font-weight: 600; overflow-wrap: anywhere; }
+.qh-texto small { color: var(--tinta-suave); font-size: .8rem; }
+.qh-texto a { color: inherit; text-decoration: underline; }
+.qh-ok { flex: none; font-size: .8rem; font-weight: 600; color: var(--tinta-suave); }
+.qh-dias { flex: 1 1 100%; display: grid; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--linea); }
+.qh-dias small { color: var(--tinta-suave); }
+.qh-dias .btn-texto { justify-self: start; }
+.qh-fuente { margin: 10px 0 0; font-size: .72rem; color: var(--tinta-tenue); text-align: right; }
+
+/* 30 — Info práctica del país */
+.info-pais + .info-pais { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--linea); }
+.ip-pais { display: block; margin-bottom: 6px; }
+.ip-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ip-lista li { display: flex; gap: 10px; align-items: flex-start; font-size: .92rem; }
+.ip-lista li > span:first-child { flex: none; width: 22px; text-align: center; }
+.ip-lista small { display: block; color: var(--tinta-suave); font-size: .8rem; margin-top: 2px; }
+.ip-ojo { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--arena-2); font-size: .78rem; }
+.ip-nota { margin: 10px 0 0; font-size: .78rem; }
