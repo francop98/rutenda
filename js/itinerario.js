@@ -354,6 +354,12 @@ R.itinerario = (function () {
         it.sinMedio = false;
         if (it.fecha) it.pendiente = false;
         it.fechaLlegada = val('#iFechaLlega');
+        // La llegada no puede ser antes que la salida; si la hora es menor el mismo día, es al día siguiente
+        if (it.fechaLlegada && it.fecha && it.fechaLlegada < it.fecha) { U.toast('La llegada es antes que la salida. Revisá las fechas.'); return false; }
+        if (it.fecha && it.hora && it.horaLlegada && it.horaLlegada < it.hora && (!it.fechaLlegada || it.fechaLlegada === it.fecha)) {
+          it.fechaLlegada = U.sumarDias(it.fecha, 1);
+          U.toast(`Llega al día siguiente (${U.fmtFecha(it.fechaLlegada, 'dia')}).`);
+        }
         it.titulo = it.desde || it.hasta ? `${it.desde || '?'} → ${it.hasta || '?'}` : A().tipo(it.tipo).nombre;
       } else {
         it.titulo = val('#iTitulo').trim();

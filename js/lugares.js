@@ -18,15 +18,23 @@ R.lugares = (function () {
     return String.fromCodePoint(...codigo.toUpperCase().split('').map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
   }
 
+  /** Tu país: el de tu documento, o el de la ciudad desde donde salís siempre. */
+  function miPais() {
+    const pr = R.db && R.db.prefs ? R.db.prefs() : {};
+    return (pr.nacionalidad && pr.nacionalidad !== 'OT' ? pr.nacionalidad : '') || (pr.ciudadOrigen && pr.ciudadOrigen.codigoPais) || 'AR';
+  }
+  const sinTilde = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+  const kmEntre = (a, b) => R.aeropuertos ? R.aeropuertos.distanciaKm(a.lat, a.lon, b.lat, b.lon) : 999;
+
   async function buscar(texto) {
     const q = texto.trim();
     if (q.length < 2) return [];
     const clave = q.toLowerCase();
     if (cache[clave]) return cache[clave];
-    const r = await fetch(`${URL_BASE}?name=${encodeURIComponent(q)}&count=7&language=es&format=json`);
+    const r = await fetch(`${URL_BASE}?name=${encodeURIComponent(q)}&count=20&language=es&format=json`);
     if (!r.ok) throw new Error('Sin respuesta del buscador');
     const json = await r.json();
-    const lista = (json.results || []).map(x => ({
+    const todos = (json.results || []).map(x => ({
       nombre: x.name,
       region: x.admin1 || '',
       pais: x.country || '',
@@ -34,8 +42,18 @@ R.lugares = (function () {
       lat: x.latitude, lon: x.longitude, zona: x.timezone || '',
       elevacion: x.elevation != null ? x.elevation : null, poblacion: x.population || 0, tipoLugar: x.feature_code || ''
     }));
-    cache[clave] = lista;
-    return lista;
+    // Primero tu país; después los más poblados. Los barrios, aeropuertos y similares van al final.
+    const pais = miPais();
+    const esCiudad = l => /^PPL/.test(l.tipoLugar);
+    todos.sort((a, b) => (b.codigoPais === pais) - (a.codigoPais === pais) || esCiudad(b) - esCiudad(a) || (b.poblacion || 0) - (a.poblacion || 0));
+    // Un solo resultado por lugar: el mismo nombre en la misma provincia, o a menos de 30 km, es el mismo lugar
+    const lista = [];
+    todos.forEach(l => {
+      const igual = lista.some(x => sinTilde(x.nombre) === sinTilde(l.nombre) && x.codigoPais === l.codigoPais && (sinTilde(x.region) === sinTilde(l.region) || kmEntre(x, l) < 30));
+      if (!igual) lista.push(l);
+    });
+    cache[clave] = lista.slice(0, 7);
+    return cache[clave];
   }
 
   const clave = l => String((l && l.nombre) || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -172,5 +190,5 @@ R.lugares = (function () {
     return { obtener, input };
   }
 
-  return { buscar, campo, bandera, etiqueta, recientes };
+  return { buscar, campo, bandera, etiqueta, recientes, miPais };
 })();
