@@ -182,6 +182,7 @@ R.gastos = (function () {
           <div>
             <small>Costo del viaje${t.ingresado ? ' (neto)' : ''}</small>
             <strong class="gh-total">${U.fmtMoneda(t.neto, v.monedaBase)}</strong>
+            ${t.neto > 0 && comparar(v, nDias) ? `<span class="gh-sub gh-comparar">${esc(comparar(v, nDias))}</span>` : ''}
             ${t.neto > 0 ? `<span class="gh-sub gh-costo">${[variosViajeros ? `${U.fmtMoneda(Math.round(t.neto / v.participantes.length), v.monedaBase)} por persona` : '', nDias > 1 ? `${U.fmtMoneda(Math.round(t.neto / nDias), v.monedaBase)} por día` : ''].filter(Boolean).join(' · ')}</span>` : ''}
             ${t.ingresado ? `<span class="gh-sub">↓ ${U.fmtMoneda(t.gastado, v.monedaBase)} en gastos · ↑ ${U.fmtMoneda(t.ingresado, v.monedaBase)} en ingresos y reintegros</span>` : ''}
             ${t.antes && t.durante ? `<span class="gh-sub">${U.fmtMoneda(t.antes, v.monedaBase)} antes · ${U.fmtMoneda(t.durante, v.monedaBase)} durante</span>` : ''}
@@ -346,7 +347,7 @@ R.gastos = (function () {
       cuerpo: `
         <div class="chips-elegir">${CATEGORIAS.map(c => `<span class="chip-op">${c.icono} ${esc(c.nombre)}</span>`).join('')}
           ${propias.map(c => `<span class="chip-op chip-propia">${c.icono} ${esc(c.nombre)} <button type="button" data-borrar-cat="${c.id}" aria-label="Borrar">×</button></span>`).join('')}</div>
-        <div class="fila-agregar"><input id="cIcono" class="input-emoji" maxlength="2" placeholder="🏷️"><input id="cNombre" placeholder="Nueva categoría (ej: Regalos)"><button type="button" class="btn btn-primario" data-a="crear">Crear</button></div>`,
+        <div class="fila-agregar"><input id="cIcono" class="input-emoji" maxlength="2" placeholder="🏷️"><input id="cNombre" placeholder="Nombre de la categoría"><button type="button" class="btn btn-primario" data-a="crear">Crear</button></div>`,
       acciones: [{ texto: 'Listo', clase: 'btn-primario', onClick: () => { R.app.refrescar(); } }]
     });
     el.querySelector('[data-a="crear"]').onclick = () => {
@@ -449,7 +450,7 @@ R.gastos = (function () {
           <label class="campo"><span>Fecha</span><input type="date" id="pFecha" value="${esc(m.fecha || U.hoyISO())}"></label>
           <label class="campo"><span>Hora</span><input type="time" id="pHora" value="${esc(m.hora || '')}"></label>
         </div>
-        <label class="campo"><span>Detalle <small>(opcional)</small></span><input id="pNota" value="${esc(m.nota || '')}" placeholder="Ej: alias, comprobante"></label>
+        <label class="campo"><span>Detalle <small>(opcional)</small></span><input id="pNota" value="${esc(m.nota || '')}" placeholder="Detalle del pago"></label>
         ${existente ? '' : '<p class="ayuda">Si pagó una parte, cambiá el monto: el resto sigue pendiente.</p>'}`,
       acciones
     });
@@ -495,12 +496,13 @@ R.gastos = (function () {
         <label class="campo campo-quien"><span>${esGasto ? '¿Quién pagó?' : '¿Quién lo recibió?'}</span>
           <select id="mPersona">${U.ordenAlfa(v.participantes, p => nombre(p)).map(p => `<option value="${p}" ${m.persona === p ? 'selected' : ''}>${esc(nombre(p))}</option>`).join('')}</select>
         </label>
-        <label class="campo"><span>Concepto ${esGasto ? '<small>(opcional)</small>' : '*'}</span><input id="mConcepto" value="${esc(m.concepto)}" placeholder="${esGasto ? 'Ej: Cena en el centro' : 'Ej: Reintegro de excursión cancelada'}"></label>
+        <label class="campo"><span>Concepto ${esGasto ? '<small>(opcional)</small>' : '*'}</span><input id="mConcepto" value="${esc(m.concepto)}" placeholder="${esGasto ? 'Qué pagaste' : 'Qué te devolvieron o cobraste'}"></label>
         ${esGasto ? `<div class="chips-elegir chips-chicos">${categorias().map(c => `<button type="button" class="chip-op ${m.categoria === c.id ? 'activo' : ''}" data-cat="${c.id}">${c.icono} ${esc(c.nombre)}</button>`).join('')}
           <button type="button" class="chip-op chip-nueva" data-a="nuevaCat">+ Nueva categoría</button></div>
-          <div class="fila-agregar oculto" id="filaNuevaCat"><input id="mCatIcono" class="input-emoji" maxlength="2" placeholder="🏷️"><input id="mCatNombre" placeholder="Nombre (ej: Regalos, Nafta)"><button type="button" class="btn btn-suave" data-a="crearCat">Crear</button></div>` : ''}
+          <div class="fila-agregar oculto" id="filaNuevaCat"><input id="mCatIcono" class="input-emoji" maxlength="2" placeholder="🏷️"><input id="mCatNombre" placeholder="Nombre de la categoría"><button type="button" class="btn btn-suave" data-a="crearCat">Crear</button></div>` : ''}
         <label class="campo"><span>Fecha</span><input type="date" id="mFecha" value="${esc(m.fecha)}"></label>
-        ${m.moneda !== v.monedaBase ? `<label class="campo"><span>Cotización: 1 ${esc(m.moneda)} = ? ${esc(v.monedaBase)}</span><input id="mCotiz" inputmode="decimal" value="${esc(m.cotizacion)}" placeholder="Ej: 1200"><small class="ayuda" id="mCotizAyuda"></small></label>` : ''}
+        ${!existente && esGasto && v.fechaFin ? `<label class="check"><input type="checkbox" id="mRepetir"> Se repite todos los días hasta el final del viaje <small>(por ejemplo, estacionamiento)</small></label>` : ''}
+        ${m.moneda !== v.monedaBase ? `<label class="campo"><span>Cotización: 1 ${esc(m.moneda)} = ? ${esc(v.monedaBase)}</span><input id="mCotiz" inputmode="decimal" value="${esc(m.cotizacion)}" placeholder="Valor de 1 en tu moneda"><small class="ayuda" id="mCotizAyuda"></small></label>` : ''}
         ${variosViajeros ? `
           <div class="campo">
             <span>${esGasto ? '¿Entre quiénes se divide?' : '¿A quiénes les corresponde?'}</span>
@@ -651,8 +653,21 @@ R.gastos = (function () {
       // La foto del ticket queda en Archivos, por si la necesitás después
       R.documentos.guardarArchivos(v, [ticket], { categoria: 'ticket' }).then(() => R.db.guardarViaje(v)).catch(() => {});
     }
+    const repetir = !existente && (f.querySelector('#mRepetir') || {}).checked && v.fechaFin && m.fecha <= v.fechaFin;
     if (existente) {
       v.movimientos = v.movimientos.map(x => x.id === existente.id ? Object.assign({}, m, { id: existente.id }) : x);
+    } else if (repetir) {
+      // Gasto fijo: uno por día, desde la fecha elegida hasta el final del viaje (se pueden borrar juntos)
+      const serie = U.id('serie');
+      let n = 0;
+      for (let d = m.fecha; d <= v.fechaFin; d = U.sumarDias(d, 1)) {
+        v.movimientos.push(Object.assign(JSON.parse(JSON.stringify(m)), { id: U.id('mov'), fecha: d, serie, creado: new Date().toISOString() }));
+        n++;
+      }
+      R.db.guardarViaje(v);
+      R.app.refrescar();
+      U.toast(`Cargué el gasto en ${U.plural(n, 'día', 'días')}.`);
+      return;
     } else {
       v.movimientos.push(Object.assign({}, m, { id: U.id('mov'), creado: new Date().toISOString() }));
     }
@@ -663,7 +678,36 @@ R.gastos = (function () {
 
   function editarPago(v, m) { registrarPago(v, null, m); }
 
+  /** "Por día, un 20% más que tus otros viajes" (solo con viajes terminados en la misma moneda). */
+  function comparar(v, nDias) {
+    if (!(nDias > 0)) return '';
+    const porDia = x => { const d = x.fechaInicio ? U.diasEntre(x.fechaInicio, x.fechaFin || x.fechaInicio) + 1 : 0; const n = totales(x).neto; return d > 0 && n > 0 ? n / d : 0; };
+    const otros = R.db.viajes().filter(x => x.id !== v.id && x.monedaBase === v.monedaBase && R.viajes.estadoViaje(x) === 'pasado').map(porDia).filter(n => n > 0);
+    if (!otros.length) return '';
+    const prom = otros.reduce((a, n) => a + n, 0) / otros.length;
+    const este = totales(v).neto / nDias;
+    const dif = Math.round(100 * (este - prom) / prom);
+    if (Math.abs(dif) < 5) return `Por día gastás lo mismo que en tus otros viajes (${U.fmtMoneda(Math.round(prom), v.monedaBase)})`;
+    return `Por día, un ${Math.abs(dif)}% ${dif > 0 ? 'más' : 'menos'} que tus otros viajes (${U.fmtMoneda(Math.round(prom), v.monedaBase)})`;
+  }
+
   async function eliminar(v, id) {
+    const mov = v.movimientos.find(x => x.id === id);
+    const serie = mov && mov.serie ? v.movimientos.filter(x => x.serie === mov.serie) : [];
+    if (serie.length > 1) {
+      // Gasto que se repite: este solo o todos los días
+      const borrar = todos => {
+        v.movimientos = v.movimientos.filter(x => todos ? x.serie !== mov.serie : x.id !== id);
+        R.db.guardarViaje(v); R.app.refrescar();
+        U.toast(todos ? 'Gastos eliminados.' : 'Movimiento eliminado.');
+      };
+      U.modal({
+        titulo: 'Eliminar gasto',
+        cuerpo: `<p>Este gasto se repite ${U.plural(serie.length, 'día', 'días')}. ¿Borrás solo este día o todos?</p>`,
+        acciones: [{ texto: 'Cancelar' }, { texto: 'Solo este', clase: 'btn-suave', onClick: () => borrar(false) }, { texto: 'Todos', clase: 'btn-peligro', onClick: () => borrar(true) }]
+      });
+      return;
+    }
     const ok = await U.confirmar('Se va a eliminar este movimiento y se recalculan las cuentas.', { titulo: 'Eliminar movimiento', textoSi: 'Eliminar', peligro: true });
     if (!ok) return;
     v.movimientos = v.movimientos.filter(x => x.id !== id);

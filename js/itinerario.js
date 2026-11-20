@@ -37,10 +37,34 @@ R.itinerario = (function () {
     const term = A().TERMINAL[it.tipo];
     const fem = term === 'terminal' || term === 'estación';
     const al = fem ? 'a la' : 'al', del = fem ? 'de la' : 'del';
-    const txt = (k, prep) => { const c = A().conexion(k); return c && k !== 'no' ? `${c[1]} ${c[2]} ${prep} ${term}` : ''; };
+    const txt = (k, prep) => { const c = A().conexion(k); return c && A().conexionResuelta(k) && k !== 'no' ? `${c[1]} ${c[2]} ${prep} ${term}` : ''; };
     const hechas = [txt(it.alSalir, al), txt(it.alLlegar, del)].filter(Boolean);
-    const faltan = [!it.alSalir ? `cómo llegás ${al} ${term}` : '', !it.alLlegar ? `cómo salís ${del} ${term}` : ''].filter(Boolean);
+    const faltan = [!A().conexionResuelta(it.alSalir) ? `cómo llegás ${al} ${term}` : '', !A().conexionResuelta(it.alLlegar) ? `cómo salís ${del} ${term}` : ''].filter(Boolean);
     return hechas.length || faltan.length ? { ok: hechas.join(' · '), falta: faltan.length ? 'Falta: ' + faltan.join(' y ') : '' } : null;
+  }
+
+  /** Duraciones para elegir (en minutos). */
+  const DURACIONES = [[30, '30 min'], [60, '1 h'], [90, '1 h 30'], [120, '2 h'], [180, '3 h'], [240, '4 h'], [300, 'Medio día (5 h)'], [480, 'Todo el día (8 h)']];
+  const aMin = h => { const m = /^(\d{1,2}):(\d{2})/.exec(h || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  const aHora = n => `${String(Math.floor(n / 60) % 24).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+
+  /**
+   * Horarios que se pisan: cada cosa con hora termina a su hora + duración
+   * (o a la hora de llegada si es un traslado del mismo día). Si la siguiente
+   * empieza antes, se marcan las dos.
+   */
+  function marcarChoques(items) {
+    const con = items.filter(i => !i.alojamiento && aMin(i.hora) != null);
+    for (let a = 0; a < con.length; a++) {
+      const fin = con[a].finMin;
+      if (fin == null) continue;
+      for (let b = a + 1; b < con.length; b++) {
+        const ini = aMin(con[b].hora);
+        if (ini >= fin) break;
+        con[a].choque = con[a].choque || `Se pisa con ${con[b].titulo}`;
+        con[b].choque = con[b].choque || `Se pisa con ${con[a].titulo}`;
+      }
+    }
   }
 
   /** Dónde estás ese día (para el PDF y el link de la familia): adonde llegaste con el último traslado, o el único destino. */
@@ -69,7 +93,10 @@ R.itinerario = (function () {
       items.push({
         id: it.id, hora: it.hora || '', icono: t.icono, titulo: it.titulo || t.nombre, sub: detalleItem(it), nota: it.nota || '',
         lugar: t.traslado ? '' : (it.lugar || ''), clase: t.traslado ? 'ev-traslado' : '', tipo: it.tipo,
-        docs: A().docsDe(v, it.id).length, checkin: it.fecha >= U.hoyISO() ? A().checkin(it) : null, conexiones: conexionesTexto(it)
+        docs: A().docsDe(v, it.id).length, checkin: it.fecha >= U.hoyISO() ? A().checkin(it) : null, conexiones: conexionesTexto(it),
+        favorito: !!it.favorito,
+        finMin: aMin(it.hora) == null ? null : it.duracion ? aMin(it.hora) + Number(it.duracion) : (t.traslado && it.horaLlegada && !it.fechaLlegada && aMin(it.horaLlegada) > aMin(it.hora) ? aMin(it.horaLlegada) : null),
+        horaFin: aMin(it.hora) != null && it.duracion ? aHora(aMin(it.hora) + Number(it.duracion)) : ''
       });
     });
     (v.alojamientos || []).filter(a => a.desde === fecha).forEach(a => items.push({
@@ -78,6 +105,7 @@ R.itinerario = (function () {
     }));
     // Sin hora: el check-out va primero, el check-in al final del día
     items.sort((a, b) => (a.orden || a.hora || '99').localeCompare(b.orden || b.hora || '99'));
+    marcarChoques(items);
     const lugarDe = a => a ? (a.direccion || a.nombre || '') : '';
     return {
       fecha, numero, items,
@@ -97,10 +125,11 @@ R.itinerario = (function () {
     const ck = it.checkin;
     return `
       <button type="button" class="it2 ${it.clase || ''}" ${it.alojamiento ? `data-aloj="${it.id}"` : `data-item="${it.id}"`} data-dia="${d.fecha}">
-        <span class="it2-hora">${esc(it.hora || '')}</span>
+        <span class="it2-hora">${esc(it.hora || '')}${it.horaFin ? `<small>${esc(it.horaFin)}</small>` : ''}</span>
         <span class="it2-ico" aria-hidden="true">${it.icono}</span>
         <span class="it2-texto">
-          <strong>${esc(it.titulo)}</strong>
+          <strong>${esc(it.titulo)}${it.favorito ? ' <span class="it2-fav" title="Favorito">⭐</span>' : ''}</strong>
+          ${it.choque ? `<small class="it2-choque">⚠️ ${esc(it.choque)}</small>` : ''}
           ${it.sub ? `<small>${esc(it.sub)}</small>` : ''}
           ${it.nota ? `<small class="it2-nota">${esc(it.nota)}</small>` : ''}
           ${it.conexiones && it.conexiones.ok ? `<small class="it2-con">${esc(it.conexiones.ok)}</small>` : ''}
@@ -122,6 +151,7 @@ R.itinerario = (function () {
           <strong>${esc(U.fmtFecha(fecha, 'dia'))}</strong>
           <span>${enRango ? 'Día ' + d.numero : 'Fuera de las fechas'}</span>
           ${fecha === hoy ? '<em class="dia2-hoy">Hoy</em>' : ''}
+          ${puede ? `<button type="button" class="dia2-menu" data-dia-menu="${fecha}" aria-label="Opciones del día" title="Plantillas del día">⋯</button>` : ''}
         </header>
         <div class="dia2-items">
           ${d.items.length ? d.items.map(it => itemHTML(v, d, it)).join('') : '<p class="dia2-libre">Día libre</p>'}
@@ -146,16 +176,7 @@ R.itinerario = (function () {
     cont.innerHTML = `
       <div class="itin2">
         ${R.armar ? R.armar.faltaHTML(v) : ''}
-        ${puede ? `<div class="itin2-acciones">
-          <button type="button" class="btn btn-primario btn-chico" data-agregar="">+ Agregar</button>
-          ${R.importar ? '<button type="button" class="btn btn-suave btn-chico" data-a="pegar">🎫 Reserva</button>' : ''}
-          <button type="button" class="btn btn-suave btn-chico" data-a="nuevoAloj">🛏️ Alojamiento</button>
-        </div>` : ''}
-        ${ideas.length ? `
-          <button type="button" class="itin2-ideas" data-a="ideas">
-            <span><strong>${ideas.length === 1 ? '1 idea sin día' : ideas.length + ' ideas sin día'}</strong><small>${esc(ideas.slice(0, 4).map(i => i.titulo).join(' · '))}</small></span>
-            <b>Ubicar</b>
-          </button>` : ''}
+        ${quieroHTML(v, puede, dias)}
         ${dias.length ? dias.map(f => diaHTML(v, f, hoy, puede)).join('') : `
           ${U.vacio({ icono: '🗓️', titulo: 'Poné las fechas del viaje', texto: 'Con la ida y la vuelta se arman los días. Después cargás qué hacés cada día.', boton: puede ? 'Poner las fechas' : '', accion: 'fechas' })}`}
         ${puede && dias.length ? '<p class="ayuda itin2-ayuda">Tocá algo para verlo o cambiarlo. Mantenelo apretado para pasarlo a otro día.</p>' : ''}
@@ -166,18 +187,222 @@ R.itinerario = (function () {
     if (hoyEl && !render._yaFue) { render._yaFue = v.id; setTimeout(() => hoyEl.scrollIntoView({ block: 'start', behavior: 'smooth' }), 120); }
   }
 
+  /* ---------------------------------------------------------
+     "Quiero hacer": el anotador de ideas, arriba del itinerario
+     --------------------------------------------------------- */
+  let verTodasIdeas = false;
+  function quieroHTML(v, puede, dias) {
+    const grupo = (v.participantes || []).length > 1;
+    const misVotos = ((v.votos || {})[R.db.yoEn(v)]) || {};
+    // Las más votadas primero
+    const ideas = A().ideas(v).slice().sort((a, b) => votosDe(v, b.id) - votosDe(v, a.id));
+    if (!puede && !ideas.length) return '';
+    const mostrar = verTodasIdeas ? ideas : ideas.slice(0, 3);
+    const favs = puede ? favoritosPara(v) : [];
+    return `
+      <section class="quiero2">
+        <div class="quiero2-cab"><strong>💡 Quiero hacer</strong><small>${ideas.length ? U.plural(ideas.length, 'idea sin día', 'ideas sin día') : 'Anotá lo que te gustaría hacer'}</small></div>
+        ${puede ? `<form class="quiero2-nuevo" data-form="idea">
+          <input id="iIdeaRapida" placeholder="Lugar, actividad o comida para el viaje" aria-label="Nueva idea" autocomplete="off">
+          <button type="submit" class="btn btn-terracota" aria-label="Anotar">+</button>
+        </form>` : ''}
+        ${ideas.length ? `<div class="quiero2-lista">${mostrar.map(i => `
+          <div class="quiero2-idea">
+            <button type="button" class="quiero2-texto" data-item="${i.id}"><span aria-hidden="true">${A().tipo(i.tipo).icono}</span><span>${esc(i.titulo)}${i.lugar ? `<small>${esc(i.lugar)}</small>` : ''}</span></button>
+            ${grupo ? `<button type="button" class="voto ${misVotos[i.id] ? 'activo' : ''}" data-votar="${i.id}" aria-pressed="${!!misVotos[i.id]}" title="Me gusta">👍 ${votosDe(v, i.id) || ''}</button>` : ''}
+            ${puede && dias.length ? `<button type="button" class="btn btn-suave btn-chico" data-elegir-dia="${i.id}">Elegir día</button>` : ''}
+          </div>`).join('')}</div>
+          ${ideas.length > 3 ? `<button type="button" class="btn-texto-mini" data-a="todasIdeas">${verTodasIdeas ? 'Ver menos' : `Ver las ${ideas.length}`}</button>` : ''}
+          ${puede && dias.length && ideas.length >= 2 ? '<button type="button" class="btn btn-suave btn-bloque quiero2-repartir" data-a="repartir">✨ Repartir mis ideas en los días</button>' : ''}` : ''}
+        ${favs.length ? `<div class="quiero2-favs"><small>⭐ Tus favoritos de viajes anteriores:</small>
+          <div class="chips-elegir chips-chicos">${favs.slice(0, 8).map((f, n) => `<button type="button" class="chip-op" data-fav="${n}">+ ${esc(f.titulo)}</button>`).join('')}</div></div>` : ''}
+      </section>`;
+  }
+  /** Cuántos viajeros votaron una idea. */
+  function votosDe(v, id) { return Object.values(v.votos || {}).filter(x => x && x[id]).length; }
+  /** Lo que marcaste con ⭐ en otros viajes al mismo destino y todavía no está en este. */
+  function favoritosPara(v) {
+    const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+    const destinos = new Set((v.destinos || []).map(d => norm(d.nombre)).filter(Boolean));
+    const ya = new Set(A().items(v).map(i => norm(i.titulo)));
+    const r = [];
+    R.db.viajes().filter(x => x.id !== v.id && (x.destinos || []).some(d => destinos.has(norm(d.nombre)))).forEach(x => {
+      (x.agenda || []).filter(i => i.favorito && !ya.has(norm(i.titulo))).forEach(i => { ya.add(norm(i.titulo)); r.push(i); });
+    });
+    return r;
+  }
+  function enlazarQuiero(v, cont) {
+    cont.querySelectorAll('[data-votar]').forEach(b => b.onclick = () => {
+      const yo = R.db.yoEn(v);
+      v.votos = Object.assign({}, v.votos);
+      const mios = Object.assign({}, v.votos[yo]);
+      if (mios[b.dataset.votar]) delete mios[b.dataset.votar]; else mios[b.dataset.votar] = 1;
+      v.votos[yo] = mios;
+      R.db.guardarViaje(v);
+      render(v, cont);
+    });
+    const favs = favoritosPara(v);
+    cont.querySelectorAll('[data-fav]').forEach(b => b.onclick = () => {
+      const f = favs[Number(b.dataset.fav)];
+      if (!f) return;
+      A().guardarItem(v, A().nuevoItem(Object.assign({ titulo: f.titulo, tipo: f.tipo, lugar: f.lugar || '', nota: f.nota || '', favorito: true, fecha: '' }, f.lat != null ? { lat: f.lat, lon: f.lon } : {})));
+      R.db.guardarViaje(v);
+      render(v, cont);
+      U.toast(`"${f.titulo}" quedó en tus ideas.`);
+    });
+    const f = cont.querySelector('[data-form="idea"]');
+    if (f) f.onsubmit = e => {
+      e.preventDefault();
+      const t = f.querySelector('input').value.trim();
+      if (!t) return;
+      A().guardarItem(v, A().nuevoItem({ titulo: t, fecha: '' }));
+      R.db.guardarViaje(v);
+      render(v, cont);
+      const i = cont.querySelector('#iIdeaRapida'); if (i) i.focus();
+    };
+    const bt = cont.querySelector('[data-a="todasIdeas"]');
+    if (bt) bt.onclick = () => { verTodasIdeas = !verTodasIdeas; render(v, cont); };
+    cont.querySelectorAll('[data-elegir-dia]').forEach(b => b.onclick = () => mover(v, b.dataset.elegirDia, () => R.app.refrescar()));
+    const br = cont.querySelector('[data-a="repartir"]');
+    if (br) br.onclick = () => repartir(v);
+  }
+
+  /* ---------------------------------------------------------
+     Repartir las ideas en los días (sin IA): cada idea va a un
+     día que pasás en su destino, las que quedan cerca entre sí
+     van juntas, y se cargan primero los días más libres.
+     No toca los días de viaje (con vuelo, micro…) si hay otros.
+     --------------------------------------------------------- */
+  async function repartir(v) {
+    const ideas = A().ideas(v);
+    const dias = A().dias(v);
+    if (!ideas.length || !dias.length) return;
+    const quedas = (v.destinos || []).filter(d => d.nombre && !d.soloDia);
+    const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    // 1) Dónde queda cada idea (lo que ya sabemos, o lo buscamos cerca del destino)
+    U.toast('Buscando dónde queda cada idea… 🔎');
+    const cerca = (quedas.find(d => d.lat != null) || null);
+    let buscadas = 0;
+    for (const i of ideas) {
+      if (i.lat != null || !R.ordenar || buscadas >= 12) continue;
+      const q = [i.lugar || i.titulo, ...(quedas.length === 1 ? [quedas[0].nombre] : [])].join(', ');
+      const t0 = Date.now();
+      const p = await R.ordenar.ubicar(q, cerca);
+      buscadas++;
+      // El buscador de mapas pide una consulta por segundo (si ya la tenía guardada, no hace falta esperar)
+      if (Date.now() - t0 > 60) await new Promise(r => setTimeout(r, 1050));
+      if (p) { i.lat = p.lat; i.lon = p.lon; }
+    }
+    // 2) A qué destino pertenece: el más cercano, o el que se nombra
+    const km = (a, b) => R.ordenar.km({ lat: a.lat, lon: a.lon }, { lat: b.lat, lon: b.lon });
+    const destinoDe = i => {
+      const nombrado = quedas.find(d => norm(i.titulo + ' ' + (i.lugar || '')).includes(norm(d.nombre)));
+      if (nombrado) return nombrado;
+      const conCoord = quedas.filter(d => d.lat != null);
+      if (i.lat != null && conCoord.length) return conCoord.slice().sort((a, b) => km(i, a) - km(i, b))[0];
+      return quedas.length === 1 ? quedas[0] : null;
+    };
+    // 3) Días disponibles en cada destino (sin traslados con horario si hay otros)
+    const carga = f => A().delDia(v, f).length;
+    const deViaje = f => A().delDia(v, f).some(it => A().esProgramado(it));
+    const diasDe = d => {
+      const todos = dias.filter(f => !d || norm(ciudadDe(v, f)) === norm(d.nombre));
+      const libres = todos.filter(f => !deViaje(f));
+      return (libres.length ? libres : todos.length ? todos : dias).slice();
+    };
+    // 4) Por destino: ordenar las ideas por cercanía y cortarlas en tantos días como haya
+    const plan = {};
+    const grupos = new Map();
+    ideas.forEach(i => { const d = destinoDe(i); const k = d ? d.id : ''; if (!grupos.has(k)) grupos.set(k, { d, ideas: [] }); grupos.get(k).ideas.push(i); });
+    grupos.forEach(({ d, ideas: lista }) => {
+      const ds = diasDe(d).sort((a, b) => carga(a) - carga(b) || a.localeCompare(b));
+      const conPos = lista.filter(i => i.lat != null).map(i => ({ i, pos: { lat: i.lat, lon: i.lon } }));
+      const sinPos = lista.filter(i => i.lat == null);
+      // Las más votadas van primero (a los días más libres); el resto, por cercanía
+      const votadas = lista.filter(i => votosDe(v, i.id) > 0).sort((a, b) => votosDe(v, b.id) - votosDe(v, a.id));
+      const resto = (conPos.length > 1 && R.ordenar ? R.ordenar.ordenCorto(null, conPos, null) : conPos).map(x => x.i).concat(sinPos).filter(i => !votadas.includes(i));
+      const orden = votadas.concat(resto);
+      const porDia = Math.max(1, Math.ceil(orden.length / ds.length));
+      orden.forEach((i, n) => {
+        const f = ds[Math.min(Math.floor(n / porDia), ds.length - 1)];
+        (plan[f] = plan[f] || []).push(i);
+      });
+    });
+    const fechas = Object.keys(plan).sort();
+    const { el } = U.modal({
+      titulo: '✨ Así quedarían tus ideas',
+      subtitulo: 'Las que quedan cerca entre sí van el mismo día, en los días más libres. Después las movés como quieras.',
+      cuerpo: `<div class="reparto">${fechas.map(f => `
+        <div class="reparto-dia"><strong>${esc(U.fmtFecha(f, 'dia'))}</strong>${ciudadDe(v, f) ? `<small>${esc(ciudadDe(v, f))}</small>` : ''}
+          <ul>${plan[f].map(i => `<li>${A().tipo(i.tipo).icono} ${esc(i.titulo)}</li>`).join('')}</ul></div>`).join('')}</div>`,
+      acciones: [{ texto: 'Cancelar' }, { texto: 'Pasarlas al itinerario', clase: 'btn-primario', onClick: () => {
+        fechas.forEach(f => plan[f].forEach(i => { i.fecha = f; A().guardarItem(v, i); }));
+        R.db.guardarViaje(v);
+        R.app.refrescar();
+        U.toast('Listo, tus ideas ya están en los días. 🗓️');
+      } }]
+    });
+    void el;
+  }
+
+  /* ---------------------------------------------------------
+     Plantillas de día: guardás un día armado y lo reusás
+     (se guardan en tu cuenta, sirven para cualquier viaje)
+     --------------------------------------------------------- */
+  function menuDia(v, fecha) {
+    const plantillas = R.db.prefs().plantillasDia || [];
+    const delDia = A().delDia(v, fecha).filter(it => !A().esTraslado(it));
+    const { el } = U.modal({
+      titulo: U.fmtFecha(fecha, 'dia').replace(/^./, c => c.toUpperCase()),
+      subtitulo: 'Plantillas: un día armado que podés reusar en cualquier viaje.',
+      cuerpo: `
+        ${delDia.length ? `<form class="fila-agregar" data-form="plantilla">
+          <input id="plNombre" placeholder="Nombre de la plantilla" aria-label="Nombre de la plantilla" autocomplete="off">
+          <button type="submit" class="btn btn-suave">💾 Guardar este día</button>
+        </form>
+        <p class="ayuda">Se guardan ${U.plural(delDia.length, 'actividad', 'actividades')} con su hora y duración (sin traslados).</p>` : '<p class="texto-suave">Este día está vacío: podés usar una plantilla.</p>'}
+        ${plantillas.length ? `<h4 class="titulo-paso">Usar una plantilla</h4>
+          <div class="plantillas">${plantillas.map(p => `
+            <div class="plantilla">
+              <button type="button" class="plantilla-usar" data-usar-plantilla="${p.id}"><strong>${esc(p.nombre)}</strong><small>${esc(p.items.map(i => (i.hora ? i.hora + ' ' : '') + i.titulo).join(' · '))}</small></button>
+              <button type="button" class="btn-icono" data-borrar-plantilla="${p.id}" aria-label="Borrar plantilla">×</button>
+            </div>`).join('')}</div>` : ''}`
+    });
+    const f = el.querySelector('[data-form="plantilla"]');
+    if (f) f.onsubmit = e => {
+      e.preventDefault();
+      const nombre = f.querySelector('#plNombre').value.trim();
+      if (!nombre) { U.toast('Poné un nombre a la plantilla.'); return; }
+      const items = delDia.map(i => ({ hora: i.hora || '', duracion: i.duracion || '', tipo: i.tipo, titulo: i.titulo, lugar: i.lugar || '', nota: i.nota || '' }));
+      R.db.guardarPrefs({ plantillasDia: plantillas.concat({ id: U.id('pl'), nombre, items }) });
+      U.cerrarModal();
+      U.toast(`Plantilla "${nombre}" guardada.`);
+    };
+    el.querySelectorAll('[data-usar-plantilla]').forEach(b => b.onclick = () => {
+      const p = plantillas.find(x => x.id === b.dataset.usarPlantilla);
+      if (!p) return;
+      p.items.forEach(i => A().guardarItem(v, A().nuevoItem(Object.assign({}, i, { fecha }))));
+      R.db.guardarViaje(v);
+      U.cerrarModal();
+      R.app.refrescar();
+      U.toast(`Sumé ${U.plural(p.items.length, 'actividad', 'actividades')} de "${p.nombre}".`);
+    });
+    el.querySelectorAll('[data-borrar-plantilla]').forEach(b => b.onclick = async () => {
+      if (!await U.confirmar('Se borra la plantilla (lo que ya usaste en tus viajes queda).', { titulo: 'Borrar plantilla', textoSi: 'Borrar', peligro: true })) return;
+      R.db.guardarPrefs({ plantillasDia: plantillas.filter(x => x.id !== b.dataset.borrarPlantilla) });
+      U.cerrarModal();
+      menuDia(v, fecha);
+    });
+  }
+
   function enlazar(v, cont) {
     const puede = R.db.puedeOrganizar(v);
     const repintar = () => R.app.refrescar();
     cont.querySelectorAll('[data-agregar]').forEach(b => b.onclick = () => editarItem(v, null, { fecha: b.dataset.agregar }));
     cont.querySelectorAll('[data-noche]').forEach(b => b.onclick = () => elegirNoche(v, b.dataset.noche));
     cont.querySelectorAll('[data-aloj]').forEach(b => b.onclick = () => editarAlojamiento(v, b.dataset.aloj));
-    const bp = cont.querySelector('[data-a="pegar"]');
-    if (bp) bp.onclick = () => R.importar.elegir(v);
-    const ba = cont.querySelector('[data-a="nuevoAloj"]');
-    if (ba) ba.onclick = () => editarAlojamiento(v, null, {});
-    const bi = cont.querySelector('[data-a="ideas"]');
-    if (bi) bi.onclick = () => { location.hash = `#viaje/${v.id}/pendientes`; };
+    enlazarQuiero(v, cont);
+    cont.querySelectorAll('[data-dia-menu]').forEach(b => b.onclick = () => menuDia(v, b.dataset.diaMenu));
     const bf = cont.querySelector('[data-a="fechas"]');
     if (bf) bf.onclick = () => R.viajes.editar(v);
     if (R.ordenar) R.ordenar.enlazar(cont, v);
@@ -268,11 +493,11 @@ R.itinerario = (function () {
           <div class="chips-elegir chips-chicos tipos-item">${tiposBtn}</div>
           <div class="si-traslado">
             <div class="grilla-2">
-              <label class="campo"><span>Desde</span><input id="iDesde" value="${esc(it.desde || '')}" placeholder="Ej: Buenos Aires"></label>
-              <label class="campo"><span>Hasta</span><input id="iHasta" value="${esc(it.hasta || '')}" placeholder="Ej: Bariloche"></label>
+              <label class="campo"><span>Desde</span><input id="iDesde" value="${esc(it.desde || '')}" placeholder="Ciudad de salida"></label>
+              <label class="campo"><span>Hasta</span><input id="iHasta" value="${esc(it.hasta || '')}" placeholder="Ciudad de llegada"></label>
             </div>
           </div>
-          <label class="campo no-traslado"><span>¿Qué?</span><input id="iTitulo" value="${esc(it.titulo || '')}" placeholder="Ej: Cerro Campanario"></label>
+          <label class="campo no-traslado"><span>¿Qué?</span><input id="iTitulo" value="${esc(it.titulo || '')}" placeholder="Nombre del lugar o actividad"></label>
           <div class="grilla-2">
             <label class="campo"><span>Día</span><select id="iFecha">
               <option value="">Sin día (Quiero hacer)</option>
@@ -283,24 +508,29 @@ R.itinerario = (function () {
           </div>
           <div class="si-traslado grilla-2">
             <label class="campo"><span>Llega</span><input type="time" id="iLlega" value="${esc(it.horaLlegada || '')}"></label>
-            <label class="campo"><span>N° <small>(vuelo, servicio)</small></span><input id="iNumero" value="${esc(it.numero || '')}" autocapitalize="characters" placeholder="Ej: AR1672"></label>
+            <label class="campo"><span>N° <small>(vuelo, servicio)</small></span><input id="iNumero" value="${esc(it.numero || '')}" autocapitalize="characters" placeholder="Como figura en el pasaje"></label>
           </div>
           <div class="si-vuelo grilla-2">
-            <label class="campo"><span>Aeropuerto de salida</span><input id="iAeroDesde" value="${esc(it.aeroDesde || '')}" maxlength="3" autocapitalize="characters" placeholder="Sigla, ej: AEP"></label>
-            <label class="campo"><span>Aeropuerto de llegada</span><input id="iAeroHasta" value="${esc(it.aeroHasta || '')}" maxlength="3" autocapitalize="characters" placeholder="Sigla, ej: BRC"></label>
+            <label class="campo"><span>Aeropuerto de salida</span><input id="iAeroDesde" value="${esc(it.aeroDesde || '')}" maxlength="3" autocapitalize="characters" placeholder="Sigla de 3 letras"></label>
+            <label class="campo"><span>Aeropuerto de llegada</span><input id="iAeroHasta" value="${esc(it.aeroHasta || '')}" maxlength="3" autocapitalize="characters" placeholder="Sigla de 3 letras"></label>
           </div>
           <div class="si-programado grilla-2">
             <label class="campo"><span class="lbl-con-salir">Hasta la terminal</span><select id="iAlSalir"><option value="">Sin resolver</option>${A().CONEXIONES.map(([k, ic, n]) => `<option value="${k}" ${it.alSalir === k ? 'selected' : ''}>${ic} ${n}</option>`).join('')}</select></label>
             <label class="campo"><span class="lbl-con-llegar">Desde la terminal</span><select id="iAlLlegar"><option value="">Sin resolver</option>${A().CONEXIONES.map(([k, ic, n]) => `<option value="${k}" ${it.alLlegar === k ? 'selected' : ''}>${ic} ${n}</option>`).join('')}</select></label>
           </div>
           <label class="campo no-traslado"><span>Dónde</span><input id="iLugar" value="${esc(it.lugar || '')}" placeholder="Escribí el lugar y elegí de la lista"></label>
+          <label class="campo no-traslado"><span>¿Cuánto dura? <small>(opcional)</small></span><select id="iDuracion"><option value="">Sin indicar</option>${DURACIONES.map(([m, t]) => `<option value="${m}" ${Number(it.duracion) === m ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
           <div class="form-opcional">
             <div class="grilla-2 si-traslado">
               <label class="campo"><span>Empresa <small>(opcional)</small></span><input id="iEmpresa" value="${esc(it.empresa || '')}" list="dlEmpresas" autocomplete="off"></label>
               <label class="campo"><span>Llega otro día <small>(opcional)</small></span><input type="date" id="iFechaLlega" value="${esc(it.fechaLlegada && it.fechaLlegada !== it.fecha ? it.fechaLlegada : '')}" ${it.fecha ? `min="${it.fecha}"` : ''}></label>
             </div>
-            <label class="campo"><span>Código de reserva <small>(opcional)</small></span><input id="iCodigo" value="${esc(it.codigo || '')}" autocapitalize="characters"></label>
-            <label class="campo"><span>Notas <small>(opcional)</small></span><textarea id="iNota" rows="2" placeholder="Ej: llevar efectivo, asientos 14A y 14B">${esc(it.nota || '')}</textarea></label>
+            <div class="grilla-2">
+              <label class="campo"><span>Código de reserva <small>(opcional)</small></span><input id="iCodigo" value="${esc(it.codigo || '')}" autocapitalize="characters"></label>
+              <label class="campo"><span>Cancelación gratis hasta <small>(opcional)</small></span><input type="date" id="iCancela" value="${esc(it.cancelaHasta || '')}"></label>
+            </div>
+            <label class="check no-traslado"><input type="checkbox" id="iFavorito" ${it.favorito ? 'checked' : ''}> ⭐ Favorito: sugerímelo cuando vuelva a este destino</label>
+            <label class="campo"><span>Notas <small>(opcional)</small></span><textarea id="iNota" rows="2" placeholder="Datos útiles para ese momento">${esc(it.nota || '')}</textarea></label>
             ${puede ? costoHTML(v, it.id) : ''}
             ${docs.length ? `<div class="docs-item">${docs.map(d => `<button type="button" class="chip-doc" data-doc="${d.id}">📎 ${esc(d.nombre)}</button>`).join('')}</div>` : ''}
             ${puede ? U.zonaArchivos('item', archivos, 'Sumar el pasaje, voucher o entrada', true) : ''}
@@ -328,6 +558,7 @@ R.itinerario = (function () {
     pintarTipo();
     el.querySelectorAll('[data-tipo]').forEach(b => b.onclick = () => { if (!puede) return; it.tipo = b.dataset.tipo; pintarTipo(); });
     const fSale = el.querySelector('#iFecha'), fLlega = el.querySelector('#iFechaLlega');
+    U.calendarioDesde(fLlega, () => fSale.value);
     fSale.addEventListener('change', () => { fLlega.min = fSale.value || ''; if (fLlega.value && fLlega.value < fSale.value) fLlega.value = ''; });
     const num = el.querySelector('#iNumero'), emp = el.querySelector('#iEmpresa');
     num.addEventListener('change', () => { const a = A().aerolineaDe(num.value); if (a && !emp.value.trim()) emp.value = a; });
@@ -342,6 +573,12 @@ R.itinerario = (function () {
       const tr = A().tipo(it.tipo).traslado;
       it.fecha = val('#iFecha'); it.hora = val('#iHora');
       it.lugar = tr ? '' : val('#iLugar').trim();
+      it.duracion = tr ? '' : val('#iDuracion');
+      it.cancelaHasta = val('#iCancela');
+      it.favorito = !tr && !!(f.querySelector('#iFavorito') || {}).checked;
+      const inpLugar = f.querySelector('#iLugar');
+      if (!tr && inpLugar && inpLugar.dataset.lat) { it.lat = Number(inpLugar.dataset.lat); it.lon = Number(inpLugar.dataset.lon); }
+      else if (!it.lugar) { delete it.lat; delete it.lon; }
       it.nota = val('#iNota').trim(); it.codigo = val('#iCodigo').trim().toUpperCase();
       if (tr) {
         it.desde = val('#iDesde').trim(); it.hasta = val('#iHasta').trim();
@@ -428,7 +665,7 @@ R.itinerario = (function () {
       titulo: existente ? A().nombreAlojamiento(a) : 'Alojamiento',
       cuerpo: `
         <div class="form-item">
-          <label class="campo"><span>Nombre${a.ciudad ? ' <small>(opcional)</small>' : ''}</span><input id="aNombre" value="${esc(a.nombre)}" list="dlAloj" autocomplete="off" placeholder="${esc(a.ciudad ? 'Alojamiento en ' + a.ciudad : 'Ej: Hotel Patagonia, depto de Airbnb')}"></label>
+          <label class="campo"><span>Nombre${a.ciudad ? ' <small>(opcional)</small>' : ''}</span><input id="aNombre" value="${esc(a.nombre)}" list="dlAloj" autocomplete="off" placeholder="${esc(a.ciudad ? 'Alojamiento en ' + a.ciudad : 'Nombre del hotel, departamento o casa')}"></label>
           <label class="campo"><span>Dirección <small>(opcional)</small></span><input id="aDir" value="${esc(a.direccion)}" placeholder="Escribí el hotel o la calle y elegí de la lista"></label>
           <div class="grilla-2">
             <label class="campo"><span>Entrás <small>(check-in)</small></span><input type="date" id="aDesde" value="${esc(a.desde)}"></label>
@@ -440,8 +677,11 @@ R.itinerario = (function () {
               <label class="campo"><span>Hora de check-in</span><input type="time" id="aIn" value="${esc(a.checkin)}"></label>
               <label class="campo"><span>Hora de check-out</span><input type="time" id="aOut" value="${esc(a.checkout)}"></label>
             </div>
-            <label class="campo"><span>Código de reserva <small>(opcional)</small></span><input id="aCodigo" value="${esc(a.codigo)}"></label>
-            <label class="campo"><span>Notas <small>(opcional)</small></span><textarea id="aNota" rows="2" placeholder="Ej: teléfono, desayuno, cómo retirar la llave">${esc(a.nota)}</textarea></label>
+            <div class="grilla-2">
+              <label class="campo"><span>Código de reserva <small>(opcional)</small></span><input id="aCodigo" value="${esc(a.codigo)}"></label>
+              <label class="campo"><span>Cancelación gratis hasta <small>(opcional)</small></span><input type="date" id="aCancela" value="${esc(a.cancelaHasta || '')}"></label>
+            </div>
+            <label class="campo"><span>Notas <small>(opcional)</small></span><textarea id="aNota" rows="2" placeholder="Datos útiles del alojamiento">${esc(a.nota)}</textarea></label>
             ${puede ? costoHTML(v, a.id) : ''}
             ${docs.length ? `<div class="docs-item">${docs.map(d => `<button type="button" class="chip-doc" data-doc="${d.id}">📎 ${esc(d.nombre)}</button>`).join('')}</div>` : ''}
             ${puede ? U.zonaArchivos('aloj', archivos, 'Sumar la reserva o el voucher', true) : ''}
@@ -456,6 +696,8 @@ R.itinerario = (function () {
     });
     ['#aDesde', '#aHasta'].forEach(s => el.querySelector(s).addEventListener('change', () => { el.querySelector('#aNoches').textContent = noches(); }));
     el.querySelector('#aDesde').addEventListener('change', e => { el.querySelector('#aHasta').min = e.target.value || ''; });
+    U.calendarioDesde(el.querySelector('#aDesde'), () => v.fechaInicio);
+    U.calendarioDesde(el.querySelector('#aHasta'), () => el.querySelector('#aDesde').value ? U.sumarDias(el.querySelector('#aDesde').value, 1) : v.fechaInicio);
     el.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => R.documentos.abrir((v.documentos || []).find(d => d.id === b.dataset.doc), v));
     if (puede) U.enlazarArchivos(el, 'aloj', archivos, () => U.repintarArchivos(el, 'aloj', archivos, 'Sumar la reserva o el voucher', true));
     if (R.direcciones) R.direcciones.enlazar(el.querySelector('#aDir'), { cerca: R.direcciones.cercaDe(v, null) });
@@ -465,7 +707,7 @@ R.itinerario = (function () {
       const val = s => (f.querySelector(s) || {}).value || '';
       a.nombre = val('#aNombre').trim(); a.direccion = val('#aDir').trim();
       a.desde = val('#aDesde'); a.hasta = val('#aHasta');
-      a.checkin = val('#aIn'); a.checkout = val('#aOut'); a.codigo = val('#aCodigo').trim(); a.nota = val('#aNota').trim();
+      a.checkin = val('#aIn'); a.checkout = val('#aOut'); a.codigo = val('#aCodigo').trim(); a.nota = val('#aNota').trim(); a.cancelaHasta = val('#aCancela');
       if (!a.nombre && !a.ciudad) { U.toast('Escribí el nombre del alojamiento.'); return false; }
       if (a.desde && a.hasta && a.hasta <= a.desde) { U.toast('La salida tiene que ser después de la entrada.'); return false; }
       A().guardarAlojamiento(v, a);

@@ -197,6 +197,8 @@
     const hayViajes = viajes.length > 0;
 
     document.body.classList.toggle('fondo-inicio', hayViajes);
+    // Viajando: el inicio es solo "Hoy" (se puede ver el inicio completo con un toque)
+    if (enCurso.length && !inicioCompleto) { renderModoViaje(enCurso); return; }
     app.innerHTML = `
       ${hayViajes ? `
       <section class="saludo-inicio">
@@ -223,6 +225,7 @@
         </div>
       </section>`}
 
+      ${enCurso.length ? `<button type="button" class="btn btn-suave btn-bloque volver-modo-viaje" data-a="modoViaje">🧳 Volver a "Hoy" del viaje</button>` : ''}
       ${enCurso.map(v => tarjetaViaje(v) + R.itinerario.hoyHTML(v)).join('')}
 
       ${puedeInstalar() && !leerOculto('instalar') ? `
@@ -250,6 +253,8 @@
         </section>` : viajes.length > 1 ? `<p class="ir-viajes"><a href="#viajes" class="btn btn-texto btn-chico">Ver todos mis viajes (${viajes.length}) →</a></p>` : ''}`;
 
     app.querySelectorAll('[data-a="nuevo"]').forEach(b => b.onclick = () => R.viajes.nuevo());
+    const bmv = app.querySelector('[data-a="modoViaje"]');
+    if (bmv) bmv.onclick = () => { inicioCompleto = false; refrescar(); };
     const bInst = app.querySelector('[data-a="instalar"]');
     if (bInst) bInst.onclick = instalar;
     const bOcultar = app.querySelector('[data-a="ocultarInstalar"]');
@@ -258,6 +263,67 @@
     if (R.bandeja) R.bandeja.enlazarInicio(app);
     if (R.cierre) R.cierre.enlazar(app);
     if (R.feriados) R.feriados.enlazarInicio(app);
+  }
+
+  /* ---------------------------------------------------------
+     Modo viaje: mientras viajás, el inicio es solo lo de hoy
+     --------------------------------------------------------- */
+  let inicioCompleto = false;
+  function renderModoViaje(lista) {
+    const v = lista[0];
+    const hoy = U.hoyISO(), manana = U.sumarDias(hoy, 1);
+    const d = R.itinerario.diaDe(v, hoy);
+    const dm = manana <= (v.fechaFin || v.fechaInicio) ? R.itinerario.diaDe(v, manana) : null;
+    const total = v.fechaFin ? U.diasEntre(v.fechaInicio, v.fechaFin) + 1 : null;
+    const faltan = R.pendientes.faltan(v);
+    const ultimo = v.fechaFin === hoy;
+    const lugar = d.lugarNombre || R.viajes.destinoCompleto(v);
+    const salida = (v.alojamientos || []).find(a => a.hasta === hoy);
+    const fila = it => `
+      <a class="mv-item ${it.clase || ''}" href="#viaje/${v.id}/itinerario">
+        <span class="mv-hora">${esc(it.hora || '')}${it.horaFin ? `<small>${esc(it.horaFin)}</small>` : ''}</span><span class="mv-ico" aria-hidden="true">${it.icono}</span>
+        <span class="mv-texto"><strong>${esc(it.titulo)}</strong>${it.sub ? `<small>${esc(it.sub)}</small>` : ''}${it.conexiones && it.conexiones.falta ? `<small class="mv-falta">${esc(it.conexiones.falta)}</small>` : ''}${it.choque ? `<small class="mv-falta">⚠️ ${esc(it.choque)}</small>` : ''}</span>
+      </a>`;
+    const noche = x => !x.dormis ? `<a class="mv-noche falta" href="#viaje/${v.id}/itinerario">🛏️ ¿Dónde dormís esta noche?</a>`
+      : x.dormis.id ? `<div class="mv-noche">🛏️ Dormís en <strong>${esc(x.dormis.texto)}</strong>${x.dormis.direccion && R.gmaps ? ` · <a href="${esc(R.gmaps.comoLlegar(x.dormis.direccion))}" target="_blank" rel="noopener">Cómo llegar</a>` : ''}</div>`
+        : `<div class="mv-noche">${x.dormis.icono} Esta noche, <strong>${esc(x.dormis.texto.toLowerCase())}</strong></div>`;
+    app.innerHTML = `
+      <section class="mv">
+        <div class="mv-cab" style="background:${R.paisaje.fondo(v)}">
+          ${U.paisaje(v)}
+          <div class="mv-cab-txt">
+            <span class="etiqueta-clara">Viajando · Día ${d.numero || 1}${total ? ' de ' + total : ''}</span>
+            <h1>${esc(lugar)}</h1>
+            <p>${esc(new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))} · ${esc(R.viajes.nombreDe(v))}</p>
+          </div>
+        </div>
+        ${R.recordatorios ? R.recordatorios.avisosHTML() : ''}
+        <section class="mv-hoy">
+          <h2 class="titulo-seccion">Hoy</h2>
+          ${salida ? `<a class="mv-noche mv-checkout" href="#viaje/${v.id}/valija">🧳 Hoy dejás <strong>${esc(R.agenda.nombreAlojamiento(salida))}</strong>${salida.checkout ? ` (check-out ${esc(salida.checkout)})` : ''}. Revisá que no quede nada en la habitación.</a>` : ''}
+          ${d.items.length ? d.items.map(fila).join('') : '<p class="texto-suave mv-libre">Día libre. Mirá tus ideas en el itinerario.</p>'}
+          ${ultimo ? '' : noche(d)}
+        </section>
+        <div class="mv-acciones">
+          <button type="button" class="mv-accion" data-a="gasto"><span>💸</span>Cargar gasto</button>
+          <a class="mv-accion" href="#viaje/${v.id}/ayuda"><span>🆘</span>Ayuda</a>
+          <a class="mv-accion" href="#viaje/${v.id}/itinerario"><span>🗓️</span>Itinerario</a>
+          <a class="mv-accion" href="#viaje/${v.id}/pendientes"><span>✅</span>Pendientes${faltan ? ` <em>${faltan}</em>` : ''}</a>
+        </div>
+        ${dm ? `
+          <section class="mv-manana">
+            <h3>Mañana · ${esc(U.fmtFecha(manana, 'dia'))}</h3>
+            ${dm.items.length ? dm.items.slice(0, 3).map(it => `<p><span class="mv-hora">${esc(it.hora || '')}</span> ${it.icono} ${esc(it.titulo)}</p>`).join('') + (dm.items.length > 3 ? `<p class="texto-suave">y ${dm.items.length - 3} más</p>` : '') : '<p class="texto-suave">Nada cargado.</p>'}
+          </section>` : ''}
+        ${ultimo && R.db.puedeOrganizar(v) ? '<button type="button" class="btn btn-primario btn-bloque" data-a="llegue">🏠 Ya llegué: terminar el viaje</button>' : ''}
+        ${lista.length > 1 ? `<p class="texto-suave">También estás en: ${lista.slice(1).map(x => `<a href="#viaje/${x.id}">${esc(R.viajes.nombreDe(x))}</a>`).join(', ')}</p>` : ''}
+        <button type="button" class="btn btn-texto btn-chico mv-completo" data-a="inicioCompleto">Ver el inicio completo</button>
+      </section>`;
+    app.querySelector('[data-a="gasto"]').onclick = () => R.gastos.nuevo(v);
+    app.querySelector('[data-a="inicioCompleto"]').onclick = () => { inicioCompleto = true; refrescar(); };
+    const bl = app.querySelector('[data-a="llegue"]');
+    if (bl) bl.onclick = () => R.viajes.finalizar(v);
+    if (R.recordatorios) R.recordatorios.enlazarAvisos(app);
   }
 
   /** Lo que tenés por hacer en un viaje, en una línea: pendientes y valija. */
@@ -286,11 +352,10 @@
           </div>
           <h2>${esc(R.viajes.nombreDe(v))}</h2>
           <p class="dp-meta">${esc(R.viajes.destinoCompleto(v))}${v.fechaInicio ? ' · ' + esc(U.fmtRango(v.fechaInicio, v.fechaFin)) : ''}</p>
+          ${R.viajes.duracion(v) ? `<p class="dp-meta dp-duracion">${esc(R.viajes.duracion(v))}</p>` : ''}
           <div class="dp-pie">
-            <a class="dp-siguiente" href="#viaje/${v.id}/pendientes">
-              <small>${esc(r.texto)}</small>
-              ${r.prox ? `<strong>${esc(r.prox.texto)} · ${esc(U.fmtFecha(r.prox.fecha, 'corto'))}</strong>` : ''}
-            </a>
+            ${R.viajes.progresoHTML(v, 'avance-claro')}
+            ${r.prox ? `<a class="dp-siguiente" href="#viaje/${v.id}/pendientes"><small>Próximo pendiente</small><strong>${esc(r.prox.texto)} · ${esc(U.fmtFecha(r.prox.fecha, 'corto'))}</strong></a>` : ''}
           </div>
         </article>
       </section>`;
@@ -314,6 +379,7 @@
      Mis viajes: todos, con filtros
      --------------------------------------------------------- */
   let filtroViajes = 'todos';
+  const ordenViajes = () => { try { return localStorage.getItem('rutenda_orden_viajes') || 'fecha'; } catch (e) { return 'fecha'; } };
   function renderMisViajes() {
     const viajes = R.db.viajes().slice();
     const estado = v => {
@@ -328,6 +394,8 @@
     ].map(g => {
       const lista = viajes.filter(v => estado(v) === g.id);
       lista.sort((a, b) => g.id === 'pasado' ? (b.fechaFin || '').localeCompare(a.fechaFin || '') : (a.fechaInicio || '9999').localeCompare(b.fechaInicio || '9999'));
+      // "Lo que falta armar": los menos armados primero (solo en los que vienen)
+      if (ordenViajes() === 'armado' && g.id !== 'pasado') lista.sort((a, b) => R.viajes.progreso(a).pct - R.viajes.progreso(b).pct);
       return Object.assign(g, { lista });
     });
     if (filtroViajes !== 'todos' && !grupos.some(g => g.id === filtroViajes && g.lista.length)) filtroViajes = 'todos';
@@ -350,6 +418,9 @@
         <button class="${filtroViajes === 'todos' ? 'activo' : ''}" data-filtro-viajes="todos">Todos</button>
         ${grupos.filter(g => g.lista.length).map(g => `<button class="${filtroViajes === g.id ? 'activo' : ''}" data-filtro-viajes="${g.id}">${g.titulo} <span>${g.lista.length}</span></button>`).join('')}
       </div>` : ''}
+      ${viajes.filter(v => estado(v) !== 'pasado').length >= 2 ? `<div class="orden-viajes"><span>Ordenar:</span>
+        <button type="button" class="chip-op ${ordenViajes() !== 'armado' ? 'activo' : ''}" data-orden="fecha">Por fecha</button>
+        <button type="button" class="chip-op ${ordenViajes() === 'armado' ? 'activo' : ''}" data-orden="armado">Lo que falta armar</button></div>` : ''}
       ${(viajes.length >= 4 ? visibles : grupos.filter(g => g.lista.length)).map(g => `
         <section class="seccion-viajes">
           <h2 class="titulo-seccion">${g.icono} ${esc(g.titulo)} <span class="contador">${g.lista.length}</span></h2>
@@ -373,6 +444,7 @@
       R.mapa.mostrarTodos(el.querySelector('#mapaTodos'), R.db.viajes());
     };
     app.querySelectorAll('[data-filtro-viajes]').forEach(b => b.onclick = () => { filtroViajes = b.dataset.filtroViajes; renderMisViajes(); });
+    app.querySelectorAll('[data-orden]').forEach(b => b.onclick = () => { try { localStorage.setItem('rutenda_orden_viajes', b.dataset.orden); } catch (e) { /* sin almacenamiento */ } renderMisViajes(); });
   }
 
   function leerOculto(clave) { try { return localStorage.getItem('rutenda_oculto_' + clave) === '1'; } catch (e) { return false; } }
@@ -510,8 +582,9 @@
       const achicado = vv ? vv.height < window.innerHeight * 0.78 : false;
       document.body.classList.toggle('teclado-abierto', esCampo(document.activeElement) || achicado);
     };
-    document.addEventListener('focusin', revisar);
-    document.addEventListener('focusout', () => setTimeout(revisar, 60));
+    // Al salir de un campo se espera un instante: si tocaste un botón, que el toque termine antes de que se mueva la pantalla
+    document.addEventListener('focusin', e => (esCampo(e.target) ? revisar() : setTimeout(revisar, 300)));
+    document.addEventListener('focusout', () => setTimeout(revisar, 300));
     if (window.visualViewport) window.visualViewport.addEventListener('resize', revisar);
   })();
   rutaAnterior = location.hash.split('/').slice(0, 2).join('/');

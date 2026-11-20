@@ -66,12 +66,12 @@ R.familia = (function () {
 
   /** Cartel para crear, copiar o apagar el link. */
   function abrir(v) {
-    if (R.db.modo() !== 'nube') { U.toast('El link para la familia necesita tu cuenta en la nube.'); return; }
+    if (R.db.modo() !== 'nube') { U.toast('El link del itinerario necesita tu cuenta en la nube.'); return; }
     const activo = v.linkFamilia && v.linkFamilia.activo;
     const org = R.db.puedeOrganizar(v);
     const { el } = U.modal({
-      titulo: '👪 Link para la familia',
-      subtitulo: 'Ven dónde estás cada día, sin cuenta y sin poder cambiar nada.',
+      titulo: '🔗 Link del itinerario',
+      subtitulo: 'Para tu familia o para quien viaja con vos sin usar la app: ven el viaje día por día, sin cuenta y sin poder cambiar nada.',
       cuerpo: activo ? `
         <label class="campo"><span>Link</span><input id="lfUrl" readonly value="${esc(url(v.linkFamilia.token))}"></label>
         <div class="opciones-compartir">
@@ -79,16 +79,16 @@ R.familia = (function () {
           <button type="button" class="btn btn-suave btn-bloque" data-a="lfCopiar">📋 Copiar el link</button>
           <a class="btn btn-texto btn-bloque" href="${esc(url(v.linkFamilia.token))}" target="_blank" rel="noopener">👀 Ver cómo lo ven</a>
         </div>
-        <p class="ayuda">Se actualiza solo cuando cambiás el itinerario. No muestra gastos, documentos, notas ni códigos de reserva.</p>
+        <p class="ayuda">Se actualiza solo cuando cambiás el itinerario. No muestra gastos, pendientes, documentos, notas ni códigos de reserva.</p>
         ${org ? '<button type="button" class="btn btn-texto btn-chico peligro" data-a="lfApagar">Dejar de compartir</button>' : ''}`
         : org ? `
         <ul class="lista-consejos">
-          <li><span>🗓️</span><div>Cada día: dónde estás, tus traslados y dónde dormís.</div></li>
-          <li><span>🔒</span><div>No muestra gastos, documentos, notas ni códigos de reserva.</div></li>
+          <li><span>🗓️</span><div>Solo los días: qué hacés, los traslados y dónde dormís.</div></li>
+          <li><span>🔒</span><div>No muestra gastos, pendientes, documentos, notas ni códigos de reserva.</div></li>
           <li><span>⏸️</span><div>Lo podés apagar cuando quieras.</div></li>
         </ul>
         <button type="button" class="btn btn-primario btn-bloque" data-a="lfCrear">Crear el link</button>`
-        : '<p class="texto-suave">Quien organiza el viaje puede crear un link para que la familia vea el itinerario.</p>',
+        : '<p class="texto-suave">Quien organiza el viaje puede crear un link del itinerario para compartirlo.</p>',
       acciones: [{ texto: 'Cerrar' }]
     });
     const bCrear = el.querySelector('[data-a="lfCrear"]');
@@ -100,7 +100,7 @@ R.familia = (function () {
     if (bCop) bCop.onclick = async () => { try { await navigator.clipboard.writeText(url(v.linkFamilia.token)); U.toast('Link copiado.'); } catch (e) { el.querySelector('#lfUrl').select(); } };
     const bCom = el.querySelector('[data-a="lfCompartir"]');
     if (bCom) bCom.onclick = async () => {
-      const texto = `Seguí mi viaje día por día: ${url(v.linkFamilia.token)}`;
+      const texto = `El itinerario del viaje, día por día: ${url(v.linkFamilia.token)}`;
       if (navigator.share) { try { await navigator.share({ title: 'Mi viaje', text: texto }); } catch (e) { /* cancelado */ } }
       else window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
     };

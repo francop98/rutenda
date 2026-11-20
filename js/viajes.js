@@ -18,7 +18,7 @@ R.viajes = (function () {
     { id: 'valija', nombre: 'Valija', icono: '🧳' }
   ];
   // Se abren desde el menú ⋯ o desde la portada
-  const OTRAS = { documentos: 'Archivos', viajeros: 'Viajeros' };
+  const OTRAS = { documentos: 'Archivos', viajeros: 'Viajeros', ayuda: 'Ayuda' };
 
   /* ---------- Datos del viaje ---------- */
   const lugares = v => (v.destinos || []).filter(d => d.nombre && !d.soloDia);
@@ -87,15 +87,14 @@ R.viajes = (function () {
     const org = R.db.puedeOrganizar(v);
     const est = estadoViaje(v);
     const ops = [];
-    if (org) ops.push(['editar', '✏️', 'Editar el viaje', 'Nombre, destinos, fechas, quiénes van']);
-    if (org) ops.push(['transporte', '🚌', 'Transporte', 'Cómo vas de un lugar a otro']);
-    if (org && R.armar.noches(v).length) ops.push(['noches', '🛏️', 'Dónde dormís', 'Noche por noche y alojamientos']);
+    if (org) ops.push(['editar', '✏️', 'Editar el viaje', 'Destinos, fechas, transporte y dónde dormís']);
     ops.push(['viajeros', '👥', 'Viajeros', 'Invitar a quienes viajan con vos']);
-    ops.push(['documentos', '📁', 'Archivos', 'Pasajes, vouchers, documentos y emergencias']);
+    ops.push(['ayuda', '🆘', 'Ayuda', 'Emergencias, contactos, requisitos y qué hacer si…']);
+    ops.push(['documentos', '📁', 'Archivos', 'Pasajes, vouchers y documentos']);
     ops.push(['ruta', '🗺️', 'Ver la ruta en Google Maps', '']);
     ops.push(['mapa', '📍', 'Mapa del viaje', '']);
     ops.push(['pdf', '📄', 'Itinerario en PDF', 'Para imprimir o mandar']);
-    if (R.familia && R.db.modo() === 'nube') ops.push(['familia', '👪', 'Link para la familia', v.linkFamilia && v.linkFamilia.activo ? 'Activo' : 'Ven dónde estás cada día']);
+    if (R.familia && R.db.modo() === 'nube') ops.push(['familia', '🔗', 'Link del itinerario', v.linkFamilia && v.linkFamilia.activo ? 'Activo · solo los días, sin gastos ni pendientes' : 'Para tu familia o quien viaja sin la app']);
     if (R.linkCuentas && R.db.modo() === 'nube' && (v.participantes || []).length > 1) ops.push(['linkCuentas', '🔗', 'Link de cuentas para el grupo', v.linkCuentas && v.linkCuentas.activo ? 'Activo' : '']);
     if (v.fechaInicio) ops.push(['resumen', '🖼️', 'Resumen para compartir', '']);
     if (org && est === 'en_curso') ops.push(['finalizar', '🏠', 'Ya llegué: terminar el viaje', '']);
@@ -109,7 +108,7 @@ R.viajes = (function () {
       const op = bt.dataset.op;
       U.cerrarModal();
       if (op === 'editar') editar(v);
-      else if (op === 'viajeros' || op === 'documentos') location.hash = `#viaje/${v.id}/${op}`;
+      else if (op === 'viajeros' || op === 'documentos' || op === 'ayuda') location.hash = `#viaje/${v.id}/${op}`;
       else if (op === 'transporte' || op === 'noches') location.hash = `#armar/${v.id}/${op}`;
       else if (op === 'ruta') R.gmaps.abrirRutaViaje(v);
       else if (op === 'mapa') { const { el: m } = U.modal({ titulo: 'Mapa del viaje', ancho: true, cuerpo: '<div id="mapaViaje" class="mapa-viaje"></div>' }); R.mapa.mostrar(m.querySelector('#mapaViaje'), v); }
@@ -141,10 +140,11 @@ R.viajes = (function () {
     app.innerHTML = `
       <section class="portada-viaje portada-compacta" style="background:${R.paisaje.fondo(v)}">
         ${U.paisaje(v)}
+        <a class="btn-ayuda-viaje" href="#viaje/${v.id}/ayuda" aria-label="Ayuda: emergencias y contactos" title="Ayuda">🆘</a>
         <button class="btn-menu-viaje" data-a="menu" aria-label="Opciones del viaje">⋯</button>
         <div class="portada-contenido">
           <h1 ${org ? 'class="editable" data-a="editar" title="Editar el viaje"' : ''}>${esc(nombreDe(v))}</h1>
-          <p class="portada-meta"><span ${org ? 'class="editable" data-a="editar"' : ''}>${esc(v.fechaInicio ? U.fmtRango(v.fechaInicio, v.fechaFin) : 'Sin fechas')}</span> · <strong>${esc(cuentaRegresiva(v))}</strong></p>
+          <p class="portada-meta"><span ${org ? 'class="editable" data-a="editar"' : ''}>${esc(v.fechaInicio ? U.fmtRango(v.fechaInicio, v.fechaFin) : 'Sin fechas')}${duracion(v) ? ' · ' + esc(duracion(v)) : ''}</span> · <strong>${esc(cuentaRegresiva(v))}</strong></p>
           <a class="portada-avatares" href="#viaje/${v.id}/viajeros" title="Viajeros">${personas.map(p => U.avatar(p, 28)).join('')}<span class="pa-mas">${personas.length > 1 ? personas.length + ' viajeros' : '+ Viajeros'}</span></a>
         </div>
       </section>
@@ -163,6 +163,7 @@ R.viajes = (function () {
     else if (pestana === 'gastos') R.gastos.render(v, cont);
     else if (pestana === 'valija') R.valija.render(v, cont);
     else if (pestana === 'documentos') R.documentos.render(v, cont);
+    else if (pestana === 'ayuda') R.ayuda.render(v, cont);
     else if (pestana === 'viajeros') R.participantes.renderViajeros(v, cont);
   }
 
@@ -173,6 +174,46 @@ R.viajes = (function () {
     const mio = v.participantes.length > 1 ? R.gastos.parteDe(v, yo) : R.gastos.totales(v).neto;
     if (mio <= 0) return '';
     return `${estadoViaje(v) === 'pasado' ? 'Te salió' : 'Te va saliendo'} ${U.fmtMoneda(mio, v.monedaBase)}`;
+  }
+
+  /** "5 días · 4 noches" */
+  function duracion(v) {
+    if (!v.fechaInicio) return '';
+    const d = U.diasEntre(v.fechaInicio, v.fechaFin || v.fechaInicio) + 1;
+    return d === 1 ? 'Ida y vuelta en el día' : `${U.plural(d, 'día', 'días')} · ${U.plural(d - 1, 'noche', 'noches')}`;
+  }
+
+  /**
+   * Cuánto está armado el viaje: transporte, noches, pendientes (los tuyos y los recomendados) y valija.
+   * { pct, partes: [{ icono, nombre, hechos, total }] }
+   */
+  function progreso(v) {
+    const partes = [];
+    const sumar = (icono, nombre, hechos, total) => { if (total > 0) partes.push({ icono, nombre, hechos, total }); };
+    if (R.armar && v.armado) {
+      const tr = R.armar.itemsDeTramos(v);
+      sumar('🚌', 'Transporte', tr.filter(x => R.armar.tramoResuelto(x.it)).length, tr.length);
+      const ns = R.armar.noches(v);
+      sumar('🛏️', 'Noches', ns.length - R.armar.faltanNoches(v), ns.length);
+    }
+    const pend = v.pendientes || [];
+    const recos = R.pendientes ? R.pendientes.recomendaciones(v) : [];
+    const recosOk = recos.filter(x => (v.recos || {})[x.id]).length;
+    sumar('✅', 'Pendientes', pend.filter(p => p.hecho).length + recosOk, pend.length + recos.length);
+    const val = R.valija ? R.valija.progreso(v) : { hechos: 0, total: 0 };
+    sumar('🧳', 'Valija', val.hechos, val.total);
+    const pct = partes.length ? Math.round(100 * partes.reduce((a, p) => a + p.hechos / p.total, 0) / partes.length) : 0;
+    return { pct, partes };
+  }
+  function progresoHTML(v, clase) {
+    const p = progreso(v);
+    if (!p.partes.length) return '';
+    return `
+      <div class="avance ${clase || ''}">
+        <div class="avance-cab"><span>${p.pct === 100 ? '¡Todo listo!' : 'Armado'}</span><strong>${p.pct}%</strong></div>
+        <div class="barra-progreso"><span style="width:${p.pct}%"></span></div>
+        <div class="avance-partes">${p.partes.map(x => `<span class="${x.hechos === x.total ? 'ok' : ''}">${x.icono} ${x.hechos}/${x.total}</span>`).join('')}</div>
+      </div>`;
   }
 
   /* ---------- Tarjeta (Mis viajes) ---------- */
@@ -187,8 +228,9 @@ R.viajes = (function () {
         </div>
         <div class="tv-cuerpo">
           <p class="tv-meta">${esc(destinoCompleto(v))}</p>
-          <p class="tv-meta">${esc(v.fechaInicio ? U.fmtRango(v.fechaInicio, v.fechaFin) : 'Sin fechas')}</p>
+          <p class="tv-meta">${esc(v.fechaInicio ? U.fmtRango(v.fechaInicio, v.fechaFin) : 'Sin fechas')}${duracion(v) ? ' · ' + esc(duracion(v)) : ''}</p>
           ${costoTexto(v) ? `<p class="tv-meta tv-costo">💸 ${esc(costoTexto(v))}</p>` : ''}
+          ${estadoViaje(v) !== 'pasado' ? progresoHTML(v, 'avance-chico') : ''}
           <div class="tv-pie"><span class="avatares">${personas.map(p => U.avatar(p, 24)).join('')}</span></div>
         </div>
       </a>`;
@@ -196,6 +238,6 @@ R.viajes = (function () {
 
   return {
     PESTANAS, nombreDe, destinoCompleto, estadoViaje, cuentaRegresiva, ciudadDeSiempre,
-    costoTexto, nuevo, editar, abrirAsistente: (v, op) => (v ? editar(v) : nuevo(op)), finalizar, menuViaje, renderViaje, tarjeta
+    costoTexto, duracion, progreso, progresoHTML, nuevo, editar, abrirAsistente: (v, op) => (v ? editar(v) : nuevo(op)), finalizar, menuViaje, renderViaje, tarjeta
   };
 })();

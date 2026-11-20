@@ -65,6 +65,7 @@ R.valija = (function () {
     const prog = progreso(v);
     const listas = R.db.listasValija();
     const sug = SUGERIDOS.filter(([, t]) => !existe(v, t));
+    const terminado = R.viajes.estadoViaje(v) === 'pasado';
     const grupos = categoriasOrdenadas().map(c => ({ c, items: U.ordenAlfa(val.items.filter(i => (i.categoria || 'otros') === c.id), 'texto') })).filter(g => g.items.length);
 
     cont.innerHTML = `
@@ -74,8 +75,9 @@ R.valija = (function () {
           <span class="texto-suave">${prog.total ? `${prog.hechos} de ${prog.total} listos` : 'Vacía'}</span>
         </div>
         ${prog.total ? `<div class="barra-progreso barra-valija"><span style="width:${prog.pct}%"></span></div>` : ''}
+        ${terminado && val.items.length && listas.length ? noUsadoHTML(val) : ''}
         <form class="fila-agregar fila-valija" data-form="valija">
-          <input id="vjTexto" placeholder="Ej: Campera de lluvia" aria-label="Agregar a la valija" autocomplete="off">
+          <input id="vjTexto" placeholder="Qué querés llevar" aria-label="Agregar a la valija" autocomplete="off">
           <select id="vjCat" aria-label="Categoría">${opcionesCategoria('otros')}</select>
           <button type="submit" class="btn btn-primario">Agregar</button>
         </form>
@@ -119,8 +121,37 @@ R.valija = (function () {
       l.items.forEach(it => { if (agregarItem(v, it.texto, it.categoria, l.id)) n++; });
       guardar(n ? `Sumé ${U.plural(n, 'cosa', 'cosas')} de "${l.nombre}".` : `Todo lo de "${l.nombre}" ya estaba.`);
     });
+    // Al volver: lo que no usaste sale de tus listas de siempre
+    cont.querySelectorAll('[data-no-use]').forEach(x => x.onchange = () => {
+      const it = val.items.find(i => i.id === x.dataset.noUse);
+      if (it) { it.noUsado = x.checked; R.db.guardarViaje(v); }
+    });
+    const bs = cont.querySelector('[data-a="sacarNoUsado"]');
+    if (bs) bs.onclick = async () => {
+      const textos = new Set(val.items.filter(i => i.noUsado).map(i => i.texto.trim().toLowerCase()));
+      if (!textos.size) { U.toast('Marcá lo que no usaste.'); return; }
+      let n = 0;
+      R.db.listasValija().forEach(l => {
+        const antes = l.items.length;
+        l.items = l.items.filter(it => !textos.has(String(it.texto).trim().toLowerCase()));
+        if (l.items.length !== antes) { n += antes - l.items.length; R.db.guardarListaValija(l); }
+      });
+      U.toast(n ? `Saqué ${U.plural(n, 'cosa', 'cosas')} de tus listas de siempre.` : 'Esas cosas no estaban en tus listas.');
+      render(v, cont);
+    };
     cont.querySelector('[data-a="sugeridos"]').onclick = () => { verSugeridos = !verSugeridos; render(v, cont); };
     cont.querySelectorAll('[data-sug]').forEach(x => x.onclick = () => { const [c, t] = sug[Number(x.dataset.sug)]; agregarItem(v, t, c, null); guardar(); });
+  }
+
+  /** Después del viaje: "¿Qué no usaste?" para aliviar la próxima valija. */
+  function noUsadoHTML(val) {
+    return `
+      <details class="bloque no-usado">
+        <summary><strong>🧳 ¿Qué no usaste?</strong><small>Marcalo y lo saco de tus listas de siempre, así la próxima valija pesa menos.</small></summary>
+        <ul class="checklist">${U.ordenAlfa(val.items, 'texto').map(i => `
+          <li><label><input type="checkbox" data-no-use="${i.id}" ${i.noUsado ? 'checked' : ''}><span>${esc(i.texto)}</span></label></li>`).join('')}</ul>
+        <button type="button" class="btn btn-primario btn-chico" data-a="sacarNoUsado">Sacar lo marcado de mis listas</button>
+      </details>`;
   }
 
   let creandoLista = false;
@@ -138,7 +169,7 @@ R.valija = (function () {
       </div>
       ${creandoLista ? `
         <form class="bloque nueva-lista" data-form="nuevaLista">
-          <label class="campo"><span>Nombre de la lista nueva</span><input id="nlNombre" placeholder="Ej: Playa, Nieve, Trabajo" maxlength="40" autocomplete="off"></label>
+          <label class="campo"><span>Nombre de la lista nueva</span><input id="nlNombre" placeholder="Nombre de la lista" maxlength="40" autocomplete="off"></label>
           <div class="acciones-fila">
             <button type="button" class="btn btn-texto" data-a="cancelarLista">Cancelar</button>
             <button type="submit" class="btn btn-primario">✓ Crear lista</button>
@@ -239,7 +270,7 @@ R.valija = (function () {
           <ul class="lista-chips">${(l.items || []).map((t, i) => `<li>${esc(t)} <button data-pquitar="${l.id}|${i}" aria-label="Quitar">×</button></li>`).join('') || '<li class="texto-suave">Vacía</li>'}</ul>
           <form class="fila-agregar" data-pform="${l.id}"><input placeholder="Agregar un pendiente" autocomplete="off"><button class="btn btn-suave" type="submit">+</button></form>
         </article>`).join('')}</div>
-      <form class="fila-agregar nueva-lista-pend" data-pform="nueva"><input placeholder="Nombre de una lista nueva (ej: Antes de cada viaje)" autocomplete="off"><button class="btn btn-primario" type="submit">+ Crear</button></form>`;
+      <form class="fila-agregar nueva-lista-pend" data-pform="nueva"><input placeholder="Nombre de la lista" autocomplete="off"><button class="btn btn-primario" type="submit">+ Crear</button></form>`;
   }
   function enlazarPendientes(app, refrescar) {
     app.querySelectorAll('[data-pform]').forEach(f => f.onsubmit = e => {

@@ -78,7 +78,7 @@ R.importar = (function () {
       const a = r.alojamiento;
       alojamientos.push({
         id: U.id('al'), nombre: t(a.nombre) || 'Alojamiento', direccion: t(a.direccion),
-        desde: t(a.checkinFecha), hasta: t(a.checkoutFecha), checkin: t(a.checkinHora), checkout: t(a.checkoutHora), codigo,
+        desde: t(a.checkinFecha), hasta: t(a.checkoutFecha), checkin: t(a.checkinHora), checkout: t(a.checkoutHora), codigo, cancelaHasta: t(a.cancelacionHasta),
         nota: [a.telefono ? 'Tel: ' + a.telefono : '', a.desayuno ? 'Desayuno incluido' : '', a.cancelacionHasta ? 'Cancelación gratis hasta el ' + U.fmtFecha(a.cancelacionHasta, 'corto') : ''].filter(Boolean).join(' · ')
       });
     } else if (r.tipo === 'excursion' && (r.actividades || []).length) {
@@ -117,7 +117,7 @@ R.importar = (function () {
       R.pendientes.sumar(v, `Seguro de viaje${s.compania ? ' · ' + s.compania : ''}${s.poliza ? ' (póliza ' + s.poliza + ')' : ''}${s.telefono ? ' · Asistencia: ' + s.telefono : ''}`);
       v.pendientes[v.pendientes.length - 1].hecho = true;
       (archivo ? R.documentos.guardarArchivos(v, [archivo], { categoria: 'seguro' }) : Promise.resolve()).then(() => { R.db.guardarViaje(v); R.app.refrescar(); });
-      U.toast('Guardé el seguro: el teléfono de asistencia queda en Archivos → Emergencias.');
+      U.toast('Guardé el seguro: el teléfono de asistencia queda en Ayuda → Emergencias.');
       return true;
     }
     if (!c.items.length && !c.alojamientos.length) return false;
@@ -182,7 +182,7 @@ R.importar = (function () {
     const { el } = U.modal({
       titulo: '📋 Pegar una reserva',
       subtitulo: 'Copiá el mail de confirmación (o el texto del voucher) y pegalo acá.',
-      cuerpo: `<label class="campo completo"><textarea id="prTexto" rows="8" placeholder="Ej: Código de reserva ABC123 · AR1672 Buenos Aires (AEP) → Bariloche (BRC) 12/12 07:15…"></textarea></label>
+      cuerpo: `<label class="campo completo"><textarea id="prTexto" rows="8" placeholder="Pegá acá el texto completo de la confirmación"></textarea></label>
         <p class="ayuda">Se lee en el celular: no se manda a ningún lado.</p>`,
       acciones: [{ texto: 'Cancelar' }, { texto: 'Leer', clase: 'btn-primario', onClick: () => {
         const texto = el.querySelector('#prTexto').value;

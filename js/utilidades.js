@@ -5,7 +5,7 @@
 window.R = window.R || {};
 
 /** Versión de la app (cambios chicos: 10.1, 10.2…; cambios grandes: 11, 12…). Igual que VERSION en sw.js. */
-window.R.VERSION = '27.4';
+window.R.VERSION = '29';
 
 R.util = (function () {
   const pad = n => String(n).padStart(2, '0');
@@ -416,8 +416,26 @@ R.util = (function () {
     enlazarArchivos(raiz, clave, archivos, () => { repintarArchivos(raiz, clave, archivos, texto, chica, alCambiar); if (alCambiar) alCambiar(); });
   }
 
+  /**
+   * Para que el calendario de una fecha vacía no arranque en hoy sino en la fecha que importa
+   * (la llegada en la salida, la vuelta en la ida…): al tocarlo, se completa con esa fecha.
+   */
+  function calendarioDesde(input, ref) {
+    if (!input || input.dataset.calRef) return;
+    input.dataset.calRef = '1';
+    const poner = () => {
+      if (input.value) return;
+      const r = typeof ref === 'function' ? ref() : ref;
+      if (!r) return;
+      input.value = r;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    input.addEventListener('pointerdown', poner);
+    input.addEventListener('focus', poner);
+  }
+
   return {
-    conMiles, zonaArchivos, enlazarArchivos, repintarArchivos,
+    conMiles, calendarioDesde, zonaArchivos, enlazarArchivos, repintarArchivos,
     tema, aplicarTema, letra, aplicarLetra, vacio, alfa, ordenAlfa,
     campoClave, enlazarClaves, sugerirFechas,
     MONEDAS, fondoBloqueado, id, esc, aISO, hoyISO, aFecha, sumarDias, diasEntre, fmtFecha, fmtRango, plural,

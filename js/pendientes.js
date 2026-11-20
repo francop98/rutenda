@@ -1,12 +1,10 @@
 /* =========================================================
    Rutenda — Pendientes
-   Dos listas que escribís vos:
-   - Por hacer: lo que tenés que resolver. Si le ponés fecha,
-     se ordena por fecha; si le pedís aviso, te llega ese día.
-   - Quiero hacer allá: ideas. Cuando sepas qué día, la pasás
-     al itinerario con un toque.
-   Tus listas de siempre (las guardás una vez) se suman con un
-   toque. Las sugerencias aparecen solo si las pedís.
+   - Por hacer: lo que anotás vos. Si le ponés fecha, se ordena
+     por fecha; si le pedís aviso, te llega ese día.
+   - Recomendadas para este viaje: salen del destino y de lo que
+     cargaste. Se marcan como listas o "no aplica".
+   Las ideas ("Quiero hacer") están arriba del itinerario.
    ========================================================= */
 window.R = window.R || {};
 
@@ -21,7 +19,6 @@ R.pendientes = (function () {
     'Imprimir o bajar los vouchers', 'Dejar a alguien a cargo de las plantas o la mascota',
     'Avisar a la familia el itinerario', 'Cargar la SUBE o la tarjeta de transporte'
   ];
-  let verSugerencias = false;
   let verHechos = false;
 
   function lista(v) { return v.pendientes || (v.pendientes = []); }
@@ -43,61 +40,120 @@ R.pendientes = (function () {
     const puede = R.db.puedeOrganizar(v);
     const pend = ordenados(v);
     const hechos = lista(v).filter(p => p.hecho);
-    const ideas = A().ideas(v);
-    const yaEstan = new Set(lista(v).map(p => p.texto.toLowerCase()));
-    const sug = SUGERENCIAS.filter(t => !yaEstan.has(t.toLowerCase()));
     const guardadas = listasGuardadas();
+    // Pendientes asignados: con más de un viajero, cada uno ve los suyos primero
+    const yo = R.db.yoEn(v);
+    const grupo = (v.participantes || []).length > 1;
+    if (!grupo || !pend.some(p => p.quien)) filtroQuien = 'todos';
+    const pendVer = (filtroQuien === 'mios' ? pend.filter(p => p.quien === yo) : pend.slice())
+      .sort((a, b) => (grupo ? (b.quien === yo) - (a.quien === yo) : 0));
     cont.innerHTML = `
       <div class="pend2">
         <section class="bloque pend2-bloque">
           <div class="pend2-cab"><h2 class="titulo-seccion">Por hacer</h2><span class="texto-suave">${hechos.length} de ${lista(v).length} listos</span></div>
           ${puede ? `<form class="pend2-nuevo" data-form="pend">
-            <input id="pTexto" placeholder="Ej: Sacar el seguro" aria-label="Nuevo pendiente" autocomplete="off">
+            <input id="pTexto" placeholder="Agregar un pendiente" aria-label="Nuevo pendiente" autocomplete="off">
             <button type="submit" class="btn btn-primario" aria-label="Agregar">+</button>
           </form>` : ''}
-          ${puede && R.armar ? R.armar.faltaHTML(v) : ''}
-          ${requisitosHTML(v)}
-          ${pend.length ? `<div class="pend2-lista">${pend.map(p => filaHTML(p, puede)).join('')}</div>` : `<p class="texto-suave pend2-vacio">${hechos.length ? '¡Nada pendiente! 🎉' : 'Anotá lo que tengas que resolver antes o durante el viaje.'}</p>`}
+          ${puede && R.armar ? R.armar.faltaHTML(v, true) : ''}
+          ${grupo && pend.some(p => p.quien) ? `<div class="chips-filtro pend2-filtro">
+            <button class="${filtroQuien === 'todos' ? 'activo' : ''}" data-quien="todos">Todos</button>
+            <button class="${filtroQuien === 'mios' ? 'activo' : ''}" data-quien="mios">Los míos <span>${pend.filter(p => p.quien === yo).length}</span></button>
+          </div>` : ''}
+          ${pendVer.length ? `<div class="pend2-lista">${pendVer.map(p => filaHTML(p, puede, v)).join('')}</div>` : `<p class="texto-suave pend2-vacio">${hechos.length ? '¡Nada pendiente! 🎉' : 'Anotá lo que tengas que resolver antes o durante el viaje.'}</p>`}
           ${hechos.length ? `
             <button type="button" class="btn-texto-mini" data-a="hechos">${verHechos ? 'Ocultar' : 'Ver'} lo hecho (${hechos.length})</button>
-            ${verHechos ? `<div class="pend2-lista pend2-hechos">${hechos.map(p => filaHTML(p, puede)).join('')}</div>` : ''}` : ''}
+            ${verHechos ? `<div class="pend2-lista pend2-hechos">${hechos.map(p => filaHTML(p, puede, v)).join('')}</div>` : ''}` : ''}
           ${puede ? `<div class="pend2-extras">
             ${guardadas.length ? guardadas.map(l => `<button type="button" class="chip-op" data-usar-lista="${l.id}">＋ ${esc(l.nombre)}</button>`).join('') : ''}
-            <button type="button" class="btn-texto-mini" data-a="sugerencias">${verSugerencias ? 'Ocultar sugerencias' : '¿Se te olvida algo? Ver sugerencias'}</button>
-          </div>
-          ${verSugerencias ? `<div class="chips-elegir chips-chicos pend2-sug">${sug.map(t => `<button type="button" class="chip-op" data-sumar="${esc(t)}">+ ${esc(t)}</button>`).join('') || '<span class="texto-suave">Ya tenés todas.</span>'}</div>` : ''}` : ''}
+          </div>` : ''}
         </section>
 
-        <section class="bloque pend2-bloque">
-          <div class="pend2-cab"><h2 class="titulo-seccion">Quiero hacer allá</h2></div>
-          <p class="texto-suave pend2-ayuda">Anotá ideas: lugares, comidas, excursiones. Cuando sepas qué día, tocá "Elegir día" y pasa al itinerario.</p>
-          ${puede ? `<form class="pend2-nuevo" data-form="idea">
-            <input id="iTextoIdea" placeholder="Ej: Cerro Catedral" aria-label="Nueva idea" autocomplete="off">
-            <button type="submit" class="btn btn-terracota" aria-label="Agregar idea">+</button>
-          </form>` : ''}
-          ${ideas.length ? `<div class="pend2-ideas">${ideas.map(i => `
-            <div class="idea2">
-              <button type="button" class="idea2-texto" data-idea="${i.id}"><span aria-hidden="true">${A().tipo(i.tipo).icono}</span><span><strong>${esc(i.titulo)}</strong>${i.nota || i.lugar ? `<small>${esc(i.nota || i.lugar)}</small>` : ''}</span></button>
-              ${puede ? `<button type="button" class="btn btn-suave btn-chico" data-elegir-dia="${i.id}">Elegir día</button>` : ''}
-            </div>`).join('')}</div>` : `<p class="texto-suave pend2-vacio">${A().items(v).length ? 'Todas tus ideas ya tienen día. Miralas en el Itinerario.' : 'Todavía no anotaste ideas.'}</p>`}
-        </section>
+        ${recomendacionesHTML(v, puede)}
       </div>`;
     enlazar(v, cont);
   }
 
-  /** Viajes al exterior: lo que hay que tramitar (visa, pasaporte, vacunas), con link a los requisitos. */
-  function requisitosHTML(v) {
-    const r = R.requisitos ? R.requisitos.resumen(v) : null;
-    if (!r) return '';
-    return `
-      <div class="falta-armar req-pend">
-        <strong>Para entrar al país</strong>
-        <a class="falta-fila" href="#viaje/${v.id}/documentos"><span aria-hidden="true">🛂</span><span>${esc(r.titulo)}<small>${esc(r.partes.length ? r.partes.join(' · ') : 'Nada para tramitar. Mirá el detalle.')}</small></span><b>Ver</b></a>
+  /* ---------------------------------------------------------
+     Recomendadas para este viaje: salen del destino y de lo que
+     cargaste (vuelos, auto, exterior…). Las marcás como listas
+     o "no aplica" y se guardan resueltas.
+     --------------------------------------------------------- */
+  function recomendaciones(v) {
+    const r = [];
+    const sumar = (id, texto, detalle, link) => r.push({ id, texto, detalle: detalle || '', link: link || '' });
+    const req = R.requisitos ? R.requisitos.analizar(v) : { internacional: false, tramites: [], aVerificar: [], fiebreAmarilla: [] };
+    const ayuda = `#viaje/${v.id}/ayuda`;
+    const destinos = (v.destinos || []).filter(d => d.nombre && !d.soloDia).map(d => d.nombre);
+    const tieneSeguro = !!(((v.emergencias || {}).seguro || {}).compania || (((v.tareas || {}).p_seguro || {}).datos || {}).compania);
+    // Del destino: documentación y salud
+    if (req.internacional) {
+      req.tramites.forEach(t => sumar('req_tramite_' + (t.codigo || t.pais), `Tramitar ${t.tramite || 'la visa de ' + t.pais}`, t.nota, ayuda));
+      if (req.necesitaPasaporte) sumar('req_pasaporte', 'Revisar que el pasaporte esté vigente', 'Muchos países piden de 3 a 6 meses de vigencia después de volver.', ayuda);
+      else sumar('req_dni', 'Revisar que el DNI esté vigente y en buen estado', 'Para este destino alcanza con el DNI.', ayuda);
+      req.aVerificar.forEach(t => sumar('req_ver_' + (t.codigo || t.pais), `Confirmar los requisitos de entrada a ${t.pais}`, '', ayuda));
+      if (!tieneSeguro) sumar('int_seguro', 'Contratar un seguro de viaje con cobertura en el exterior', 'En algunos países es obligatorio para entrar.');
+      sumar('int_banco', 'Habilitar la tarjeta para usarla en el exterior', 'Desde la app o llamando al banco.');
+      sumar('int_moneda', 'Prever cómo vas a pagar allá', 'Efectivo en moneda local, tarjeta o billetera virtual.');
+      sumar('int_datos', 'Resolver internet en el celular', 'Roaming, chip local o eSIM.');
+    } else if (!tieneSeguro) sumar('seguro', 'Revisar si necesitás seguro de viaje', 'Algunas tarjetas de crédito lo incluyen.');
+    (req.fiebreAmarilla || []).forEach(x => sumar('req_fa_' + x.lugar, `Vacuna contra la fiebre amarilla (${x.lugar})`, 'Se aplica al menos 10 días antes de viajar.', ayuda));
+    if (req.dengue) sumar('req_dengue', 'Llevar repelente', 'El destino tiene zonas con dengue.', ayuda);
+    // De lo que cargaste
+    const items = A().items(v).filter(it => it.fecha);
+    items.filter(it => it.tipo === 'vuelo').forEach(it => {
+      const c = A().checkin(it);
+      sumar('vuelo_checkin_' + it.id, `Hacer el check-in del vuelo ${[it.empresa, it.numero].filter(Boolean).join(' ') || it.titulo}`, c ? `Se habilita el ${U.fmtFecha(c.fecha, 'dia')} a las ${c.hora}.` : 'Se hace online, en general entre 24 y 72 horas antes.');
+    });
+    if (items.some(it => it.tipo === 'vuelo')) sumar('vuelo_equipaje', 'Revisar qué equipaje incluye el pasaje', 'Medidas y peso de la valija y del bolso de mano.');
+    if (items.some(it => it.tipo === 'auto')) {
+      sumar('auto_revisar', 'Revisar el auto antes de salir', 'Aceite, agua, cubiertas (y la de auxilio), luces.');
+      sumar('auto_papeles', 'Llevar los papeles del auto', 'Cédula, seguro al día, VTV y licencia de conducir.');
+    }
+    // Cancelación gratis: aparece con la fecha límite (si cambian los planes, cancelá antes)
+    const hoy = U.hoyISO();
+    (v.alojamientos || []).filter(a => a.cancelaHasta && a.cancelaHasta >= hoy).concat(A().items(v).filter(it => it.cancelaHasta && it.cancelaHasta >= hoy))
+      .sort((a, b) => a.cancelaHasta.localeCompare(b.cancelaHasta))
+      .forEach(x => {
+        const d = U.diasEntre(hoy, x.cancelaHasta);
+        r.push({ id: 'cancela_' + x.id + '_' + x.cancelaHasta, texto: `Cancelación gratis de ${x.titulo || A().nombreAlojamiento(x)}: hasta el ${U.fmtFecha(x.cancelaHasta, 'dia')}`, detalle: d <= 7 ? `⏰ Vence ${d === 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`}. Si cambian los planes, cancelá antes.` : 'Si cambian los planes, cancelá antes de esa fecha.', urgente: d <= 7 });
+      });
+    if ((v.alojamientos || []).length) sumar('aloj_horario', 'Confirmar el horario de entrada con el alojamiento', 'Sobre todo si llegás temprano o muy tarde.');
+    if (destinos.length) sumar('mapas', `Descargar el mapa sin conexión de ${destinos.join(', ')}`, 'En Google Maps: tu foto → Mapas sin conexión.');
+    return r;
+  }
+  function estadoRecos(v) { return v.recos || {}; }
+  /** Las recomendaciones sin resolver. */
+  function recosPendientes(v) { const e = estadoRecos(v); return recomendaciones(v).filter(x => !e[x.id]); }
+
+  let verResueltas = false;
+  function recomendacionesHTML(v, puede) {
+    const todas = recomendaciones(v);
+    if (!todas.length) return '';
+    const e = estadoRecos(v);
+    const pend = todas.filter(x => !e[x.id]);
+    const res = todas.filter(x => e[x.id]);
+    const fila = x => `
+      <div class="reco ${e[x.id] ? 'reco-' + e[x.id] : ''} ${x.urgente && !e[x.id] ? 'reco-urgente' : ''}">
+        <div class="reco-texto"><strong>${esc(x.texto)}</strong>${x.detalle ? `<small>${esc(x.detalle)}</small>` : ''}${x.link ? `<a href="${x.link}" class="reco-link">Ver requisitos →</a>` : ''}</div>
+        ${puede ? (e[x.id]
+          ? `<button type="button" class="btn-texto-mini" data-reco="${x.id}" data-valor="">${e[x.id] === 'hecho' ? '✓ Listo' : '✕ No aplica'} · deshacer</button>`
+          : `<div class="reco-acc"><button type="button" class="btn btn-suave btn-chico" data-reco="${x.id}" data-valor="hecho">✓ Listo</button><button type="button" class="btn btn-texto btn-chico" data-reco="${x.id}" data-valor="no">No aplica</button></div>`) : ''}
       </div>`;
+    return `
+      <section class="bloque pend2-bloque">
+        <div class="pend2-cab"><h2 class="titulo-seccion">Recomendadas para este viaje</h2><span class="texto-suave">${res.length} de ${todas.length}</span></div>
+        <p class="texto-suave pend2-ayuda">Según el destino y lo que cargaste. Marcalas como listas o sacalas si no aplican.</p>
+        ${pend.length ? `<div class="recos">${pend.map(fila).join('')}</div>` : '<p class="texto-suave pend2-vacio">¡Todo resuelto! 🎉</p>'}
+        ${res.length ? `<button type="button" class="btn-texto-mini" data-a="resueltas">${verResueltas ? 'Ocultar' : 'Ver'} las resueltas (${res.length})</button>
+          ${verResueltas ? `<div class="recos recos-resueltas">${res.map(fila).join('')}</div>` : ''}` : ''}
+      </section>`;
   }
 
-  function filaHTML(p, puede) {
+  let filtroQuien = 'todos';
+  function filaHTML(p, puede, v) {
     const c = cuando(p);
+    const quien = p.quien && v ? (p.quien === R.db.yoEn(v) ? 'vos' : ((R.db.persona(p.quien) || {}).nombre || '')) : '';
     const vencido = p.fecha && !p.hecho && p.fecha < U.hoyISO();
     return `
       <div class="pend2-fila ${p.hecho ? 'hecho' : ''} ${vencido ? 'vencido' : ''}">
@@ -105,7 +161,7 @@ R.pendientes = (function () {
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5L20 7"/></svg>
         </button>
         <button type="button" class="pend2-texto" data-editar="${p.id}" ${puede ? '' : 'disabled'}>
-          <span>${esc(p.texto)}</span>${c ? `<small>${esc(c)}</small>` : ''}
+          <span>${esc(p.texto)}</span>${c || quien ? `<small>${esc([c, quien ? '👤 ' + quien : ''].filter(Boolean).join(' · '))}</small>` : ''}
         </button>
       </div>`;
   }
@@ -121,15 +177,6 @@ R.pendientes = (function () {
       guardar();
       const i = cont.querySelector('#pTexto'); if (i) i.focus();
     };
-    const fi = cont.querySelector('[data-form="idea"]');
-    if (fi) fi.onsubmit = e => {
-      e.preventDefault();
-      const t = fi.querySelector('input').value.trim();
-      if (!t) return;
-      A().guardarItem(v, A().nuevoItem({ titulo: t, fecha: '' }));
-      R.db.guardarViaje(v); render(v, cont);
-      const i = cont.querySelector('#iTextoIdea'); if (i) i.focus();
-    };
     cont.querySelectorAll('[data-tildar]').forEach(b => b.onclick = () => {
       const p = lista(v).find(x => x.id === b.dataset.tildar);
       if (!p) return;
@@ -139,12 +186,14 @@ R.pendientes = (function () {
     cont.querySelectorAll('[data-editar]').forEach(b => b.onclick = () => editar(v, b.dataset.editar, () => render(v, cont)));
     const bh = cont.querySelector('[data-a="hechos"]');
     if (bh) bh.onclick = () => { verHechos = !verHechos; render(v, cont); };
-    const bs = cont.querySelector('[data-a="sugerencias"]');
-    if (bs) bs.onclick = () => { verSugerencias = !verSugerencias; render(v, cont); };
-    cont.querySelectorAll('[data-sumar]').forEach(b => b.onclick = () => {
-      lista(v).push({ id: U.id('pe'), texto: b.dataset.sumar, hecho: false, fecha: '', creado: new Date().toISOString() });
-      guardar();
+    cont.querySelectorAll('[data-reco]').forEach(b => b.onclick = () => {
+      v.recos = Object.assign({}, v.recos);
+      if (b.dataset.valor) v.recos[b.dataset.reco] = b.dataset.valor; else delete v.recos[b.dataset.reco];
+      R.db.guardarViaje(v); render(v, cont);
     });
+    cont.querySelectorAll('[data-quien]').forEach(b => b.onclick = () => { filtroQuien = b.dataset.quien; render(v, cont); });
+    const br = cont.querySelector('[data-a="resueltas"]');
+    if (br) br.onclick = () => { verResueltas = !verResueltas; render(v, cont); };
     cont.querySelectorAll('[data-usar-lista]').forEach(b => b.onclick = () => {
       const l = listasGuardadas().find(x => x.id === b.dataset.usarLista);
       if (!l) return;
@@ -153,11 +202,6 @@ R.pendientes = (function () {
       nuevos.forEach(t => lista(v).push({ id: U.id('pe'), texto: t, hecho: false, fecha: '', creado: new Date().toISOString() }));
       guardar();
       U.toast(nuevos.length ? `Sumé ${U.plural(nuevos.length, 'pendiente', 'pendientes')} de "${l.nombre}".` : 'Ya los tenías todos.');
-    });
-    cont.querySelectorAll('[data-idea]').forEach(b => b.onclick = () => R.itinerario.editarItem(v, b.dataset.idea));
-    cont.querySelectorAll('[data-elegir-dia]').forEach(b => b.onclick = () => {
-      if (!A().dias(v).length) { U.toast('Primero poné las fechas del viaje.'); return; }
-      R.itinerario.mover(v, b.dataset.elegirDia, () => render(v, cont));
     });
   }
 
@@ -169,7 +213,8 @@ R.pendientes = (function () {
       cuerpo: `
         <label class="campo"><span>Qué</span><input id="peTexto" value="${esc(p.texto)}"></label>
         <label class="campo"><span>Para cuándo <small>(opcional)</small></span><input type="date" id="peFecha" value="${esc(p.fecha || '')}"></label>
-        <label class="check"><input type="checkbox" id="peAviso" ${p.aviso ? 'checked' : ''}> Avisame ese día al celular</label>`,
+        <label class="check"><input type="checkbox" id="peAviso" ${p.aviso ? 'checked' : ''}> Avisame ese día al celular</label>
+        ${(v.participantes || []).length > 1 ? `<label class="campo"><span>¿Quién se ocupa? <small>(opcional)</small></span><select id="peQuien"><option value="">Nadie en particular</option>${v.participantes.map(id => `<option value="${id}" ${p.quien === id ? 'selected' : ''}>${esc(id === R.db.yoEn(v) ? 'Yo' : ((R.db.persona(id) || {}).nombre || 'Viajero'))}</option>`).join('')}</select></label>` : ''}`,
       acciones: [
         { texto: 'Borrar', clase: 'btn-texto peligro', onClick: () => { v.pendientes = lista(v).filter(x => x.id !== id); R.db.guardarViaje(v); alTerminar(); } },
         { texto: 'Cancelar' },
@@ -177,6 +222,8 @@ R.pendientes = (function () {
           const t = f.querySelector('#peTexto').value.trim();
           if (!t) { U.toast('Escribí el pendiente.'); return false; }
           p.texto = t; p.fecha = f.querySelector('#peFecha').value; p.aviso = !!(p.fecha && f.querySelector('#peAviso').checked);
+          const q = f.querySelector('#peQuien');
+          if (q) p.quien = q.value;
           R.db.guardarViaje(v);
           if (R.recordatorios) R.recordatorios.actualizar();
           alTerminar();
@@ -191,5 +238,5 @@ R.pendientes = (function () {
   /** Para "Cargar" y otros lugares: sumar un pendiente o una idea rápido. */
   function sumar(v, texto) { lista(v).push({ id: U.id('pe'), texto, hecho: false, fecha: '', creado: new Date().toISOString() }); }
 
-  return { render, faltan, sumar, SUGERENCIAS, listasGuardadas };
+  return { render, faltan, sumar, SUGERENCIAS, listasGuardadas, recomendaciones, recosPendientes };
 })();

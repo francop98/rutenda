@@ -33,7 +33,10 @@ R.resumen = (function () {
     return {
       nombre: v.nombre || lugares.filter((x, i) => !(v.destinos[i] || {}).soloDia).join(' → ') || v.destino || 'Mi viaje',
       fechas: U.fmtRango(v.fechaInicio, v.fechaFin), dias, kms, lugares, paises, medios, traslados: segs.length,
-      gasto: t.neto, porPersona: personas > 1 ? t.neto / personas : 0, moneda: v.monedaBase, personas,
+      gasto: t.neto, porPersona: personas > 1 ? t.neto / personas : 0, porDia: dias > 0 ? t.neto / dias : 0, moneda: v.monedaBase, personas,
+      noches: dias > 1 ? dias - 1 : 0,
+      actividades: (v.agenda || []).filter(i => i.fecha && !R.agenda.esTraslado(i)).length,
+      favoritos: (v.agenda || []).filter(i => i.favorito).map(i => i.titulo).slice(0, 3),
       notas: (v.notasViaje || '').trim()
     };
   }
@@ -100,7 +103,7 @@ R.resumen = (function () {
     if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(60, y0, W - 120, H - y0 - 150, 40); ctx.fill(); } else ctx.fillRect(60, y0, W - 120, H - y0 - 150);
     const cifras = [
       [d.dias ? String(d.dias) : '—', d.dias === 1 ? 'día' : 'días'],
-      [String(d.lugares.length), d.lugares.length === 1 ? 'lugar' : 'lugares'],
+      [String(d.noches), d.noches === 1 ? 'noche' : 'noches'],
       [d.kms ? d.kms.toLocaleString('es-AR') : '—', 'km recorridos']
     ];
     ctx.fillStyle = '#1F3A36';
@@ -113,23 +116,26 @@ R.resumen = (function () {
     ctx.fillStyle = '#22302f';
     ctx.font = `500 34px ${sans}`;
     let y = y0 + 280;
-    const iconos = { avion: '✈️', micro: '🚌', auto: '🚗', tren: '🚆', barco: '⛴️', otro: '🧭' };
+    const iconos = { avion: '✈️', micro: '🚌', auto: '🚗', tren: '🚆', barco: '⛴️', taxi: '🚕', transfer: '🚐', otro: '🧭' };
     const medios = Object.entries(d.medios).map(([m, n]) => `${iconos[m] || '🧭'} ${n}`).join('   ');
     y += 50 * envolver(ctx, `📍 ${d.lugares.join(' · ')}`, 110, y, W - 220, 46, 2);
     if (medios) { ctx.fillText(`${medios}  ·  ${U.plural(d.traslados, 'traslado', 'traslados')}`, 110, y); y += 56; }
+    if (d.actividades) { ctx.fillText(`🗓️ ${U.plural(d.actividades, 'actividad', 'actividades')}${d.paises.length > 1 ? `  ·  🌎 ${U.plural(d.paises.length, 'país', 'países')}` : ''}`, 110, y); y += 56; }
     if (d.gasto > 0) {
-      ctx.fillText(`💸 ${U.fmtMoneda(d.gasto, d.moneda)}${d.porPersona ? ` · ${U.fmtMoneda(d.porPersona, d.moneda)} por persona` : ''}`, 110, y); y += 56;
+      ctx.fillText(`💸 ${U.fmtMoneda(Math.round(d.gasto), d.moneda)}${d.porPersona ? ` · ${U.fmtMoneda(Math.round(d.porPersona), d.moneda)} c/u` : ''}${d.porDia ? ` · ${U.fmtMoneda(Math.round(d.porDia), d.moneda)} por día` : ''}`, 110, y); y += 56;
     }
-    if (d.notas) {
+    if (d.favoritos.length) { y += 50 * envolver(ctx, `⭐ ${d.favoritos.join(' · ')}`, 110, y, W - 220, 46, 2); }
+    const lugar = Math.min(3, Math.floor((H - 190 - y) / 42));
+    if (d.notas && lugar > 0) {
       ctx.font = `italic 500 32px ${serif.replace('600 ', '')}`; ctx.fillStyle = '#5b6b68';
-      envolver(ctx, `“${d.notas}”`, 110, y + 6, W - 220, 42, 3);
+      envolver(ctx, `“${d.notas}”`, 110, y + 6, W - 220, 42, lugar);
     }
     // Marca
     ctx.fillStyle = '#fff';
     ctx.font = `600 46px ${serif}`;
     ctx.fillText('Rutenda', 90, H - 70);
     ctx.font = `500 26px ${sans}`; ctx.globalAlpha = .85;
-    ctx.fillText('tu viaje, paso a paso', 300, H - 74); ctx.globalAlpha = 1;
+    ctx.fillText('tus viajes, simples', 300, H - 74); ctx.globalAlpha = 1;
     return await new Promise(ok => c.toBlob(ok, 'image/png'));
   }
 
