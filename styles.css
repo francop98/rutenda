@@ -2847,4 +2847,7 @@ body.teclado-abierto .armar-pie { position: static; background: none; }
 .mv-hora small { display: block; font-weight: 500; font-size: .74rem; color: var(--tinta-suave); }
 
 /* 29.1 — Qué hacés en cada destino (me quedo / en el día / solo paso) */
-.fv-clase { margin-top: 6px; width: 100%; font-size: .9rem; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--linea); background: var(--papel); color: var(--tinta); }
+.fv-clase { margin-top: 0; width: 100%; font-size: .9rem; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--linea); background: var(--papel); color: var(--tinta); }
+.fv-destino .fv-quitar { flex: none; margin-top: 4px; }
+.fv-destino { flex-wrap: wrap; }
+.fv-destino > .fv-destino-pie { flex: 1 1 100%; margin-top: 0; }

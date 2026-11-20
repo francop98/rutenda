@@ -221,15 +221,15 @@ R.armar = (function () {
               <span class="fv-num">${i + 1}</span>
               <div class="fv-destino-campos">
                 <div data-lugar="${i}"></div>
-                <div class="fv-destino-pie">
+              </div>
+              ${b.destinos.length > 1 ? `<button type="button" class="btn-icono fv-quitar" data-quitar-destino="${i}" aria-label="Quitar" title="Quitar">×</button>` : ''}
+              <div class="fv-destino-pie">
                   <select class="fv-clase" data-clase-destino="${i}" aria-label="Qué hacés en ${esc(d.nombre || 'este destino')}">
                     <option value="noche" ${!d.soloDia && !d.paso ? 'selected' : ''}>🛏️ Duermo ahí</option>
-                    <option value="dia" ${d.soloDia ? 'selected' : ''}>🎒 Voy en el día</option>
-                    <option value="paso" ${d.paso ? 'selected' : ''}>⏳ Solo paso, sin dormir</option>
+                    <option value="dia" ${d.soloDia ? 'selected' : ''}>🎒 Voy y vuelvo en el día</option>
+                    <option value="paso" ${d.paso ? 'selected' : ''}>🚏 De pasada, sin dormir</option>
                   </select>
-                  ${b.destinos.length > 1 ? `<button type="button" class="btn-icono" data-quitar-destino="${i}" aria-label="Quitar" title="Quitar">×</button>` : ''}
                 </div>
-              </div>
             </li>`).join('')}
           </ol>
           <button type="button" class="btn btn-suave btn-chico" data-a="otroDestino">+ Otro destino</button>
