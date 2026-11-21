@@ -87,7 +87,9 @@ R.infoPais = (function () {
       const c = String(d.codigoPais || d.pais || '').toUpperCase();
       if (c && c !== mio && P[c] && !r.includes(c)) r.push(c);
     });
-    return r;
+    // Durante el viaje, primero el país donde estás hoy
+    const hoy = R.emergencias && R.emergencias.paisHoy ? R.emergencias.paisHoy(v) : '';
+    return hoy && r.includes(hoy) ? [hoy].concat(r.filter(c => c !== hoy)) : r;
   }
 
   function html(v) {
@@ -106,7 +108,7 @@ R.infoPais = (function () {
           const ojoVolt = vMio && vAlla && Math.abs(vMio - vAlla) > 50;
           return `
           <div class="info-pais">
-            <strong class="ip-pais">${esc(NOMBRES[c] || c)}</strong>
+            <strong class="ip-pais">${esc(NOMBRES[c] || c)}${R.emergencias && R.emergencias.paisHoy && R.emergencias.paisHoy(v) === c ? ' <b class="em-hoy">📍 Estás acá</b>' : ''}</strong>
             <ul class="ip-lista">
               <li><span>🔌</span><span>Enchufe tipo ${esc(enchufes)} · ${esc(String(v2))} V${adaptador ? '<b class="ip-ojo">Llevá adaptador</b>' : ''}${ojoVolt ? `<small>Fijate que tus cargadores digan 100-240 V (casi todos los de celular lo dicen; secadores y planchitas, no siempre).</small>` : ''}</span></li>
               <li><span>🚗</span><span>Se maneja por la ${manejo === 'i' ? '<b>izquierda</b>' : 'derecha'}${manejo === 'i' ? '<small>Al cruzar la calle, mirá primero a la derecha.</small>' : ''}</span></li>

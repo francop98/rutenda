@@ -88,9 +88,9 @@ R.armar = (function () {
   function faltaTransporte(v) { return itemsDeTramos(v).filter(x => !tramoResuelto(x.it)).length; }
   /** Cómo llegás al aeropuerto o terminal y de ahí al alojamiento (en vuelos, micros, trenes y barcos). */
   function faltanConexiones(v) { return A().items(v).filter(it => it.fecha && !it.pendiente).reduce((n, it) => n + A().conexionesFaltan(it), 0); }
-  function faltanNoches(v) { return noches(v).filter(f => !alojDe(v, f) && !(v.noches || {})[f]).length; }
+  function faltanNoches(v) { return noches(v).filter(f => !alojDe(v, f) && !nocheGuardada(v, f)).length; }
   /** Cuántas cosas de armado quedan (para la pestaña Pendientes). */
-  function cuantasFaltan(v) { return v.armado ? (faltaTransporte(v) ? 1 : 0) + (faltanConexiones(v) ? 1 : 0) + (faltanNoches(v) ? 1 : 0) : 0; }
+  function cuantasFaltan(v) { return v.armado ? (faltaTransporte(v) ? 1 : 0) + (faltanNoches(v) ? 1 : 0) : 0; }
 
   /**
    * "Para completar": en el itinerario, solo lo que falta.
@@ -98,7 +98,8 @@ R.armar = (function () {
    */
   function faltaHTML(v, completo) {
     if (!v.armado || !R.db.puedeOrganizar(v)) return '';
-    const t = faltaTransporte(v), n = faltanNoches(v), c = faltanConexiones(v);
+    // Los traslados a aeropuertos y terminales no son obligatorios: aparecen en "Recomendadas"
+    const t = faltaTransporte(v), n = faltanNoches(v), c = 0;
     if (!t && !n && !c && !completo) return '';
     const hayNoches = noches(v).length > 0;
     const fila = (ok, paso, icono, titulo, txtOk, txtFalta) => (ok && !completo) ? '' : `
@@ -106,9 +107,8 @@ R.armar = (function () {
         <span aria-hidden="true">${ok ? '✅' : icono}</span><span>${titulo}<small>${ok ? txtOk : txtFalta}</small></span><b>${ok ? 'Ver' : 'Completar'}</b></a>`;
     return `
       <div class="falta-armar ${!t && !n && !c ? 'todo-ok' : ''}">
-        <strong>${!t && !n && !c ? 'El viaje está armado' : 'Para completar cuando quieras'}</strong>
+        <strong>${!t && !n && !c ? 'El viaje está armado' : 'Falta cargar del viaje'}</strong>
         ${fila(!t, 'transporte', '🚌', 'Cómo vas de un lugar a otro', 'Todos los tramos resueltos', U.plural(t, 'tramo sin resolver', 'tramos sin resolver'))}
-        ${fila(!c, 'transporte', '🚕', 'Traslados a aeropuertos y terminales', 'Todos resueltos', `${c} sin resolver: cómo llegás y cómo salís`)}
         ${hayNoches ? fila(!n, 'noches', '🛏️', 'Dónde dormís', 'Todas las noches definidas', U.plural(n, 'noche sin definir', 'noches sin definir')) : ''}
       </div>`;
   }
@@ -116,6 +116,28 @@ R.armar = (function () {
   // Al entrar desde "Para completar", se marca en verde lo resuelto y en rojo lo que falta
   let revisarProx = false;
   document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-revisar]')) revisarProx = true; }, true);
+  // De dónde viniste (para volver ahí al guardar un viaje que ya está armado)
+  let volverA = '';
+  let armandoNuevo = '';   // id del viaje que se está creando ahora (ese sí pasa por todos los pasos)
+  const editandoArmado = v => !!v.armado && armandoNuevo !== v.id;
+  window.addEventListener('hashchange', e => {
+    const antes = (e.oldURL || '').split('#')[1] || '';
+    if (antes && !/^(armar|nuevo)/.test(antes)) volverA = '#' + antes;
+  });
+  const volver = v => { location.hash = volverA && volverA.includes(v.id) ? volverA : `#viaje/${v.id}/itinerario`; };
+  /** En un viaje ya armado, cada página se guarda sola: no hace falta pasar por todas hasta el final. */
+  const pieEditar = () => `<button type="button" class="btn btn-suave" data-a="cancelar">Cancelar</button>
+       <button type="button" class="btn btn-primario" data-a="guardarVolver">Guardar</button>`;
+  function enlazarPieEditar(app, v, guardar) {
+    const c = app.querySelector('[data-a="cancelar"]'), g = app.querySelector('[data-a="guardarVolver"]');
+    if (c) c.onclick = () => { guardarActual = null; volver(v); };
+    if (g) g.onclick = () => { if (guardar() === false) return; U.toast('Cambios guardados.'); guardarActual = null; volver(v); };
+  }
+  /** Al entrar desde "Para completar", va directo a lo primero que falta. */
+  function irALoQueFalta(app) {
+    setTimeout(() => { const x = app.querySelector('.revisar .falta, .revisar .noche.pregunta, .revisar .noche.sin-definir'); if (x) x.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 80);
+  }
+
   // Moverse entre las páginas guarda la que estás viendo
   let guardarActual = null;
   document.addEventListener('click', e => {
@@ -145,6 +167,7 @@ R.armar = (function () {
     else pagDatos(app, v, {});
     const sec = app.querySelector('.armar');
     if (sec) sec.classList.toggle('revisar', revisar);
+    if (revisar) irALoQueFalta(app);
   }
 
   function pasosHTML(actual, v) {
@@ -380,8 +403,8 @@ R.armar = (function () {
     app.querySelector('[data-a="guardar"]').onclick = () => {
       const v = guardarDatos();
       if (!v) return;
-      if (editando) { U.toast('Cambios guardados.'); location.hash = `#viaje/${v.id}/itinerario`; }
-      else location.hash = `#armar/${v.id}/transporte`;
+      if (editando) { U.toast('Cambios guardados.'); volver(v); }
+      else { armandoNuevo = v.id; location.hash = `#armar/${v.id}/transporte`; }
     };
     const bs = app.querySelector('[data-a="guardarSeguir"]');
     if (bs) bs.onclick = () => { const v = guardarDatos(); if (v) location.hash = `#armar/${v.id}/transporte`; };
@@ -446,8 +469,12 @@ R.armar = (function () {
             </div>
           </div>` : ''}`;
       const titulo = tipo === 'vuelo' ? '✈️ Datos del vuelo' : `${A().tipo(tipo).icono} Datos del ${A().tipo(tipo).nombre.toLowerCase()}`;
-      return `${campos.trim() ? `<div class="tramo-sec"><span class="tramo-sec-tit">${esc(titulo)}</span>${campos}</div>` : ''}
-        ${prog ? `<div class="ruta-con">${rutaHTML(x)}</div>` : ''}`;
+      const conDatos = ['numero', 'empresa', 'codigo', 'aeroDesde', 'aeroHasta'].some(k => x[k]) || x.escala;
+      const resumen = [x.numero, x.empresa, x.codigo ? 'reserva ' + x.codigo : ''].filter(Boolean).join(' · ');
+      const conRuta = ['alSalir', 'alLlegar'].some(k => x[k]) || ['puntoSalida', 'puntoLlegada'].some(k => x[k] && x[k] !== 'casa');
+      const tm = A().TERMINAL[tipo] || 'terminal', alTerm = (tm === 'terminal' || tm === 'estación' ? 'a la ' : 'al ') + tm;
+      return `${campos.trim() ? `<details class="tramo-sec tramo-pl" ${conDatos ? 'open' : ''}><summary><span class="tramo-sec-tit">${esc(titulo)} <small>(opcional)</small></span>${resumen ? `<small class="tramo-pl-res">${esc(resumen)}</small>` : ''}</summary>${campos}</details>` : ''}
+        ${prog ? `<details class="tramo-pl tramo-pl-ruta" ${conRuta ? 'open' : ''}><summary><span class="tramo-sec-tit">🚪 Puerta a puerta <small>(opcional)</small></span><small class="tramo-pl-res">Cómo llegás ${alTerm} y a dónde vas después</small></summary><div class="ruta-con">${rutaHTML(x)}</div></details>` : ''}`;
     }
 
     /** Chips de aeropuertos: los de la ciudad, o los que coinciden con lo que escribiste. Marca el elegido. */
@@ -563,9 +590,9 @@ R.armar = (function () {
           </div>
         </div>`).join('')}</div>
       <datalist id="dlEmpresasArmar">${A().usados('empresa').map(e => `<option value="${esc(e)}">`).join('')}</datalist>
-      <p class="ayuda">Lo que no sepas, dejalo vacío. Con taxi, transfer o auto alcanza con elegir el medio; con avión, micro, tren o barco falta el día. Lo que quede sin resolver aparece en "Para completar".</p>`;
+      <p class="ayuda">Solo hace falta el medio y, si es avión, micro, tren o barco, el día. Lo demás es opcional: completalo cuando lo tengas.</p>`;
     pagina(app, 'transporte', v, 'Cómo vas de un lugar a otro', 'Cada tramo del recorrido, con la vuelta incluida.', cuerpo,
-      `<button type="button" class="btn btn-suave" data-a="omitir">Omitir por ahora</button>
+      editandoArmado(v) ? pieEditar() : `<button type="button" class="btn btn-suave" data-a="omitir">Omitir por ahora</button>
        <button type="button" class="btn btn-primario" data-a="seguir">${noches(v).length ? 'Siguiente: noches →' : 'Listo'}</button>`);
 
     const leer = el => {
@@ -707,17 +734,20 @@ R.armar = (function () {
       marcarEstado(el);
     });
 
-    const siguiente = () => { location.hash = noches(v).length ? `#armar/${v.id}/noches` : `#viaje/${v.id}/itinerario`; };
-    app.querySelector('[data-a="omitir"]').onclick = () => { v.armado = true; R.db.guardarViaje(v); siguiente(); };
+    const siguiente = () => { if (!noches(v).length) armandoNuevo = ''; location.hash = noches(v).length ? `#armar/${v.id}/noches` : `#viaje/${v.id}/itinerario`; };
     guardarActual = guardarTransporte;
-    app.querySelector('[data-a="seguir"]').onclick = () => { if (guardarTransporte()) siguiente(); };
+    if (editandoArmado(v)) enlazarPieEditar(app, v, () => guardarTransporte());
+    else {
+      app.querySelector('[data-a="omitir"]').onclick = () => { v.armado = true; R.db.guardarViaje(v); siguiente(); };
+      app.querySelector('[data-a="seguir"]').onclick = () => { if (guardarTransporte()) siguiente(); };
+    }
     /** Verde si el tramo está resuelto (medio, día si tiene horario, y cómo llegás/salís de la terminal); rojo si falta algo. */
     function marcarEstado(el) {
       const x = lista[Number(el.dataset.i)];
       leer(el);
       const tipo = MEDIO_A_TIPO[x.medio];
       const prog = A().PROGRAMADOS.includes(tipo);
-      const ok = !!x.medio && !x.indef && (!prog || !!x.fecha) && (!prog || (A().conexionResuelta(x.alSalir) && A().conexionResuelta(x.alLlegar)));
+      const ok = !!x.medio && !x.indef && (!prog || !!x.fecha);
       el.classList.toggle('ok', ok);
       el.classList.toggle('falta', !ok);
     }
@@ -752,20 +782,52 @@ R.armar = (function () {
   }
 
   /* ---------- 3. Noches ---------- */
-  /**
-   * Lo que quedó guardado de una noche ("viajando" o "en casa"), salvo que el transporte
-   * ahora diga otra cosa: si cambiaste un horario y esa noche ya no viajás, no sigue diciendo "viajando".
+  /*
+   * Una sola fuente para las noches: lo que dice el transporte.
+   * Solo se guarda lo que vos cambiaste ("viajando" o "en casa" distinto de lo que se deduce),
+   * junto con lo que decía el transporte en ese momento (v.nochesBase). Si después el transporte
+   * cambia, tu cambio viejo deja de valer y vuelve a mandar el transporte.
    */
+  /** Lo que se deduce del transporte para esa noche: 'viaje', 'casa' o '' (un lugar, o hay que preguntar). */
+  function nocheDeducida(v, f) {
+    const s = lugarSegunTransporte(v, f);
+    if (s.pregunta) return '';
+    if (s.viaje) return 'viaje';
+    if (s.lugar && s.lugar.id === 'o') return 'casa';
+    return '';
+  }
+  /** Huella de lo que dice el transporte esa noche (para saber si cambió). */
+  function huella(v, f) {
+    const s = lugarSegunTransporte(v, f);
+    return s.pregunta ? 'p:' + s.pregunta : s.viaje ? 'v' : s.lugar ? 'l:' + (s.lugar.id || s.lugar.nombre) : s.opciones ? 'o' : '-';
+  }
+  /** "viaje" / "casa" que vale esa noche: tu cambio si sigue vigente, o lo que sale del transporte. */
   function nocheGuardada(v, f) {
     const n = (v.noches || {})[f] || '';
-    if (n !== 'viaje' && n !== 'casa') return n;
-    const s = lugarSegunTransporte(v, f);
-    if (n === 'viaje' && s.lugar && !s.pregunta) return '';
-    if (n === 'casa' && s.viaje) return '';
-    return n;
+    if (n === 'viaje' || n === 'casa') {
+      const base = (v.nochesBase || {})[f];
+      const vigente = base ? base === huella(v, f)
+        // Datos viejos (sin huella): vale salvo que el transporte diga claramente otra cosa
+        : !(n === 'viaje' && (() => { const s = lugarSegunTransporte(v, f); return s.lugar && !s.pregunta; })()) && !(n === 'casa' && lugarSegunTransporte(v, f).viaje);
+      if (vigente) return n;
+    } else if (n) return n;
+    return nocheDeducida(v, f);
   }
+  /** Guarda tu elección de una noche: solo si es distinta de lo que dice el transporte. */
+  function guardarNoche(v, f, valor) {
+    v.noches = Object.assign({}, v.noches);
+    v.nochesBase = Object.assign({}, v.nochesBase);
+    if ((valor === 'viaje' || valor === 'casa') && valor !== nocheDeducida(v, f)) { v.noches[f] = valor; v.nochesBase[f] = huella(v, f); }
+    else { delete v.noches[f]; delete v.nochesBase[f]; }
+  }
+  /** Borra los cambios que ya no valen (el transporte cambió) o que coinciden con lo deducido. */
   function limpiarNoches(v) {
-    Object.keys(v.noches || {}).forEach(f => { if (!nocheGuardada(v, f)) delete v.noches[f]; });
+    Object.keys(v.noches || {}).forEach(f => {
+      const n = v.noches[f];
+      if (n !== 'viaje' && n !== 'casa') return;
+      if (nocheGuardada(v, f) !== n || nocheDeducida(v, f) === n) { delete v.noches[f]; if (v.nochesBase) delete v.nochesBase[f]; }
+      else if (!(v.nochesBase || {})[f]) v.nochesBase = Object.assign({}, v.nochesBase, { [f]: huella(v, f) });
+    });
   }
 
   // Si llegás al día siguiente antes de esta hora, puede que esa noche duermas en un alojamiento: se pregunta
@@ -897,7 +959,7 @@ R.armar = (function () {
         <p class="ayuda">El nombre y la dirección son opcionales: si todavía no reservaste, dejalo así y lo completás después.</p>
       </section>` : '<p class="texto-suave">Es ida y vuelta en el día: no hay noches. 🎒</p>';
     pagina(app, 'noches', v, 'Dónde dormís', 'Noche por noche. Lo que se pudo, sale del transporte; cambialo si no es así.', cuerpo,
-      `<button type="button" class="btn btn-suave" data-a="omitir">Omitir por ahora</button>
+      editandoArmado(v) ? pieEditar() : `<button type="button" class="btn btn-suave" data-a="omitir">Omitir por ahora</button>
        <button type="button" class="btn btn-primario" data-a="listo">Listo</button>`);
 
     function leerEscritos() {
@@ -962,14 +1024,17 @@ R.armar = (function () {
     }
     pintar();
 
-    const terminar = () => { location.hash = `#viaje/${v.id}/itinerario`; };
-    app.querySelector('[data-a="omitir"]').onclick = () => { v.armado = true; R.db.guardarViaje(v); terminar(); };
+    const terminar = () => { armandoNuevo = ''; location.hash = `#viaje/${v.id}/itinerario`; };
     guardarActual = () => { guardarNoches(); return true; };
-    app.querySelector('[data-a="listo"]').onclick = () => {
-      guardarNoches();
-      U.toast('¡Listo! Ahora sumá qué hacés cada día. 🧭');
-      terminar();
-    };
+    if (editandoArmado(v)) enlazarPieEditar(app, v, () => { guardarNoches(); });
+    else {
+      app.querySelector('[data-a="omitir"]').onclick = () => { v.armado = true; R.db.guardarViaje(v); terminar(); };
+      app.querySelector('[data-a="listo"]').onclick = () => {
+        guardarNoches();
+        U.toast('¡Listo! Ahora sumá qué hacés cada día. 🧭');
+        terminar();
+      };
+    }
     function guardarNoches() {
       if (ns.length) {
         leerEscritos();
@@ -986,13 +1051,13 @@ R.armar = (function () {
         const quedan = new Set(nuevos.map(a => a.id));
         deArmado.filter(a => !quedan.has(a.id)).forEach(a => A().borrarAlojamiento(v, a.id));
         v.alojamientos = (v.alojamientos || []).filter(a => !a.deArmado).concat(nuevos);
-        v.noches = {};
-        ns.forEach(f => { if (elegido[f] === 'viaje' || elegido[f] === 'casa') v.noches[f] = elegido[f]; });
+        v.noches = {}; v.nochesBase = {};
+        ns.forEach(f => guardarNoche(v, f, elegido[f]));
       }
       v.armado = true;
       R.db.guardarViaje(v);
     }
   }
 
-  return { nuevo, render, tramos, itemsDeTramos, noches, faltaHTML, cuantasFaltan, faltaTransporte, faltanNoches, faltanConexiones, tramoResuelto, lugarSegunTransporte, nocheGuardada };
+  return { nuevo, render, tramos, itemsDeTramos, noches, faltaHTML, cuantasFaltan, faltaTransporte, faltanNoches, faltanConexiones, tramoResuelto, lugarSegunTransporte, nocheGuardada, guardarNoche };
 })();

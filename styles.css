@@ -2921,3 +2921,24 @@ body.teclado-abierto .armar-pie { position: static; background: none; }
 .ayuda-vista .plegable > summary small { display: block; font-weight: 500; color: var(--tinta-suave); font-size: .82rem; margin-top: 2px; }
 .ayuda-vista > details.bloque { padding: 0; }
 .ayuda-vista > details > .plegable-cuerpo { padding-top: 2px; }
+
+/* 31 — Ayuda: contactos y país de hoy */
+.ct-agregar { margin-bottom: 12px; }
+.cf-editar { all: unset; cursor: pointer; display: grid; gap: 2px; flex: 1; min-width: 0; }
+.cf-editar:disabled { cursor: default; }
+.cf-editar small { color: var(--tinta-suave); font-size: .8rem; }
+.ct-tipos { margin-bottom: 12px; }
+.ct-agenda { margin-bottom: 12px; }
+.em-hoy { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px; background: var(--salvia-claro); color: var(--tinta); font-size: .74rem; font-weight: 600; }
+
+/* 31 — Transporte: datos y puerta a puerta plegados */
+.tramo-pl > summary { list-style: none; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.tramo-pl > summary::-webkit-details-marker { display: none; }
+.tramo-pl > summary .tramo-sec-tit { margin-bottom: 0; }
+.tramo-pl > summary::after { content: '▾'; margin-left: auto; color: var(--tinta-suave); transition: transform .2s; }
+.tramo-pl[open] > summary::after { transform: rotate(180deg); }
+.tramo-pl[open] > summary { margin-bottom: 10px; }
+.tramo-pl-res { flex: 1 1 100%; color: var(--tinta-suave); font-size: .8rem; }
+.tramo-sec-tit small { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.tramo-pl-ruta { margin: 12px 12px 0; padding: 12px; border: 1px solid var(--linea); border-top: 4px solid var(--salvia); border-radius: 14px; background: var(--salvia-claro); }
+.tramo .tramo-pl-ruta .ruta-con { margin: 0; padding: 0; border: 0; background: transparent; }

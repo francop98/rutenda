@@ -81,7 +81,7 @@ R.pendientes = (function () {
      --------------------------------------------------------- */
   function recomendaciones(v) {
     const r = [];
-    const sumar = (id, texto, detalle, link) => r.push({ id, texto, detalle: detalle || '', link: link || '' });
+    const sumar = (id, texto, detalle, link, linkTexto) => r.push({ id, texto, detalle: detalle || '', link: link || '', linkTexto: linkTexto || '' });
     const req = R.requisitos ? R.requisitos.analizar(v) : { internacional: false, tramites: [], aVerificar: [], fiebreAmarilla: [] };
     const ayuda = `#viaje/${v.id}/ayuda`;
     const destinos = (v.destinos || []).filter(d => d.nombre && !d.soloDia).map(d => d.nombre);
@@ -104,6 +104,12 @@ R.pendientes = (function () {
     items.filter(it => it.tipo === 'vuelo').forEach(it => {
       const c = A().checkin(it);
       sumar('vuelo_checkin_' + it.id, `Hacer el check-in del vuelo ${[it.empresa, it.numero].filter(Boolean).join(' ') || it.titulo}`, c ? `Se habilita el ${U.fmtFecha(c.fecha, 'dia')} a las ${c.hora}.` : 'Se hace online, en general entre 24 y 72 horas antes.');
+    });
+    // Cómo llegás a cada aeropuerto o terminal (opcional: se marca como listo o "no aplica")
+    items.filter(it => !it.pendiente && A().conexionesFaltan(it)).forEach(it => {
+      const term = A().TERMINAL[it.tipo] || 'terminal', fem = term === 'terminal' || term === 'estación';
+      const falta = [!A().conexionResuelta(it.alSalir) ? `cómo llegás ${fem ? 'a la' : 'al'} ${term}` : '', !A().conexionResuelta(it.alLlegar) ? `cómo salís ${fem ? 'de la' : 'del'} ${term}` : ''].filter(Boolean).join(' y ');
+      sumar('traslado_' + it.id, `Ver ${falta}`, `${A().tipo(it.tipo).icono} ${[it.desde, it.hasta].filter(Boolean).join(' → ')} · ${U.fmtFecha(it.fecha, 'dia')}`, `#armar/${v.id}/transporte`, 'Completarlo →');
     });
     if (items.some(it => it.tipo === 'vuelo')) sumar('vuelo_equipaje', 'Revisar qué equipaje incluye el pasaje', 'Medidas y peso de la valija y del bolso de mano.');
     if (items.some(it => it.tipo === 'auto')) {
@@ -145,7 +151,7 @@ R.pendientes = (function () {
     const res = todas.filter(x => e[x.id]);
     const fila = x => `
       <div class="reco ${e[x.id] ? 'reco-' + e[x.id] : ''} ${x.urgente && !e[x.id] ? 'reco-urgente' : ''}">
-        <div class="reco-texto"><strong>${esc(x.texto)}</strong>${x.detalle ? `<small>${esc(x.detalle)}</small>` : ''}${x.link ? `<a href="${x.link}" class="reco-link">Ver requisitos →</a>` : ''}</div>
+        <div class="reco-texto"><strong>${esc(x.texto)}</strong>${x.detalle ? `<small>${esc(x.detalle)}</small>` : ''}${x.link ? `<a href="${x.link}" class="reco-link" ${x.link.includes('/transporte') ? 'data-revisar' : ''}>${esc(x.linkTexto || 'Ver requisitos →')}</a>` : ''}</div>
         ${puede ? (e[x.id]
           ? `<button type="button" class="btn-texto-mini" data-reco="${x.id}" data-valor="">${e[x.id] === 'hecho' ? '✓ Listo' : '✕ No aplica'} · deshacer</button>`
           : `<div class="reco-acc"><button type="button" class="btn btn-suave btn-chico" data-reco="${x.id}" data-valor="hecho">✓ Listo</button><button type="button" class="btn btn-texto btn-chico" data-reco="${x.id}" data-valor="no">No aplica</button></div>`) : ''}

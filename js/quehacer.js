@@ -25,16 +25,21 @@ R.queHacer = (function () {
   }
   function guardarCache(d, items) { try { localStorage.setItem(claveCache(d), JSON.stringify({ t: Date.now(), items })); } catch (e) { /* sin lugar: no pasa nada */ } }
 
-  function consulta(d, radio) {
-    const a = `(around:${radio},${d.lat},${d.lon})`;
-    return `[out:json][timeout:25];(
-      nwr${a}[tourism~"^(attraction|museum|viewpoint|gallery|zoo|theme_park|aquarium)$"][name];
-      nwr${a}[historic~"^(monument|castle|fort|ruins|archaeological_site|city_gate|palace|church|cathedral)$"][name][wikidata];
-      nwr${a}[building~"^(cathedral|church|basilica)$"][name][wikipedia];
-      nwr${a}[leisure~"^(park|garden|nature_reserve)$"][name][wikidata];
-      nwr${a}[natural~"^(beach|peak|waterfall|glacier|cave_entrance)$"][name][wikidata];
-      nwr${a}[amenity=marketplace][name][wikidata];
-    );out center tags 300;`;
+  /*
+   * Consulta rápida: un recuadro alrededor del destino (mucho más rápido que buscar "a tantos metros")
+   * y solo lugares con ficha en Wikidata, que son los conocidos.
+   */
+  function consulta(d, km) {
+    const dLat = km / 111, dLon = km / (111 * Math.max(0.2, Math.cos(d.lat * Math.PI / 180)));
+    const caja = [d.lat - dLat, d.lon - dLon, d.lat + dLat, d.lon + dLon].map(n => n.toFixed(4)).join(',');
+    return `[out:json][timeout:12][bbox:${caja}];(
+      nwr[tourism~"^(attraction|museum|viewpoint|gallery|zoo|theme_park|aquarium)$"][wikidata];
+      nwr[historic~"^(monument|castle|fort|ruins|archaeological_site|city_gate|palace)$"][wikidata];
+      nwr[building~"^(cathedral|basilica)$"][wikidata];
+      nwr[leisure~"^(park|garden|nature_reserve)$"][wikipedia];
+      nwr[natural~"^(beach|peak|waterfall|glacier)$"][wikidata];
+      nwr[amenity=marketplace][wikidata];
+    );out center tags qt 250;`;
   }
 
   function categoria(t) {
@@ -68,23 +73,39 @@ R.queHacer = (function () {
       .map(({ puntos, ...x }) => x);
   }
 
+  /** Pregunta a los dos servidores a la vez y se queda con el primero que responde. */
+  async function pedir(d, km) {
+    const cuerpo = 'data=' + encodeURIComponent(consulta(d, km));
+    const cortes = SERVIDORES.map(() => (typeof AbortController !== 'undefined' ? new AbortController() : null));
+    const intentos = SERVIDORES.map((url, i) => fetch(url, { method: 'POST', body: cuerpo, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: cortes[i] ? cortes[i].signal : undefined })
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(j => { cortes.forEach((c, k) => { if (c && k !== i) c.abort(); }); return j; }));
+    const espera = new Promise((_, no) => setTimeout(() => no(new Error('tardó demasiado')), 15000));
+    return Promise.race([primero(intentos), espera]);
+  }
+  /** Como Promise.any (el primero que sale bien). */
+  function primero(ps) {
+    return new Promise((si, no) => { let fallas = 0; ps.forEach(p => p.then(si, e => { if (++fallas === ps.length) no(e); })); });
+  }
+
+  const enCurso = {};
   async function buscar(d) {
     const cache = leerCache(d);
     if (cache && Date.now() - cache.t < DIAS_CACHE * 864e5) return cache.items;
-    let ultimoError = null;
-    for (const radio of [12000]) {
-      for (const url of SERVIDORES) {
-        try {
-          const r = await fetch(url, { method: 'POST', body: 'data=' + encodeURIComponent(consulta(d, radio)), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-          if (!r.ok) throw new Error('HTTP ' + r.status);
-          const items = procesar(await r.json());
-          guardarCache(d, items);
-          return items;
-        } catch (e) { ultimoError = e; }
-      }
+    const k = claveCache(d);
+    if (!enCurso[k]) enCurso[k] = pedir(d, 10).then(j => { const items = procesar(j); guardarCache(d, items); return items; }).finally(() => { delete enCurso[k]; });
+    try { return await enCurso[k]; } catch (e) {
+      if (cache) return cache.items;   // sin conexión: lo último que se buscó
+      throw e;
     }
-    if (cache) return cache.items;   // sin conexión: lo último que se buscó
-    throw ultimoError || new Error('sin datos');
+  }
+
+  /** Se busca de antemano (al abrir el itinerario), así al tocar el botón ya está. */
+  function precargar(v) {
+    if (navigator.onLine === false) return;
+    const hacer = () => destinos(v).filter(d => d.lat != null && d.lon != null && !leerCache(d)).slice(0, 3)
+      .reduce((p, d) => p.then(() => buscar(d).catch(() => {})), Promise.resolve());
+    if (window.requestIdleCallback) requestIdleCallback(hacer, { timeout: 4000 }); else setTimeout(hacer, 1500);
   }
 
   /** Los destinos donde tiene sentido buscar (los de pasada no). */
@@ -102,7 +123,7 @@ R.queHacer = (function () {
       return ahi.length ? ahi : todos;
     };
     const { el } = U.modal({
-      titulo: '🧭 Qué hacer',
+      titulo: '📍 Lugares para conocer',
       subtitulo: 'Lo más conocido de cada lugar, para sumar a tu itinerario',
       cuerpo: '<div class="qh"></div>',
       acciones: [{ texto: 'Listo', clase: 'btn-primario' }]
@@ -168,5 +189,5 @@ R.queHacer = (function () {
     cargar();
   }
 
-  return { abrir, procesar };
+  return { abrir, procesar, precargar };
 })();

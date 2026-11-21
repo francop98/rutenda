@@ -65,11 +65,11 @@ R.queHacerSi = (function () {
       .replace(/\s+\./g, '.').replace(/\s{2,}/g, ' ');
   }
 
-  /** Bloque para Archivos. */
+  /** Bloque para Ayuda. */
   function html(v) {
     return `
       <details class="bloque plegable que-hacer-si" data-que-hacer-si>
-        <summary><div><h3 class="bloque-titulo">🧭 Qué hacer si…</h3><small>Si algo sale mal. Se ve también sin señal.</small></div></summary>
+        <summary><div><h3 class="bloque-titulo">🧯 Si algo sale mal</h3><small>Vuelo cancelado, valija perdida, robo… Se ve sin señal.</small></div></summary>
         <div class="plegable-cuerpo">
           ${GUIAS.map(g => `
             <details class="qhs-guia" data-guia="${g.id}">
@@ -88,10 +88,10 @@ R.queHacerSi = (function () {
     if (abierto) d.open = true;
     d.addEventListener('toggle', () => { abierto = d.open; });
   }
-  /** Abre Documentos con la guía desplegada. */
+  /** Abre Ayuda con la guía desplegada. */
   function ir(v) {
     abierto = true;
-    location.hash = `#viaje/${v.id}/documentos`;
+    location.hash = `#viaje/${v.id}/ayuda`;
     setTimeout(() => { const d = document.querySelector('[data-que-hacer-si]'); if (d) { d.open = true; d.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }, 200);
   }
 

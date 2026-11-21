@@ -41,11 +41,25 @@ R.emergencias = (function () {
 
   const tel = n => 'tel:' + String(n || '').replace(/[^+\d]/g, '');
 
-  /** Países del viaje (sin repetir), con nombre. */
+  /**
+   * El país donde estás hoy (si el viaje está en curso), según el itinerario: el destino de ese día.
+   * Así Ayuda pone primero lo de ese país.
+   */
+  function paisHoy(v) {
+    const hoy = U.hoyISO();
+    if (!v.fechaInicio || hoy < v.fechaInicio || (v.fechaFin && hoy > v.fechaFin) || v.finalizado) return '';
+    const norm = x => String(x || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+    const ciudad = R.itinerario && R.itinerario.ciudadDe ? R.itinerario.ciudadDe(v, hoy) : '';
+    const d = (v.destinos || []).find(x => x.codigoPais && norm(x.nombre) === norm(ciudad));
+    return d ? d.codigoPais : '';
+  }
+  /** Países del viaje (sin repetir), con nombre; el de hoy, primero. */
   function paises(v) {
     const vistos = new Map();
     (v.destinos || []).filter(d => d.nombre && d.codigoPais).forEach(d => { if (!vistos.has(d.codigoPais)) vistos.set(d.codigoPais, d.pais || d.codigoPais); });
-    return Array.from(vistos.entries()).map(([codigo, nombre]) => ({ codigo, nombre }));
+    const hoy = paisHoy(v);
+    return Array.from(vistos.entries()).map(([codigo, nombre]) => ({ codigo, nombre, hoy: codigo === hoy }))
+      .sort((a, b) => (b.hoy ? 1 : 0) - (a.hoy ? 1 : 0));
   }
   function internacional(v) { return !!(v.perfil && v.perfil.internacional) || (v.destinos || []).some(d => d.codigoPais && d.codigoPais !== 'AR'); }
 
@@ -72,7 +86,7 @@ R.emergencias = (function () {
     // 1) Números de cada país
     if (ps.length) {
       partes.push(fila('📞 Números de emergencia', ps.map(p => `
-        ${ps.length > 1 || p.codigo !== 'AR' ? `<small class="em-pais">${R.lugares.bandera(p.codigo) || ''} ${esc(p.nombre)}</small>` : ''}
+        ${ps.length > 1 || p.codigo !== 'AR' ? `<small class="em-pais">${R.lugares.bandera(p.codigo) || ''} ${esc(p.nombre)}${p.hoy ? ' <b class="em-hoy">📍 Estás acá</b>' : ''}</small>` : ''}
         ${NUMEROS[p.codigo] ? botonesTel(NUMEROS[p.codigo]) : `<p class="texto-suave">Desde el celular, el 112 funciona en la mayoría de los países (en América, probá el 911).</p>`}`).join('')));
     }
     // 2) Seguro
@@ -82,7 +96,7 @@ R.emergencias = (function () {
       : '<p class="texto-suave">Si tenés seguro, cargá el teléfono de asistencia y queda acá, a un toque.</p>'));
     // 3) Consulado argentino (si salís del país)
     if (inter) {
-      const destinoExt = ps.find(p => p.codigo !== 'AR');
+      const destinoExt = ps.find(p => p.codigo !== 'AR');   // el de hoy va primero
       partes.push(fila('🇦🇷 Consulado argentino', `
         ${d.consulado ? `<a class="btn btn-suave btn-chico" href="${tel(d.consulado)}">📞 ${esc(d.consulado)}</a>` : ''}
         ${d.consuladoNota ? `<p class="texto-suave">${esc(d.consuladoNota)}</p>` : ''}
@@ -96,7 +110,7 @@ R.emergencias = (function () {
 
     return `
       <details class="bloque plegable emergencias" data-emergencias>
-        <summary><div><h3 class="bloque-titulo">🆘 Emergencias</h3><small>Números, seguro${inter ? ', consulado' : ''} y tu contacto</small></div></summary>
+        <summary><div><h3 class="bloque-titulo">🆘 Emergencias</h3><small>${ps.some(p => p.hoy) && ps.length > 1 ? `Números de ${esc(ps[0].nombre)} (donde estás), seguro` : 'Números, seguro'}${inter ? ', consulado' : ''} y tu contacto</small></div></summary>
         <div class="plegable-cuerpo">
           ${partes.join('')}
           <button type="button" class="btn btn-texto btn-chico" data-a="emEditar">✏️ Editar contacto, seguro${inter ? ' y consulado' : ''}</button>
@@ -123,20 +137,20 @@ R.emergencias = (function () {
       cuerpo: `
         <h4 class="titulo-paso">👤 Tu contacto de emergencia</h4>
         <div class="grilla-2">
-          <label class="campo"><span>Nombre</span><input id="emNombre" value="${esc(c.nombre)}" placeholder="Ej: Mamá"></label>
-          <label class="campo"><span>Teléfono</span><input id="emTel" type="tel" inputmode="tel" value="${esc(c.telefono)}" placeholder="+54 9 291 …"></label>
+          <label class="campo"><span>Nombre</span><input id="emNombre" value="${esc(c.nombre)}" placeholder="Nombre"></label>
+          <label class="campo"><span>Teléfono</span><input id="emTel" type="tel" inputmode="tel" value="${esc(c.telefono)}" placeholder="Teléfono con código de área"></label>
         </div>
         <small class="ayuda">Queda para todos tus viajes.</small>
         ${org ? `
         <h4 class="titulo-paso">🛡️ Seguro de viaje</h4>
         <div class="grilla-2">
-          <label class="campo"><span>Compañía</span><input id="emSegComp" value="${esc(sg.compania || '')}" placeholder="Ej: Assist Card"></label>
+          <label class="campo"><span>Compañía</span><input id="emSegComp" value="${esc(sg.compania || '')}" placeholder="Nombre de la compañía"></label>
           <label class="campo"><span>N° de póliza</span><input id="emSegPol" value="${esc(sg.poliza || '')}"></label>
         </div>
-        <label class="campo"><span>Teléfono de asistencia</span><input id="emSegTel" type="tel" inputmode="tel" value="${esc(sg.telefono || '')}" placeholder="+54 11 …"></label>` : ''}
+        <label class="campo"><span>Teléfono de asistencia</span><input id="emSegTel" type="tel" inputmode="tel" value="${esc(sg.telefono || '')}" placeholder="Teléfono con código de área"></label>` : ''}
         ${inter ? `
         <h4 class="titulo-paso">🇦🇷 Consulado argentino</h4>
-        <label class="campo"><span>Teléfono de guardia</span><input id="emCons" type="tel" inputmode="tel" value="${esc(d.consulado)}" placeholder="Ej: +34 …"></label>
+        <label class="campo"><span>Teléfono de guardia</span><input id="emCons" type="tel" inputmode="tel" value="${esc(d.consulado)}" placeholder="Teléfono con código de país"></label>
         <label class="campo"><span>Dirección o nota <small>(opcional)</small></span><input id="emConsNota" value="${esc(d.consuladoNota)}"></label>` : ''}`,
       acciones: [{ texto: 'Cancelar' }, {
         texto: 'Guardar', clase: 'btn-primario', onClick: el => {
@@ -155,5 +169,5 @@ R.emergencias = (function () {
     });
   }
 
-  return { html, enlazar, NUMEROS, paises };
+  return { html, enlazar, NUMEROS, paises, paisHoy };
 })();

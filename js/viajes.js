@@ -91,28 +91,37 @@ R.viajes = (function () {
     if (org) ops.push(['editar', '✏️', 'Editar el viaje', 'Destinos, fechas, transporte y dónde dormís']);
     ops.push(['viajeros', '👥', 'Viajeros', 'Invitar a quienes viajan con vos']);
     ops.push(['documentos', '📁', 'Archivos', 'Pasajes, vouchers y documentos']);
-    ops.push(['ruta', '🗺️', 'Ver la ruta en Google Maps', '']);
-    ops.push(['mapa', '📍', 'Mapa del viaje', '']);
-    ops.push(['pdf', '📄', 'Itinerario en PDF', 'Para imprimir o mandar']);
-    if (R.calendario) ops.push(['calendario', '📅', 'Pasar al calendario del celular', 'Google Calendar, iPhone u Outlook']);
-    if (R.familia && R.db.modo() === 'nube') ops.push(['familia', '🔗', 'Link del itinerario', v.linkFamilia && v.linkFamilia.activo ? 'Activo · solo los días, sin gastos ni pendientes' : 'Para tu familia o quien viaja sin la app']);
-    if (R.linkCuentas && R.db.modo() === 'nube' && (v.participantes || []).length > 1) ops.push(['linkCuentas', '🔗', 'Link de cuentas para el grupo', v.linkCuentas && v.linkCuentas.activo ? 'Activo' : '']);
-    if (v.fechaInicio) ops.push(['resumen', '🖼️', 'Resumen para compartir', '']);
+    ops.push(['mapa', '🗺️', 'Mapa del viaje', 'Y la ruta en Google Maps']);
+    // Todo lo que es compartir o sacar el viaje de la app, junto en un solo lugar
+    const compartir = [];
+    compartir.push(['pdf', '📄', 'Itinerario en PDF', 'Para imprimir o mandar']);
+    if (R.calendario) compartir.push(['calendario', '📅', 'Pasar al calendario del celular', 'Google Calendar, iPhone u Outlook']);
+    if (R.familia && R.db.modo() === 'nube') compartir.push(['familia', '🔗', 'Link del itinerario', v.linkFamilia && v.linkFamilia.activo ? 'Activo · solo los días, sin gastos ni pendientes' : 'Para tu familia o quien viaja sin la app']);
+    if (R.linkCuentas && R.db.modo() === 'nube' && (v.participantes || []).length > 1) compartir.push(['linkCuentas', '🔗', 'Link de cuentas para el grupo', v.linkCuentas && v.linkCuentas.activo ? 'Activo' : '']);
+    if (v.fechaInicio) compartir.push(['resumen', '🖼️', 'Resumen para compartir', '']);
+    ops.push(['compartir', '📤', 'Compartir o exportar', 'PDF, calendario del celular, links y resumen']);
     if (org && est === 'en_curso') ops.push(['finalizar', '🏠', 'Ya llegué: terminar el viaje', '']);
     if (org && v.finalizado && (!v.fechaFin || v.fechaFin >= U.hoyISO())) ops.push(['reabrir', '↩️', 'Seguir el viaje', 'Todavía no terminó']);
     if (R.db.esDueno(v)) ops.push(['eliminar', '🗑', 'Eliminar viaje', '']);
-    const { el } = U.modal({
-      titulo: nombreDe(v),
-      cuerpo: `<div class="menu-acciones">${ops.map(([id, ic, t, sub]) => `<button type="button" class="menu-op menu-op-dato ${id === 'eliminar' ? 'peligro' : ''}" data-op="${id}"><span>${ic}</span><span class="mo-texto"><strong>${esc(t)}</strong>${sub ? `<small>${esc(sub)}</small>` : ''}</span></button>`).join('')}</div>`
-    });
-    el.querySelectorAll('[data-op]').forEach(bt => bt.onclick = async () => {
-      const op = bt.dataset.op;
-      U.cerrarModal();
+    const lista = (titulo, items) => {
+      const { el } = U.modal({
+        titulo,
+        cuerpo: `<div class="menu-acciones">${items.map(([id, ic, t, sub]) => `<button type="button" class="menu-op menu-op-dato ${id === 'eliminar' ? 'peligro' : ''}" data-op="${id}"><span>${ic}</span><span class="mo-texto"><strong>${esc(t)}</strong>${sub ? `<small>${esc(sub)}</small>` : ''}</span></button>`).join('')}</div>`
+      });
+      el.querySelectorAll('[data-op]').forEach(bt => bt.onclick = () => { U.cerrarModal(); hacer(bt.dataset.op); });
+    };
+    lista(nombreDe(v), ops);
+    async function hacer(op) {
+      if (op === 'compartir') { setTimeout(() => lista('Compartir o exportar', compartir), 50); return; }
       if (op === 'editar') editar(v);
       else if (op === 'viajeros' || op === 'documentos') location.hash = `#viaje/${v.id}/${op}`;
       else if (op === 'transporte' || op === 'noches') location.hash = `#armar/${v.id}/${op}`;
       else if (op === 'ruta') R.gmaps.abrirRutaViaje(v);
-      else if (op === 'mapa') { const { el: m } = U.modal({ titulo: 'Mapa del viaje', ancho: true, cuerpo: '<div id="mapaViaje" class="mapa-viaje"></div>' }); R.mapa.mostrar(m.querySelector('#mapaViaje'), v); }
+      else if (op === 'mapa') {
+        const { el: m } = U.modal({ titulo: 'Mapa del viaje', ancho: true, cuerpo: '<div id="mapaViaje" class="mapa-viaje"></div>',
+          acciones: [{ texto: '🗺️ Abrir la ruta en Google Maps', clase: 'btn-suave', onClick: () => { R.gmaps.abrirRutaViaje(v); return false; } }, { texto: 'Cerrar', clase: 'btn-primario' }] });
+        R.mapa.mostrar(m.querySelector('#mapaViaje'), v);
+      }
       else if (op === 'pdf') R.itinerarioPdf.descargar(v);
       else if (op === 'calendario') R.calendario.descargar(v);
       else if (op === 'familia') R.familia.abrir(v);
@@ -127,7 +136,7 @@ R.viajes = (function () {
         location.hash = '#inicio';
         U.toast('Viaje eliminado.');
       }
-    });
+    }
   }
 
   /* ---------------------------------------------------------

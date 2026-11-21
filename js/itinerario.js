@@ -214,7 +214,7 @@ R.itinerario = (function () {
           </div>`).join('')}</div>
           ${ideas.length > 3 ? `<button type="button" class="btn-texto-mini" data-a="todasIdeas">${verTodasIdeas ? 'Ver menos' : `Ver las ${ideas.length}`}</button>` : ''}
           ${puede && dias.length && ideas.length >= 2 ? '<button type="button" class="btn btn-suave btn-bloque quiero2-repartir" data-a="repartir">✨ Repartir mis ideas en los días</button>' : ''}` : ''}
-        ${puede && R.queHacer && (v.destinos || []).some(d => d.nombre && !d.paso) ? `<button type="button" class="btn btn-suave btn-bloque quiero2-quehacer" data-a="queHacer">🧭 Qué hacer en ${esc(nombresQueHacer(v))}</button>` : ''}
+        ${puede && R.queHacer && (v.destinos || []).some(d => d.nombre && !d.paso) ? `<button type="button" class="btn btn-suave btn-bloque quiero2-quehacer" data-a="queHacer">📍 Lugares para conocer en ${esc(nombresQueHacer(v))}</button>` : ''}
         ${favs.length ? `<div class="quiero2-favs"><small>⭐ Tus favoritos de viajes anteriores:</small>
           <div class="chips-elegir chips-chicos">${favs.slice(0, 8).map((f, n) => `<button type="button" class="chip-op" data-fav="${n}">+ ${esc(f.titulo)}</button>`).join('')}</div></div>` : ''}
       </section>`;
@@ -259,6 +259,7 @@ R.itinerario = (function () {
     cont.querySelectorAll('[data-elegir-dia]').forEach(b => b.onclick = () => mover(v, b.dataset.elegirDia, () => R.app.refrescar()));
     const bq = cont.querySelector('[data-a="queHacer"]');
     if (bq) bq.onclick = () => R.queHacer.abrir(v, () => R.app.refrescar());
+    if (bq) R.queHacer.precargar(v);
     const br = cont.querySelector('[data-a="repartir"]');
     if (br) br.onclick = () => repartir(v);
   }
@@ -636,11 +637,13 @@ R.itinerario = (function () {
     });
     el.querySelectorAll('[data-usar]').forEach(b => b.onclick = () => {
       if (b.dataset.usar === 'viaje' || b.dataset.usar === 'casa') {
-        v.noches = Object.assign({}, v.noches, { [fecha]: b.dataset.usar });
+        if (R.armar && R.armar.guardarNoche) R.armar.guardarNoche(v, fecha, b.dataset.usar);
+        else v.noches = Object.assign({}, v.noches, { [fecha]: b.dataset.usar });
         R.db.guardarViaje(v); U.cerrarModal(); R.app.refrescar();
         return;
       }
       if (v.noches) delete v.noches[fecha];
+      if (v.nochesBase) delete v.nochesBase[fecha];
       const a = A().alojamiento(v, b.dataset.usar);
       if (!a) { editarAlojamiento(v, null, { desde: fecha }); return; }
       if (!a.desde || fecha < a.desde) a.desde = fecha;
