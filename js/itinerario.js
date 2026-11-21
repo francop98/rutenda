@@ -186,9 +186,12 @@ R.itinerario = (function () {
         ${puede && dias.length ? '<p class="ayuda itin2-ayuda">Tocá algo para verlo o cambiarlo. Mantenelo apretado para pasarlo a otro día.</p>' : ''}
       </div>`;
     enlazar(v, cont);
-    // Viajando: arranca en el día de hoy
+    // Viajando: la página arranca arriba, con un atajo al día de hoy
     const hoyEl = cont.querySelector('.dia2.hoy');
-    if (hoyEl && !render._yaFue) { render._yaFue = v.id; setTimeout(() => hoyEl.scrollIntoView({ block: 'start', behavior: 'smooth' }), 120); }
+    if (hoyEl) {
+      cont.insertAdjacentHTML('afterbegin', '<button type="button" class="btn btn-suave btn-chico itin-ir-hoy" data-a="irHoy">📍 Ir a hoy</button>');
+      cont.querySelector('[data-a="irHoy"]').onclick = () => hoyEl.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
   }
 
   /* ---------------------------------------------------------
@@ -214,15 +217,13 @@ R.itinerario = (function () {
           </div>`).join('')}</div>
           ${ideas.length > 3 ? `<button type="button" class="btn-texto-mini" data-a="todasIdeas">${verTodasIdeas ? 'Ver menos' : `Ver las ${ideas.length}`}</button>` : ''}
           ${puede && dias.length && ideas.length >= 2 ? '<button type="button" class="btn btn-suave btn-bloque quiero2-repartir" data-a="repartir">✨ Repartir mis ideas en los días</button>' : ''}` : ''}
-        ${puede && R.queHacer && (v.destinos || []).some(d => d.nombre && !d.paso) ? `<button type="button" class="btn btn-suave btn-bloque quiero2-quehacer" data-a="queHacer">📍 Lugares para conocer en ${esc(nombresQueHacer(v))}</button>` : ''}
+        ${destinosQueHacer(v).length ? `<div class="quiero2-buscar"><small>¿Ideas? Buscá qué hacer en:</small>${destinosQueHacer(v).map(n => `<a class="chip-op quiero2-buscar-link" href="https://www.google.com/search?q=${encodeURIComponent('qué hacer en ' + n)}" target="_blank" rel="noopener">🔎 ${esc(n)}</a>`).join('')}</div>` : ''}
         ${favs.length ? `<div class="quiero2-favs"><small>⭐ Tus favoritos de viajes anteriores:</small>
           <div class="chips-elegir chips-chicos">${favs.slice(0, 8).map((f, n) => `<button type="button" class="chip-op" data-fav="${n}">+ ${esc(f.titulo)}</button>`).join('')}</div></div>` : ''}
       </section>`;
   }
-  function nombresQueHacer(v) {
-    const ds = (v.destinos || []).filter(d => d.nombre && !d.paso).map(d => d.nombre);
-    return ds.length > 2 ? ds.slice(0, 2).join(', ') + '…' : ds.join(' y ');
-  }
+  /** Destinos para buscar ideas afuera de la app (en Google): los de pasada no. */
+  const destinosQueHacer = v => (v.destinos || []).filter(d => d.nombre && !d.paso).map(d => d.nombre);
   /** Lo que marcaste con ⭐ en otros viajes al mismo destino y todavía no está en este. */
   function favoritosPara(v) {
     const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
@@ -257,9 +258,6 @@ R.itinerario = (function () {
     const bt = cont.querySelector('[data-a="todasIdeas"]');
     if (bt) bt.onclick = () => { verTodasIdeas = !verTodasIdeas; render(v, cont); };
     cont.querySelectorAll('[data-elegir-dia]').forEach(b => b.onclick = () => mover(v, b.dataset.elegirDia, () => R.app.refrescar()));
-    const bq = cont.querySelector('[data-a="queHacer"]');
-    if (bq) bq.onclick = () => R.queHacer.abrir(v, () => R.app.refrescar());
-    if (bq) R.queHacer.precargar(v);
     const br = cont.querySelector('[data-a="repartir"]');
     if (br) br.onclick = () => repartir(v);
   }

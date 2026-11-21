@@ -495,9 +495,6 @@
       </section>
       <div class="itin-global"></div>`;
     R.itinerario.render(v, app.querySelector('.itin-global'));
-    // Viajando: arranca en el día de hoy
-    const hoyEl = app.querySelector('.itin-global .dia2.hoy');
-    if (hoyEl && !idElegido) setTimeout(() => hoyEl.scrollIntoView({ block: 'start', behavior: 'smooth' }), 150);
   }
 
   /* ---------- Copia de seguridad (desde Mi cuenta) ---------- */
@@ -567,7 +564,8 @@
   window.addEventListener('hashchange', anotarRuta);
   window.addEventListener('hashchange', () => {
     if (R.menu) R.menu.cerrar();
-    const ruta = location.hash.split('/').slice(0, 2).join('/');
+    // Cambiar de página o de sección (pestaña del viaje, paso de "Editar el viaje") arranca desde arriba
+    const ruta = location.hash.split('#')[1] ? '#' + location.hash.split('#')[1].split('/').slice(0, 3).join('/') : '';
     const cambioDeVista = ruta !== rutaAnterior;
     rutaAnterior = ruta;
     U.cerrarModal();
@@ -587,7 +585,9 @@
     document.addEventListener('focusout', () => setTimeout(revisar, 300));
     if (window.visualViewport) window.visualViewport.addEventListener('resize', revisar);
   })();
-  rutaAnterior = location.hash.split('/').slice(0, 2).join('/');
+  rutaAnterior = location.hash.split('#')[1] ? '#' + location.hash.split('#')[1].split('/').slice(0, 3).join('/') : '';
+  // El navegador no recuerda el scroll de cada página: cada una arranca arriba
+  try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (e) { /* no pasa nada */ }
   app.innerHTML = '<div class="pantalla-carga"><span class="marca-logo grande"></span><p>Abriendo Rutenda…</p></div>';
   R.auth.iniciar().then(async u => {
     listo = true;

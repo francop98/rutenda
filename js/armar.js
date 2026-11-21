@@ -916,11 +916,15 @@ R.armar = (function () {
       manuales.forEach(a => ops.push([`aloj:${a.id}`, `🛏️ ${A().nombreAlojamiento(a)}`]));
       if (s.escala) ops.unshift([`parada:${s.escala.lugar}`, `🛏️ Hotel en ${s.escala.lugar} (escala)`]);
       if (s.pregunta === 'paso') ops.unshift([`parada:${s.lugar.nombre}`, `🛏️ Hotel en ${s.lugar.nombre}`]);
+      // Llegás de madrugada a un lugar donde no te quedás (por ej. Buenos Aires, de pasada): también se puede dormir ahí
+      const llegaA = s.pregunta === 'madrugada' && s.tramo && s.tramo.t.hasta;
+      const paradaLlegada = llegaA && llegaA.id !== 'o' && llegaA.nombre && !quedas.some(d => d.id === llegaA.id) ? `parada:${llegaA.nombre}` : '';
+      if (paradaLlegada) ops.unshift([paradaLlegada, `🛏️ En ${llegaA.nombre}`]);
       const tr = s.tramo ? `${s.tramo.t.desde.nombre} → ${s.tramo.t.hasta.nombre}` : '';
       ops.push(['viaje', s.pregunta === 'escala' || s.pregunta === 'paso' ? '✈️ En el aeropuerto / terminal' : tr ? `${A().tipo(s.tramo.it.tipo).icono} Viajando (${tr})` : '🚌 Viajando']);
       ops.push(['casa', '🏠 En casa']);
       // "En otro lugar": una parada en el camino (la escribís vos)
-      const otro = (elegido[f] || '').startsWith('parada:') && !(s.escala && elegido[f] === `parada:${s.escala.lugar}`);
+      const otro = (elegido[f] || '').startsWith('parada:') && !(s.escala && elegido[f] === `parada:${s.escala.lugar}`) && elegido[f] !== paradaLlegada && !(s.pregunta === 'paso' && elegido[f] === `parada:${s.lugar.nombre}`);
       ops.push([otro ? elegido[f] : '__otro', otro ? `🛏️ En ${elegido[f].slice(7)}` : '🛏️ En otro lugar (parada en el camino)…']);
       return `<option value="">Sin definir</option>${ops.map(([k, t]) => `<option value="${esc(k)}" ${elegido[f] === k ? 'selected' : ''}>${esc(t)}</option>`).join('')}`;
     };

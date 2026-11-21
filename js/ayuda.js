@@ -97,7 +97,7 @@ R.ayuda = (function () {
         } }]
       });
     });
-    if (location.hash.includes('#requisitos')) { const r = cont.querySelector('[data-requisitos]'); if (r) { r.open = true; r.scrollIntoView({ block: 'start' }); } }
+    if (location.hash.includes('#requisitos')) { const r = cont.querySelector('[data-requisitos]'); if (r) { r.open = true; setTimeout(() => r.scrollIntoView({ block: 'start' }), 60); } }
   }
 
   // Sugerencias para cargar rápido

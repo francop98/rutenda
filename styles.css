@@ -2853,24 +2853,6 @@ body.teclado-abierto .armar-pie { position: static; background: none; }
 .fv-destino > .fv-destino-pie { flex: 1 1 100%; margin-top: 0; }
 .ayuda-campo { display: block; margin-top: 4px; font-size: .8rem; color: var(--tinta-suave); }
 
-/* 30 — Qué hacer en cada destino */
-.quiero2-quehacer { margin-top: 8px; }
-.qh-lugar { margin: 0 0 8px; color: var(--tinta-suave); }
-.qh-destinos, .qh-filtros { margin-bottom: 10px; }
-.qh-cargando { padding: 14px 0; text-align: center; }
-.qh-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.qh-item { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--linea); border-radius: var(--radio-chico); background: var(--papel); }
-.qh-icono { font-size: 1.2rem; flex: none; }
-.qh-texto { flex: 1; min-width: 0; display: grid; gap: 2px; }
-.qh-texto strong { font-weight: 600; overflow-wrap: anywhere; }
-.qh-texto small { color: var(--tinta-suave); font-size: .8rem; }
-.qh-texto a { color: inherit; text-decoration: underline; }
-.qh-ok { flex: none; font-size: .8rem; font-weight: 600; color: var(--tinta-suave); }
-.qh-dias { flex: 1 1 100%; display: grid; gap: 6px; padding-top: 6px; border-top: 1px dashed var(--linea); }
-.qh-dias small { color: var(--tinta-suave); }
-.qh-dias .btn-texto { justify-self: start; }
-.qh-fuente { margin: 10px 0 0; font-size: .72rem; color: var(--tinta-tenue); text-align: right; }
-
 /* 30 — Info práctica del país */
 .info-pais + .info-pais { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--linea); }
 .ip-pais { display: block; margin-bottom: 6px; }
@@ -2942,3 +2924,29 @@ body.teclado-abierto .armar-pie { position: static; background: none; }
 .tramo-sec-tit small { text-transform: none; letter-spacing: 0; font-weight: 500; }
 .tramo-pl-ruta { margin: 12px 12px 0; padding: 12px; border: 1px solid var(--linea); border-top: 4px solid var(--salvia); border-radius: 14px; background: var(--salvia-claro); }
 .tramo .tramo-pl-ruta .ruta-con { margin: 0; padding: 0; border: 0; background: transparent; }
+.itin-ir-hoy { margin: 0 0 10px; }
+
+/* 31.1 — Celular: nada más ancho que la pantalla */
+.itin2, .itin-global, #contPestana { grid-template-columns: minmax(0, 1fr); min-width: 0; max-width: 100%; }
+.itin2 > *, .falta-armar, .falta-armar > *, .quiero2, .quiero2 > * { min-width: 0; max-width: 100%; }
+.falta-fila > span:nth-child(2) { min-width: 0; }
+.falta-fila b { flex: none; }
+.quiero2 .btn, .falta-armar .btn { white-space: normal; }
+.quiero2-texto > span:last-child { overflow-wrap: anywhere; }
+.quiero2-buscar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
+.quiero2-buscar > small { flex: 1 1 100%; color: var(--tinta-suave); }
+.quiero2-buscar-link { text-decoration: none; color: var(--tinta); }
+
+/* 31.1 — Lo que se despliega dice "Ver más" (así se nota que adentro hay más) */
+.plegable > summary::after, .tramo-pl > summary::after, .qhs-guia > summary::after, .no-usado > summary::after {
+  content: 'Ver más ▾'; flex: none; width: auto; height: auto; margin-left: auto; border: 1px solid var(--linea); transform: none;
+  padding: 4px 10px; border-radius: 999px; background: var(--arena-2); color: var(--tinta); font-size: .76rem; font-weight: 600; white-space: nowrap; transition: none;
+}
+.plegable[open] > summary::after, .tramo-pl[open] > summary::after, .qhs-guia[open] > summary::after, .no-usado[open] > summary::after { content: 'Ocultar ▴'; transform: none; background: transparent; }
+.plegable > summary { gap: 12px; }
+.plegable > summary > div { min-width: 0; }
+.tramo-pl > summary .tramo-pl-res { order: 2; }
+.no-usado > summary { list-style: none; }
+.no-usado > summary::-webkit-details-marker { display: none; }
+.no-usado > summary::after { align-self: flex-start; margin: 6px 0 0; }
+.qhs-guia > summary::after { font-size: .76rem; }
